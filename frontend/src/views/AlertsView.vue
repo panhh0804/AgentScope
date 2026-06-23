@@ -44,7 +44,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from '@lucide/vue'
 import { fetchHistoryAlerts } from '../api/dashboard'
 
 const date = ref('2026-06-23')
@@ -56,4 +56,3 @@ async function load() {
 
 onMounted(load)
 </script>
-

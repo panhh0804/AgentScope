@@ -30,7 +30,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { FilePlus2 } from 'lucide-vue-next'
+import { FilePlus2 } from '@lucide/vue'
 import { generateReport } from '../api/dashboard'
 
 const date = ref('2026-06-23')
@@ -44,4 +44,3 @@ async function createReport() {
   })
 }
 </script>
-

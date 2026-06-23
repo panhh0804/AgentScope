@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.schemas.common import ok
 from app.services.report_service import ReportService
@@ -14,6 +14,8 @@ service = ReportService()
 
 
 class GenerateReportRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     report_date: date
     report_type: str = "daily"
     model_name: Optional[str] = None
@@ -32,4 +34,3 @@ def list_reports():
 @router.get("/{report_id}")
 def report_detail(report_id: str):
     return ok(service.get_report(report_id))
-

@@ -31,7 +31,7 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Activity, AlertTriangle, BarChart3, Bot, FileText, GitBranch, LayoutDashboard, Server } from 'lucide-vue-next'
+import { Activity, AlertTriangle, BarChart3, Bot, FileText, GitBranch, LayoutDashboard, Server } from '@lucide/vue'
 
 const route = useRoute()
 const navItems = [
@@ -43,4 +43,3 @@ const navItems = [
   { path: '/reports', label: 'AI 报告', icon: FileText }
 ]
 </script>
-

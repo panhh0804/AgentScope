@@ -48,7 +48,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { AlertTriangle, BadgeDollarSign, Bot, Clock3, Coins, PlayCircle, RadioTower, Siren } from 'lucide-vue-next'
+import { AlertTriangle, BadgeDollarSign, Bot, Clock3, Coins, PlayCircle, RadioTower, Siren } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import MetricCard from '../components/MetricCard.vue'
 import { fetchOverview, fetchRealtimeAlerts, fetchTrend } from '../api/dashboard'
@@ -94,4 +94,3 @@ async function load() {
 
 onMounted(load)
 </script>
-

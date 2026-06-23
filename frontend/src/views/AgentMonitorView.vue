@@ -39,7 +39,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from '@lucide/vue'
 import { fetchAgents } from '../api/dashboard'
 
 const agents = ref([])
@@ -54,4 +54,3 @@ async function load() {
 
 onMounted(load)
 </script>
-

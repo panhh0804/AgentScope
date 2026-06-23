@@ -16,7 +16,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Network } from 'lucide-vue-next'
+import { Network } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchRelationGraph } from '../api/dashboard'
 import { graphOption } from '../charts/options'
@@ -31,4 +31,3 @@ async function load() {
 
 onMounted(load)
 </script>
-

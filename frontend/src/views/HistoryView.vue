@@ -28,7 +28,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Search } from 'lucide-vue-next'
+import { Search } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchAgentRankings, fetchDailyMetrics } from '../api/dashboard'
 import { barOption, lineOption } from '../charts/options'
@@ -70,4 +70,3 @@ async function load() {
 
 onMounted(load)
 </script>
-

@@ -1,0 +1,37 @@
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Java / Scala / Maven
+target/
+*.class
+
+# Node / Vue
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Local runtime output
+logs/
+tmp/
+data/
+reports/*.md
+
+# Secrets
+.env
+*.local
+deploy/environment
+

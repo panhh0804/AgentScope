@@ -1,0 +1,15 @@
+[Unit]
+Description=AgentScope FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data2/panhaohao/phh-codes/research/agentscope/backend
+EnvironmentFile=/data2/panhaohao/phh-codes/research/agentscope/deploy/environment
+ExecStart=/usr/bin/env uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

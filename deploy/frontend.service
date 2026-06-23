@@ -1,0 +1,15 @@
+[Unit]
+Description=AgentScope frontend static preview
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data2/panhaohao/phh-codes/research/agentscope/frontend
+EnvironmentFile=/data2/panhaohao/phh-codes/research/agentscope/deploy/environment
+ExecStart=/usr/bin/env npm run preview -- --host 0.0.0.0 --port 5173
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

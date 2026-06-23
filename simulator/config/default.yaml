@@ -1,0 +1,21 @@
+kafka:
+  bootstrap_servers: middleware:9092
+  topic: agent-events
+
+mysql:
+  host: middleware
+  port: 3306
+  user: agentscope
+  password: agentscope_pass
+  database: agentscope_source
+
+simulator:
+  default_rate: 10
+  normal_ratio: 0.70
+  failure_ratio: 0.10
+  tool_failure_ratio: 0.05
+  high_latency_ratio: 0.05
+  retry_ratio: 0.05
+  token_overuse_ratio: 0.03
+  loop_ratio: 0.02
+

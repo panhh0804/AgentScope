@@ -48,6 +48,7 @@ if [[ -z "${DEFAULT_FS}" ]]; then
 fi
 
 hdfs dfs -rm -r -f "${TARGET_DIR}" >/dev/null 2>&1 || true
+hdfs dfs -mkdir -p "${TARGET_DIR}"
 
 job_conf="$(mktemp)"
 trap 'rm -f "${job_conf}"' EXIT
@@ -118,7 +119,7 @@ cat >"${job_conf}" <<EOF
             "writeMode": "nonConflict",
             "fieldDelimiter": "\t",
             "encoding": "UTF-8",
-            "nullFormat": "\\N",
+            "nullFormat": "\\\\N",
             "column": [
               {"name": "id", "type": "string"},
               {"name": "event_id", "type": "string"},

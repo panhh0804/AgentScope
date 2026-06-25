@@ -11,6 +11,21 @@ Agent 模拟器 -> MySQL Source -> DataX -> HDFS Raw
 -> Spark Batch -> HDFS Clean/Metric + MySQL Analytics -> FastAPI -> Vue/ECharts
 ```
 
+## 当前状态
+
+离线链路已经完成闭环验证：
+
+- `MySQL Source -> DataX -> HDFS Raw`
+- `HDFS Raw -> Spark Clean -> HDFS Clean`
+- `HDFS Clean -> Spark Batch -> HDFS Metric + MySQL Analytics`
+- `FastAPI -> 读取 MySQL Analytics 并返回历史分析接口`
+
+已验证的结果包括：
+
+- `2026-06-24` 的 raw、clean、metric 产物已生成
+- `agentscope_analytics` 中的离线分析表已写入真实数据
+- 后端 `http://59.110.123.179:8000/health` 和历史指标接口可正常访问
+
 ## 目录结构
 
 ```text
@@ -97,8 +112,6 @@ python main.py --mode offline --count 100 --output ../tmp/agent_events.jsonl
 
 本仓库根据《AgentScope 多智能体运行监测与效能分析平台设计说明书》初始化，当前目标是提供清晰、可扩展、可答辩的工程起点。后续开发优先级：
 
-1. 打通 MySQL Source、DataX 和 HDFS Raw。
-2. 完成 Spark Clean 与历史指标写入。
-3. 接入 Kafka、Spark Streaming 和 Redis 实时指标。
-4. 完成 FastAPI 与前端页面联调。
-5. 补充 AI 报告、异常规则、部署测试文档。
+1. 实时链路联调：Kafka、Spark Streaming 和 Redis。
+2. 前端页面联调：实时总览、历史分析、告警中心和 AI 报告。
+3. 补充 AI 报告、异常规则和部署测试文档。

@@ -11,11 +11,35 @@ mysql:
 
 simulator:
   default_rate: 10
-  normal_ratio: 0.70
-  failure_ratio: 0.10
-  tool_failure_ratio: 0.05
-  high_latency_ratio: 0.05
-  retry_ratio: 0.05
-  token_overuse_ratio: 0.03
-  loop_ratio: 0.02
+  default_model: gpt-4.1-mini
 
+  scenario_weights:
+    success: 70
+    agent_failed: 10
+    tool_failed: 5
+    high_latency: 5
+    retry: 5
+    token_overuse: 3
+    loop: 2
+
+  latency_ms:
+    normal_min: 300
+    normal_max: 4500
+    high_min: 10000
+    high_max: 30000
+    tool_min: 100
+    tool_max: 2500
+
+  tokens:
+    prompt_min: 200
+    prompt_max: 2500
+    completion_min: 200
+    completion_max: 1800
+    overuse_prompt_min: 12000
+    overuse_prompt_max: 18000
+    overuse_completion_min: 8000
+    overuse_completion_max: 12000
+
+  timing:
+    gap_min_ms: 50
+    gap_max_ms: 500

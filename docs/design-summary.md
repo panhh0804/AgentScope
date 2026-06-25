@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-AgentScope 不是通用 Agent 开发框架，而是多智能体系统的运行观测与效能分析平台。项目重点展示完整的大数据处理链路：Kafka、Spark Streaming、Redis、MySQL、Sqoop、HDFS、Spark Batch、FastAPI、Vue/ECharts 和 AI 报告。
+AgentScope 不是通用 Agent 开发框架，而是多智能体系统的运行观测与效能分析平台。项目重点展示完整的大数据处理链路：Kafka、Spark Streaming、Redis、MySQL、DataX、HDFS、Spark Batch、FastAPI、Vue/ECharts 和 AI 报告。
 
 ## 典型业务场景
 
@@ -25,7 +25,7 @@ Agent 实时事件 -> Kafka -> Spark Streaming -> Redis -> FastAPI -> Vue/EChart
 ## 离线链路
 
 ```text
-Agent 历史数据 -> MySQL Source -> Sqoop -> HDFS Raw
+Agent 历史数据 -> MySQL Source -> DataX -> HDFS Raw
 -> Spark Batch 清洗与分析 -> HDFS Clean/Metric + MySQL Analytics
 -> FastAPI / AI 报告 -> 历史分析页面
 ```
@@ -36,7 +36,7 @@ Agent 历史数据 -> MySQL Source -> Sqoop -> HDFS Raw
 
 | 节点 | 组件 |
 |---|---|
-| master | NameNode、ResourceManager、Spark Master、Sqoop、任务提交客户端 |
+| master | NameNode、ResourceManager、Spark Master、DataX、任务提交客户端 |
 | worker1 | DataNode、NodeManager、Spark Worker |
 | worker2 | DataNode、NodeManager、Spark Worker |
 | middleware | ZooKeeper、Kafka、Redis、MySQL |
@@ -49,10 +49,9 @@ Agent 历史数据 -> MySQL Source -> Sqoop -> HDFS Raw
 - Kafka 持续接收事件；
 - Spark Streaming 计算实时指标并写 Redis；
 - MySQL Source 生成历史数据；
-- Sqoop 导入 HDFS Raw；
+- DataX 导入 HDFS Raw；
 - Spark Batch 生成 Clean 和历史指标；
 - MySQL Analytics 可查询历史结果；
 - 页面包含实时总览、历史分析、告警中心、AI 报告；
 - 至少识别 4 类异常；
 - 能生成 Markdown 格式 AI 分析报告。
-

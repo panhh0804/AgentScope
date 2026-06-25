@@ -15,9 +15,8 @@
 | 测试项 | 预期结果 | 实际结果 |
 |---|---|---|
 | 离线模拟器 | Source 表出现批量数据 | 待测试 |
-| Sqoop 导入 | HDFS Raw 出现文件 | 待测试 |
+| DataX 导入 | HDFS Raw 出现文件 | 待测试 |
 | Spark 清洗 | HDFS Clean 出现结果 | 待测试 |
 | Spark 分析 | Metric 和 Analytics 有结果 | 待测试 |
 | 历史 API | 返回趋势与排行 | 待测试 |
 | AI 报告 | 生成 Markdown 报告 | 待测试 |
-

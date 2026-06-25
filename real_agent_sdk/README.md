@@ -48,13 +48,15 @@ python real_agent_sdk/demo_agent_workflow.py \
   --task "分析大模型在教育行业的应用，并给出三条建议" \
   --sink jsonl \
   --output tmp/real_agent_events.jsonl \
-  --model nex-agi/Nex-N2-Pro
+  --model nex-agi/Nex-N2-Pro \
+  --timeout 180 \
+  --max-tokens 512
 ```
 
 PowerShell 可以写成一行：
 
 ```powershell
-python real_agent_sdk/demo_agent_workflow.py --task "分析大模型在教育行业的应用，并给出三条建议" --sink jsonl --output tmp/real_agent_events.jsonl --model nex-agi/Nex-N2-Pro
+python real_agent_sdk/demo_agent_workflow.py --task "分析大模型在教育行业的应用，并给出三条建议" --sink jsonl --output tmp/real_agent_events.jsonl --model nex-agi/Nex-N2-Pro --timeout 180 --max-tokens 512
 ```
 
 强制演示 retry：
@@ -65,6 +67,8 @@ python real_agent_sdk/demo_agent_workflow.py \
   --sink jsonl \
   --output tmp/real_agent_events.jsonl \
   --model nex-agi/Nex-N2-Pro \
+  --timeout 180 \
+  --max-tokens 512 \
   --force-retry
 ```
 
@@ -78,7 +82,9 @@ python real_agent_sdk/demo_agent_workflow.py \
   --sink kafka \
   --kafka-bootstrap middleware:9092 \
   --kafka-topic agent-events \
-  --model nex-agi/Nex-N2-Pro
+  --model nex-agi/Nex-N2-Pro \
+  --timeout 180 \
+  --max-tokens 512
 ```
 
 Kafka 消息规则：
@@ -99,7 +105,9 @@ python real_agent_sdk/demo_agent_workflow.py \
   --output tmp/real_agent_events.jsonl \
   --kafka-bootstrap middleware:9092 \
   --kafka-topic agent-events \
-  --model nex-agi/Nex-N2-Pro
+  --model nex-agi/Nex-N2-Pro \
+  --timeout 180 \
+  --max-tokens 512
 ```
 
 ## 自检

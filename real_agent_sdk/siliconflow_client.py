@@ -15,12 +15,20 @@ class SiliconFlowError(RuntimeError):
 
 
 class SiliconFlowClient:
-    def __init__(self, model: str = MODEL_NAME, api_key: Optional[str] = None, base_url: Optional[str] = None, timeout: int = 60) -> None:
+    def __init__(
+        self,
+        model: str = MODEL_NAME,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: int = 60,
+        max_tokens: int = 512,
+    ) -> None:
         load_local_env()
         self.model = model
         self.api_key = api_key or os.getenv("SILICONFLOW_API_KEY")
         self.base_url = (base_url or os.getenv("SILICONFLOW_BASE_URL") or "https://api.siliconflow.cn/v1").rstrip("/")
         self.timeout = timeout
+        self.max_tokens = max_tokens
 
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.3) -> Dict:
         if not self.api_key:
@@ -30,6 +38,7 @@ class SiliconFlowClient:
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
+            "max_tokens": self.max_tokens,
         }
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",

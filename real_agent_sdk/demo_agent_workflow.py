@@ -24,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--kafka-bootstrap", default="middleware:9092")
     parser.add_argument("--kafka-topic", default="agent-events")
     parser.add_argument("--model", default=MODEL_NAME)
+    parser.add_argument("--timeout", type=int, default=60, help="SiliconFlow request timeout in seconds")
+    parser.add_argument("--max-tokens", type=int, default=512, help="Maximum completion tokens per LLM call")
     parser.add_argument("--force-retry", action="store_true", help="Force reviewer to emit retry and rerun writer/reviewer once")
     return parser
 
@@ -31,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
 def run_workflow(args: argparse.Namespace) -> None:
     sink = build_sink(args.sink, args.output, args.kafka_bootstrap, args.kafka_topic)
     recorder = EventRecorder(sink, model_name=args.model)
-    client = SiliconFlowClient(model=args.model)
+    client = SiliconFlowClient(model=args.model, timeout=args.timeout, max_tokens=args.max_tokens)
     workflow = WorkflowContext()
     parent_run_id = None
     parent_agent_id = None
@@ -124,4 +126,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

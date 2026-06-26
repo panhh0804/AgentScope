@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import json
+import logging
+import os
 from datetime import date, datetime
+from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import uuid4
 
 from app.services.metric_service import MetricService
+
+logger = logging.getLogger(__name__)
 
 
 class ReportService:
     def __init__(self) -> None:
         self.metrics = MetricService()
         self._reports: Dict[str, Dict] = {}
+        self._prompt_path = Path(__file__).resolve().parents[1] / "report" / "prompt.md"
 
     def generate(self, report_date: date, report_type: str, model_name: Optional[str]) -> Dict:
         daily = self.metrics.daily_metrics(report_date, report_date)
@@ -18,8 +25,12 @@ class ReportService:
         alerts = self.metrics.history_alerts(report_date)
         relation = self.metrics.agent_relations(report_date)
         report_id = f"report_{uuid4().hex[:12]}"
-        model = model_name or "rule-template"
+        model = model_name or os.getenv("OPENAI_MODEL_NAME") or "rule-template"
         content = self._render_markdown(report_date, report_type, daily, rankings, alerts, relation)
+        try:
+            content = self._render_llm_markdown(report_date, report_type, model, daily, rankings, alerts, relation)
+        except Exception as exc:
+            logger.exception("LLM report generation failed, falling back to rule report: %s", exc)
         item = {
             "report_id": report_id,
             "report_type": report_type,
@@ -50,6 +61,65 @@ class ReportService:
                 "report_id": report_id,
                 "content": "报告不存在或服务重启后内存缓存已清空。",
             },
+        )
+
+    def _render_llm_markdown(
+        self,
+        report_date: date,
+        report_type: str,
+        model: str,
+        daily: List[Dict],
+        rankings: List[Dict],
+        alerts: List[Dict],
+        relation: Dict,
+    ) -> str:
+        if model == "rule-template":
+            raise ValueError("OPENAI_MODEL_NAME is not configured")
+
+        from openai import OpenAI
+
+        prompt = self._build_prompt(report_date, report_type, daily, rankings, alerts, relation)
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL")
+        timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "300"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))
+        client_kwargs = {"api_key": api_key, "timeout": timeout, "max_retries": max_retries}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        client = OpenAI(**client_kwargs)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "你是一名多智能体系统运维分析师，只输出 Markdown 格式的系统运行分析报告。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content
+        if not content or not content.strip():
+            raise ValueError("LLM returned empty report content")
+        return content.strip()
+
+    def _build_prompt(
+        self,
+        report_date: date,
+        report_type: str,
+        daily: List[Dict],
+        rankings: List[Dict],
+        alerts: List[Dict],
+        relation: Dict,
+    ) -> str:
+        template = self._prompt_path.read_text(encoding="utf-8")
+        metrics = {
+            "report_date": report_date.isoformat(),
+            "report_type": report_type,
+            "daily": daily,
+            "rankings": rankings,
+        }
+        return (
+            template.replace("{{metrics_json}}", json.dumps(metrics, ensure_ascii=False, indent=2, default=str))
+            .replace("{{alerts_json}}", json.dumps(alerts, ensure_ascii=False, indent=2, default=str))
+            .replace("{{relation_json}}", json.dumps(relation, ensure_ascii=False, indent=2, default=str))
         )
 
     def _render_markdown(self, report_date: date, report_type: str, daily: List[Dict], rankings: List[Dict], alerts: List[Dict], relation: Dict) -> str:

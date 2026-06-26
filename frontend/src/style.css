@@ -958,6 +958,24 @@ h2 {
   line-height: 1.8;
 }
 
+.report-message {
+  padding: 14px 16px;
+}
+
+.report-message p {
+  margin: 0;
+  color: #c6d6e6;
+}
+
+.report-message--error {
+  border-color: rgba(248, 113, 113, 0.38);
+  background: rgba(127, 29, 29, 0.24);
+}
+
+.report-message--error p {
+  color: #fecaca;
+}
+
 .history-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1071,10 +1089,22 @@ h2 {
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+  filter: none;
+}
+
 .primary-button:hover,
 .icon-button:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
+}
+
+.primary-button:disabled:hover {
+  transform: none;
+  filter: none;
 }
 
 .icon-button {

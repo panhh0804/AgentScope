@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
-  timeout: 5000
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT || 60000)
 })
 
 export async function getData(path, params = {}) {

@@ -12,10 +12,18 @@
           <option value="weekly">weekly</option>
         </select>
       </label>
-      <button class="primary-button" @click="createReport">
+      <button class="primary-button" :disabled="isGenerating" @click="createReport">
         <FilePlus2 :size="16" />
-        <span>生成报告</span>
+        <span>{{ isGenerating ? '生成中...' : '生成报告' }}</span>
       </button>
+    </section>
+
+    <section v-if="reportError" class="panel report-message report-message--error">
+      <p>{{ reportError }}</p>
+    </section>
+
+    <section v-if="isGenerating" class="panel report-message">
+      <p>正在生成报告，请稍候。</p>
     </section>
 
     <section class="report-hero panel">
@@ -85,6 +93,8 @@ import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 const date = ref('2026-06-23')
 const reportType = ref('daily')
 const report = ref({})
+const isGenerating = ref(false)
+const reportError = ref('')
 
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))
 const reportTitle = computed(() => sections.value[0]?.title || 'AI 报告')
@@ -94,9 +104,20 @@ const reportIntro = computed(() => {
 })
 
 async function createReport() {
-  report.value = await generateReport({
-    report_date: date.value,
-    report_type: reportType.value
-  })
+  if (isGenerating.value) return
+
+  isGenerating.value = true
+  reportError.value = ''
+
+  try {
+    report.value = await generateReport({
+      report_date: date.value,
+      report_type: reportType.value
+    })
+  } catch (error) {
+    reportError.value = error?.response?.data?.detail || error?.message || '报告生成失败，请稍后重试。'
+  } finally {
+    isGenerating.value = false
+  }
 }
 </script>

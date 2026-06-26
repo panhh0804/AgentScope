@@ -184,14 +184,114 @@ curl http://59.110.123.179:8000/api/v1/realtime/alerts
 FastAPI 返回 Redis 中的真实实时指标、Agent 状态和 streaming 告警。
 ```
 
-### visualization
+## 前后端联调启动流程
+
+本项目后端 API 前缀为 `/api/v1`，正式部署时由 Nginx 统一暴露前端静态页面，并把 `/api/` 转发到本机 FastAPI 后端。
+
+### 1. 启动后端
 
 ```bash
-cd /data2/panhaohao/phh-codes/research/agentscope/backend
+cd /root/projects/agentscope/backend
 uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
-cd /data2/panhaohao/phh-codes/research/agentscope/frontend
+验证后端健康检查：
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+预期返回：
+
+```json
+{"status":"ok"}
+```
+
+### 2. 构建前端
+
+前端默认通过相对路径访问后端：
+
+```env
+VITE_API_BASE_URL=/api/v1
+VITE_API_TIMEOUT=60000
+```
+
+构建命令：
+
+```bash
+cd /root/projects/agentscope/frontend
+npm install
 npm run build
+```
+
+构建产物目录：
+
+```text
+/root/projects/agentscope/frontend/dist
+```
+
+### 3. 配置 Nginx
+
+使用 `deploy/nginx.conf`，关键配置如下：
+
+```nginx
+root /root/projects/agentscope/frontend/dist;
+
+location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+}
+
+location /health {
+    proxy_pass http://127.0.0.1:8000/health;
+}
+```
+
+加载配置后重启或 reload Nginx：
+
+```bash
+nginx -t
+nginx -s reload
+```
+
+### 4. 访问页面
+
+浏览器访问：
+
+```text
+http://59.110.123.179/
+```
+
+前端请求会通过 Nginx 转发到后端，例如：
+
+```text
+/api/v1/realtime/overview
+/api/v1/realtime/agents
+/api/v1/realtime/alerts
+/api/v1/reports/generate
+```
+
+### 5. curl 验证接口
+
+通过 Nginx 验证健康检查：
+
+```bash
+curl http://59.110.123.179/health
+```
+
+通过 Nginx 验证实时接口：
+
+```bash
+curl http://59.110.123.179/api/v1/realtime/overview
+curl http://59.110.123.179/api/v1/realtime/agents
+curl http://59.110.123.179/api/v1/realtime/alerts
+```
+
+通过 Nginx 验证报告接口：
+
+```bash
+curl -X POST http://59.110.123.179/api/v1/reports/generate \
+  -H "Content-Type: application/json" \
+  -d '{"report_date":"2026-06-23","report_type":"daily"}'
 ```
 
 ## 离线任务顺序

@@ -23,7 +23,7 @@ if ! command -v hdfs >/dev/null 2>&1; then
 fi
 
 if [[ -z "${DATAX_PY}" ]]; then
-  if [[ -x "${DATAX_HOME}/bin/datax.py" ]]; then
+  if [[ -f "${DATAX_HOME}/bin/datax.py" ]]; then
     DATAX_PY="${DATAX_HOME}/bin/datax.py"
   elif command -v datax.py >/dev/null 2>&1; then
     DATAX_PY="$(command -v datax.py)"
@@ -152,6 +152,6 @@ cat >"${job_conf}" <<EOF
 }
 EOF
 
-"${DATAX_PY}" "${job_conf}"
+python3 "${DATAX_PY}" "${job_conf}"
 
 hdfs dfs -touchz "${TARGET_DIR}/_SUCCESS"

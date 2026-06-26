@@ -18,6 +18,14 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────
+# 加载环境变量（crontab / 非交互式 SSH 不会自动加载）
+# ─────────────────────────────────────────────
+set +u
+[[ -f /etc/profile ]] && source /etc/profile 2>/dev/null || true
+[[ -f ~/.bashrc ]]    && source ~/.bashrc 2>/dev/null || true
+set -u
+
+# ─────────────────────────────────────────────
 # 1. 基础变量
 # ─────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

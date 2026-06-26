@@ -19,6 +19,14 @@
 set -uo pipefail
 
 # ─────────────────────────────────────────────
+# 加载环境变量（crontab / 非交互式 SSH 不会自动加载）
+# ─────────────────────────────────────────────
+set +u
+[[ -f /etc/profile ]] && source /etc/profile 2>/dev/null || true
+[[ -f ~/.bashrc ]]    && source ~/.bashrc 2>/dev/null || true
+set -u
+
+# ─────────────────────────────────────────────
 # 环境变量默认值
 # ─────────────────────────────────────────────
 KAFKA_BIN="${KAFKA_BIN:-/usr/local/kafka_2.11-2.1.0/bin}"

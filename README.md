@@ -1,179 +1,144 @@
 # AgentScope 多智能体运行监测与效能分析平台
 
-AgentScope 是一个面向大数据课程综合实践的多 Agent 运行观测与效能分析项目。仓库按设计说明书初始化为“实时 + 离线”双链路：
+AgentScope 是一个针对多智能体（Multi-Agent）系统设计的大数据观测与效能分析平台。本项目提供了一个完整的“实时 + 离线”双链路大数据处理架构，旨在解决多 Agent 系统在运行过程中面临的不可见、难追踪、难评估等问题。
 
-```text
-实时链路：
-Agent 模拟器 -> Kafka -> Spark Streaming -> Redis -> FastAPI -> Vue/ECharts
+通过 AgentScope，您可以对 Agent 的运行数据进行实时采集、流式计算、离线导入、数据清洗、历史分析、异常检测和可视化展示，并利用大语言模型（LLM）自动生成系统运行分析报告。
 
-离线链路：
-Agent 模拟器 -> MySQL Source -> DataX -> HDFS Raw
--> Spark Batch -> HDFS Clean/Metric + MySQL Analytics -> FastAPI -> Vue/ECharts
+## 🎯 核心特性
+
+*   **双链路数据流处理**:
+    *   **实时链路**: 基于 `Kafka + Spark Streaming + Redis`，实现毫秒级的实时监控和告警。
+    *   **离线链路**: 基于 `DataX + HDFS + Spark Batch + MySQL`，实现海量历史数据的深度清洗与T+1复杂指标分析。
+*   **多维效能指标分析**: 提供耗时分析、Token 消耗统计、错误率计算等关键效能指标。
+*   **Agent 关系图谱**: 通过分析调用链路，还原 Agent 之间的协作关系与调用拓扑。
+*   **实时异常与容错**: 具备强大的流式处理容错能力（能优雅跳过各种畸形数据），并支持实时规则告警（如 Token 超限、高延迟等）。
+*   **AI 智能体报告**: 接入大语言模型（LLM），基于离线分析结果自动生成自然语言的系统效能分析报告。
+*   **一键式自动化调度**: 离线链路提供一键总控脚本并支持 Crontab 定时调度，实现全自动数据流转。
+
+## 🏗️ 系统架构
+
+本项目采用经典的 Lambda 大数据架构：
+
+```mermaid
+graph LR
+    subgraph 数据源
+        Sim[Agent 模拟器]
+    end
+    
+    subgraph 实时链路
+        Sim -->|JSON| Kafka[Kafka (agent-events)]
+        Kafka --> SS[Spark Streaming]
+        SS -->|实时指标/告警| Redis[(Redis)]
+    end
+    
+    subgraph 离线链路
+        Sim -->|JDBC| MySQL_Src[(MySQL Source)]
+        MySQL_Src -->|DataX| HDFS_Raw[HDFS Raw]
+        HDFS_Raw -->|Spark| HDFS_Clean[HDFS Clean]
+        HDFS_Clean -->|Spark Batch| HDFS_Metric[HDFS Metric]
+        HDFS_Clean -->|Spark Batch| MySQL_Ana[(MySQL Analytics)]
+    end
+    
+    subgraph 服务与展示
+        Redis --> FastAPI[FastAPI]
+        MySQL_Ana --> FastAPI
+        FastAPI -->|REST API| Vue[Vue 3 + ECharts 大屏]
+        FastAPI -->|生成报告| LLM[LLM 接口]
+    end
 ```
 
-## 当前状态
-
-离线链路已经完成闭环验证：
-
-- `MySQL Source -> DataX -> HDFS Raw`
-- `HDFS Raw -> Spark Clean -> HDFS Clean`
-- `HDFS Clean -> Spark Batch -> HDFS Metric + MySQL Analytics`
-- `FastAPI -> 读取 MySQL Analytics 并返回历史分析接口`
-
-已验证的结果包括：
-
-- `2026-06-24` 的 raw、clean、metric 产物已生成
-- `agentscope_analytics` 中的离线分析表已写入真实数据
-- 后端 `http://59.110.123.179:8000/health` 和历史指标接口可正常访问
-
-### 实时链路后端闭环状态
-
-实时链路后端闭环已经在真实集群完成验证：
-
-```text
-Agent 模拟器 -> Kafka -> Spark Streaming -> Redis -> FastAPI realtime API
-```
-
-本轮验证范围到 FastAPI realtime API 为止，不包含 Vue/ECharts 前端联调，不表示前端实时页面已经完成。
-
-已验证的基础服务：
-
-- ZooKeeper：`middleware:2181`
-- Kafka：`middleware:9092`
-- Redis：`middleware:6379`
-
-Kafka topic：
-
-```text
-agent-events
-```
-
-当前 Kafka 版本为 `kafka_2.11-2.1.0`。该版本的 `kafka-topics.sh` 创建和查看 topic 时使用 ZooKeeper 参数：
-
-```bash
-/usr/local/kafka_2.11-2.1.0/bin/kafka-topics.sh --zookeeper middleware:2181 --list
-/usr/local/kafka_2.11-2.1.0/bin/kafka-topics.sh --create --zookeeper middleware:2181 --replication-factor 1 --partitions 1 --topic agent-events
-```
-
-Redis 实时 key：
-
-```text
-agentscope:realtime:overview
-agentscope:realtime:agents
-agentscope:realtime:alerts
-```
-
-FastAPI realtime API：
-
-```text
-GET /health
-GET /api/v1/realtime/overview
-GET /api/v1/realtime/agents
-GET /api/v1/realtime/alerts
-```
-
-其中 `/api/v1/realtime/overview` 已验证返回 Redis 中的真实实时指标，包括：
-
-```text
-success_count
-token_total_5m
-error_rate
-avg_latency_ms
-events_per_minute
-estimated_cost_5m
-running_tasks
-open_alerts
-active_agents
-retry_tasks
-failed_count
-```
-
-## 目录结构
+## 📁 目录结构
 
 ```text
 agentscope/
-├── docs/                 # 设计摘要、部署、API、数据字典、测试记录
-├── simulator/            # Python Agent 事件模拟器，支持 realtime/offline
-├── spark-streaming/      # Spark 2.4 + Scala 2.11 实时作业
-├── spark-batch/          # Spark 2.4 + Scala 2.11 离线清洗与分析作业
-├── backend/              # FastAPI 后端与 AI 报告服务
-├── frontend/             # Vue 3 + ECharts 可视化前端
-├── sql/                  # MySQL Source / Analytics 建表脚本
-├── scripts/              # Kafka、DataX、Spark 作业脚本
-└── deploy/               # Nginx、systemd、环境模板
+├── backend/              # FastAPI 后端服务 (提供 API 接口与 AI 报告服务)
+├── frontend/             # Vue 3 + ECharts 大屏可视化前端
+├── simulator/            # Agent 事件模拟器 (支持实时 Kafka 发送和离线 MySQL 写入)
+├── spark-streaming/      # Spark Streaming 实时计算作业 (Scala 2.11 + Spark 2.4)
+├── spark-batch/          # Spark Batch 离线清洗与分析作业 (Scala 2.11 + Spark 2.4)
+├── sql/                  # MySQL Source / Analytics 库表初始化脚本
+├── scripts/              # 自动化运维脚本 (DataX导入, Spark提交, 健康检查, 压测等)
+└── docs/                 # 项目设计文档、测试报告与部署说明
 ```
 
-## 本地快速预览
+## 🚀 快速开始
 
-本地机器通常没有 Hadoop/Kafka/Spark 集群，因此默认代码提供 mock 降级数据，便于先开发后端和前端。
+本项目依赖真实的 Hadoop/Spark 集群环境运行。建议的部署拓扑为 `master` (Hadoop/Spark), `worker1/2`, `middleware` (MySQL, Redis, Kafka, ZK), `visualization` (Backend, Frontend)。
 
-### 后端
+### 1. 环境准备与初始化
 
+1. 确保集群各组件正常运行 (HDFS, YARN, Spark Standalone, Kafka, ZooKeeper, Redis, MySQL)。
+2. 在 `middleware` 节点初始化数据库表：
+   ```bash
+   mysql -u root -p < sql/source_schema.sql
+   mysql -u root -p < sql/analytics_schema.sql
+   ```
+3. 创建 Kafka Topic：
+   ```bash
+   bash scripts/create_kafka_topics.sh
+   ```
+
+### 2. 启动服务
+
+**启动后端服务 (FastAPI):**
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 ```
 
-打开：
-
-```text
-http://localhost:8000/docs
+**启动实时链路 (Spark Streaming):**
+```bash
+bash scripts/start_streaming_job.sh
 ```
 
-### 前端
-
+**启动前端开发服务器:**
 ```bash
 cd frontend
 npm install
 npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-打开：
+### 3. 运行数据模拟器
 
-```text
-http://localhost:5173
-```
-
-## 模拟器
-
-实时模式发送 Kafka 事件：
-
+**实时模式 (向 Kafka 持续发送数据):**
 ```bash
 cd simulator
 python main.py --mode realtime --kafka-bootstrap middleware:9092 --rate 10
 ```
+*此时可访问前端大屏 (默认 http://localhost:5173) 查看实时变动的数据。*
 
-离线模式生成历史事件并写入 MySQL Source：
-
+**离线模式 (向 MySQL Source 写入历史数据):**
 ```bash
 cd simulator
-python main.py --mode offline --count 10000 --start-date 2026-06-01 --end-date 2026-06-23
+python main.py --mode offline --count 10000 --start-date 2026-06-01 --end-date 2026-06-25
 ```
 
-没有安装 Kafka/MySQL 依赖时，可先输出 JSONL 样例：
+### 4. 运行离线数据 Pipeline
+
+为处理刚才模拟的离线数据，运行离线总控脚本。该脚本会自动串联 DataX 数据导入、Spark 数据清洗和 5 个 Spark 分析作业：
 
 ```bash
-cd simulator
-python main.py --mode offline --count 100 --output ../tmp/agent_events.jsonl
+bash scripts/run_daily_offline_pipeline.sh 2026-06-25
 ```
+*此脚本已在 master 节点配置为 crontab 每日凌晨 2:00 自动执行。*
 
-## 集群运行顺序
+## 🛠️ 运维与测试工具
 
-1. 在 `middleware` 启动 MySQL、Redis、ZooKeeper、Kafka。
-2. 在 `master` 启动 HDFS、YARN、Spark。
-3. 执行 `sql/source_schema.sql` 和 `sql/analytics_schema.sql`。
-4. 执行 `scripts/create_kafka_topics.sh`。
-5. 启动 Spark Streaming：`scripts/start_streaming_job.sh`。
-6. 启动实时模拟器。
-7. 离线链路按顺序运行：离线模拟器、DataX、Clean Job、Batch Jobs、报告生成。
+项目提供了一系列脚本用于日常诊断和测试，位于 `scripts/` 目录下：
 
-## 设计来源
+- `health_check.sh`: **集群健康一键体检**。检查 HDFS, YARN, Spark, Kafka, ZK, Redis, MySQL 的存活状态。
+- `test_fault_tolerance.sh`: **异常容错演练**。向 Kafka 注入畸形、缺失字段、非法格式的脏数据以及 Token 超限数据，验证 Spark Streaming 的鲁棒性和告警机制。
+- `benchmark.sh`: **自动化压测**。以不同速率向集群打入数据，评估系统吞吐与延迟。
 
-本仓库根据《AgentScope 多智能体运行监测与效能分析平台设计说明书》初始化，当前目标是提供清晰、可扩展、可答辩的工程起点。后续开发优先级：
+## 📄 文档与报告
 
-1. 实时链路联调：Kafka、Spark Streaming 和 Redis。
-2. 前端页面联调：实时总览、历史分析、告警中心和 AI 报告。
-3. 补充 AI 报告、异常规则和部署测试文档。
+更多详细设计和说明，请参阅：
+
+- [AgentScope 多智能体运行监测与效能分析平台设计说明书](docs/) (根目录外/桌面)
+- [性能测试报告模板](docs/performance_test_report.md)
+
+---
+*构建由: Hadoop生态, Spark, Kafka, FastAPI, Vue3, ECharts.*

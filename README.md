@@ -26,7 +26,7 @@ graph LR
     end
     
     subgraph 实时链路
-        Sim -->|JSON| Kafka[Kafka (agent-events)]
+        Sim -->|JSON| Kafka["Kafka (agent-events)"]
         Kafka --> SS[Spark Streaming]
         SS -->|实时指标/告警| Redis[(Redis)]
     end
@@ -42,7 +42,7 @@ graph LR
     subgraph 服务与展示
         Redis --> FastAPI[FastAPI]
         MySQL_Ana --> FastAPI
-        FastAPI -->|REST API| Vue[Vue 3 + ECharts 大屏]
+        FastAPI -->|REST API| Vue["Vue 3 + ECharts 大屏"]
         FastAPI -->|生成报告| LLM[LLM 接口]
     end
 ```

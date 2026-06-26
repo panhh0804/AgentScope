@@ -57,7 +57,7 @@ make_normal_event() {
   local trace_id="$1"
   local agent_id="$2"
   cat <<EOF
-{"event_id":"evt_fault_test_${RANDOM}","trace_id":"${trace_id}","run_id":"run_fault_test_${RANDOM}","parent_run_id":"","agent_id":"${agent_id}","parent_agent_id":"","agent_role":"worker","event_type":"llm_call","status":"completed","event_time":"${TS}","latency_ms":150,"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"cost_usd":0.003,"model_name":"gpt-4","tool_name":"","error_type":"","retry_count":0,"metadata_json":"{}"}
+{"event_id":"evt_fault_test_${RANDOM}","trace_id":"${trace_id}","run_id":"run_fault_test_${RANDOM}","parent_run_id":"","agent_id":"${agent_id}","parent_agent_id":"","agent_role":"worker","event_type":"llm_request","status":"completed","event_time":"${TS}","latency_ms":150,"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"cost_usd":0.003,"model_name":"gpt-4","tool_name":"","error_type":"","retry_count":0,"metadata_json":"{}"}
 EOF
 }
 
@@ -78,12 +78,12 @@ send_event \
 # ───── 测试 1：完全缺失 agent_id 字段 ─────
 send_event \
   "测试 1/7：❌ 缺失 agent_id 字段（应被安全跳过）" \
-  '{"event_id":"evt_bad_1","trace_id":"trace_bad_1","run_id":"run_bad_1","event_type":"llm_call","status":"completed","event_time":"'"${TS}"'","latency_ms":100,"total_tokens":50}'
+  '{"event_id":"evt_bad_1","trace_id":"trace_bad_1","run_id":"run_bad_1","event_type":"llm_request","status":"completed","event_time":"'"${TS}"'","latency_ms":100,"total_tokens":50}'
 
 # ───── 测试 2：latency_ms 为字符串而非数字 ─────
 send_event \
   "测试 2/7：❌ latency_ms 类型错误（字符串 'abc'，应被安全跳过）" \
-  '{"event_id":"evt_bad_2","trace_id":"trace_bad_2","run_id":"run_bad_2","agent_id":"agent_bad_type","agent_role":"worker","event_type":"llm_call","status":"completed","event_time":"'"${TS}"'","latency_ms":"abc","total_tokens":50}'
+  '{"event_id":"evt_bad_2","trace_id":"trace_bad_2","run_id":"run_bad_2","agent_id":"agent_bad_type","agent_role":"worker","event_type":"llm_request","status":"completed","event_time":"'"${TS}"'","latency_ms":"abc","total_tokens":50}'
 
 # ───── 测试 3：空 JSON ─────
 send_event \
@@ -98,12 +98,12 @@ send_event \
 # ───── 测试 5：event_time 为非法日期格式 ─────
 send_event \
   "测试 5/7：❌ event_time 格式非法（应被安全跳过）" \
-  '{"event_id":"evt_bad_5","trace_id":"trace_bad_5","run_id":"run_bad_5","agent_id":"agent_bad_time","agent_role":"worker","event_type":"llm_call","status":"completed","event_time":"not-a-date","latency_ms":100,"total_tokens":50}'
+  '{"event_id":"evt_bad_5","trace_id":"trace_bad_5","run_id":"run_bad_5","agent_id":"agent_bad_time","agent_role":"worker","event_type":"llm_request","status":"completed","event_time":"not-a-date","latency_ms":100,"total_tokens":50}'
 
 # ───── 测试 6：超大 total_tokens 触发告警 ─────
 send_event \
   "测试 6/7：⚠️  超大 total_tokens=999999（应触发 token_overuse 告警但不崩溃）" \
-  '{"event_id":"evt_bad_6","trace_id":"trace_bad_6","run_id":"run_bad_6","agent_id":"agent_token_bomb","agent_role":"worker","event_type":"llm_call","status":"completed","event_time":"'"${TS}"'","latency_ms":100,"prompt_tokens":500000,"completion_tokens":499999,"total_tokens":999999,"cost_usd":99.99,"model_name":"gpt-4","tool_name":"","error_type":"","retry_count":0,"metadata_json":"{}"}'
+  '{"event_id":"evt_bad_6","trace_id":"trace_bad_6","run_id":"run_bad_6","agent_id":"agent_token_bomb","agent_role":"worker","event_type":"llm_request","status":"completed","event_time":"'"${TS}"'","latency_ms":100,"prompt_tokens":500000,"completion_tokens":499999,"total_tokens":999999,"cost_usd":99.99,"model_name":"gpt-4","tool_name":"","error_type":"","retry_count":0,"metadata_json":"{}"}'
 
 # ───── 测试 7：再发一条正常事件，证明 Streaming 仍然存活 ─────
 send_event \
@@ -129,7 +129,7 @@ redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" KEYS "agentscope:*" 2>/dev/null 
 
 echo ""
 echo "📊  Redis 中的最近告警（应包含 token_overuse）："
-redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" LRANGE "agentscope:alerts:recent" 0 5 2>/dev/null || echo "  （无法读取告警列表）"
+redis-cli -h "${REDIS_HOST}" -p "${REDIS_PORT}" GET "agentscope:realtime:alerts" 2>/dev/null || echo "  （无法读取告警数据）"
 
 # ─────────────────────────────────────────────
 # 结论

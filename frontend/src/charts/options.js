@@ -1,22 +1,47 @@
 export function lineOption(title, xData, series) {
   return {
-    title: { text: title, textStyle: { fontSize: 14, fontWeight: 600 } },
     tooltip: { trigger: 'axis' },
-    grid: { top: 46, right: 18, bottom: 32, left: 44 },
-    xAxis: { type: 'category', data: xData, boundaryGap: false },
-    yAxis: { type: 'value' },
-    series
+    grid: { top: 18, right: 18, bottom: 28, left: 44 },
+    xAxis: {
+      type: 'category',
+      data: xData,
+      boundaryGap: false,
+      axisLabel: { color: '#9bc0d9' },
+      axisLine: { lineStyle: { color: '#3f5a70' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9bc0d9' },
+      axisLine: { lineStyle: { color: '#3f5a70' } },
+      splitLine: { lineStyle: { color: 'rgba(139, 192, 217, 0.12)' } }
+    },
+    series: series.map((item) => ({
+      symbol: 'none',
+      showSymbol: false,
+      hoverAnimation: false,
+      ...item
+    }))
   }
 }
 
 export function barOption(title, xData, data, name) {
   return {
-    title: { text: title, textStyle: { fontSize: 14, fontWeight: 600 } },
+    title: { text: title, textStyle: { fontSize: 14, fontWeight: 600, color: '#dbe7f3' } },
     tooltip: { trigger: 'axis' },
     grid: { top: 46, right: 18, bottom: 42, left: 52 },
-    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 20 } },
-    yAxis: { type: 'value' },
-    series: [{ name, type: 'bar', data, itemStyle: { color: '#2563eb' } }]
+    xAxis: {
+      type: 'category',
+      data: xData,
+      axisLabel: { rotate: 20, color: '#9bc0d9' },
+      axisLine: { lineStyle: { color: '#3f5a70' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9bc0d9' },
+      axisLine: { lineStyle: { color: '#3f5a70' } },
+      splitLine: { lineStyle: { color: 'rgba(139, 192, 217, 0.12)' } }
+    },
+    series: [{ name, type: 'bar', data, itemStyle: { color: '#3f5f82' } }]
   }
 }
 
@@ -43,4 +68,3 @@ export function graphOption(graph) {
     ]
   }
 }
-

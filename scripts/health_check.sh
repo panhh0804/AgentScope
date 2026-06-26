@@ -14,8 +14,10 @@ echo "== Spark =="
 jps -l | grep -E "Master|Worker|CoarseGrainedExecutorBackend" || true
 
 echo "== Kafka topic =="
-KAFKA_BIN="${KAFKA_BIN:-/usr/local/kafka/bin}"
-"${KAFKA_BIN}/kafka-topics.sh" --bootstrap-server "${KAFKA_BOOTSTRAP_SERVERS:-middleware:9092}" --list 2>/dev/null | grep agent-events || true
+KAFKA_BIN="${KAFKA_BIN:-/usr/local/kafka_2.11-2.1.0/bin}"
+KAFKA_ZOOKEEPER="${KAFKA_ZOOKEEPER:-middleware:2181}"
+KAFKA_TOPIC="${KAFKA_TOPIC:-agent-events}"
+"${KAFKA_BIN}/kafka-topics.sh" --zookeeper "${KAFKA_ZOOKEEPER}" --list 2>/dev/null | grep "${KAFKA_TOPIC}" || true
 
 echo "== Redis =="
 redis-cli -h "${REDIS_HOST:-middleware}" -p "${REDIS_PORT:-6379}" ping 2>/dev/null || true

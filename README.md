@@ -26,6 +26,68 @@ Agent 模拟器 -> MySQL Source -> DataX -> HDFS Raw
 - `agentscope_analytics` 中的离线分析表已写入真实数据
 - 后端 `http://59.110.123.179:8000/health` 和历史指标接口可正常访问
 
+### 实时链路后端闭环状态
+
+实时链路后端闭环已经在真实集群完成验证：
+
+```text
+Agent 模拟器 -> Kafka -> Spark Streaming -> Redis -> FastAPI realtime API
+```
+
+本轮验证范围到 FastAPI realtime API 为止，不包含 Vue/ECharts 前端联调，不表示前端实时页面已经完成。
+
+已验证的基础服务：
+
+- ZooKeeper：`middleware:2181`
+- Kafka：`middleware:9092`
+- Redis：`middleware:6379`
+
+Kafka topic：
+
+```text
+agent-events
+```
+
+当前 Kafka 版本为 `kafka_2.11-2.1.0`。该版本的 `kafka-topics.sh` 创建和查看 topic 时使用 ZooKeeper 参数：
+
+```bash
+/usr/local/kafka_2.11-2.1.0/bin/kafka-topics.sh --zookeeper middleware:2181 --list
+/usr/local/kafka_2.11-2.1.0/bin/kafka-topics.sh --create --zookeeper middleware:2181 --replication-factor 1 --partitions 1 --topic agent-events
+```
+
+Redis 实时 key：
+
+```text
+agentscope:realtime:overview
+agentscope:realtime:agents
+agentscope:realtime:alerts
+```
+
+FastAPI realtime API：
+
+```text
+GET /health
+GET /api/v1/realtime/overview
+GET /api/v1/realtime/agents
+GET /api/v1/realtime/alerts
+```
+
+其中 `/api/v1/realtime/overview` 已验证返回 Redis 中的真实实时指标，包括：
+
+```text
+success_count
+token_total_5m
+error_rate
+avg_latency_ms
+events_per_minute
+estimated_cost_5m
+running_tasks
+open_alerts
+active_agents
+retry_tasks
+failed_count
+```
+
 ## 目录结构
 
 ```text

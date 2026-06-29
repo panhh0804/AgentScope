@@ -242,6 +242,20 @@
                     <span v-if="block.language" class="code-lang">{{ block.language }}</span>
                     <pre v-text="block.text"></pre>
                   </div>
+                  <div v-else-if="block.type === 'table'" class="report-block report-block--table table-responsive">
+                    <table class="data-table screen-native-table markdown-table">
+                      <thead>
+                        <tr>
+                          <th v-for="(h, hIdx) in block.headers" :key="hIdx" v-html="h"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, rIdx) in block.rows" :key="rIdx">
+                          <td v-for="(cell, cIdx) in row" :key="cIdx" v-html="cell"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </template>
               </div>
             </article>
@@ -286,7 +300,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
-import { Cpu, Search, Brain, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
+import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend } from '../api/dashboard'
 import { barOption, graphOption, lineOption } from '../charts/options'
@@ -347,7 +361,7 @@ const getEventIcon = (agent, level) => {
   if (level === 'warn') return AlertTriangle
   
   switch (agent) {
-    case 'planner_agent': return Brain
+    case 'planner_agent': return Compass
     case 'search_agent': return Search
     case 'analysis_agent': return Cpu
     case 'writer_agent': return FileText

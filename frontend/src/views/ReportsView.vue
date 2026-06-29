@@ -70,6 +70,20 @@
               <span v-if="block.language" class="code-lang">{{ block.language }}</span>
               <pre v-text="block.text"></pre>
             </div>
+            <div v-else-if="block.type === 'table'" class="report-block report-block--table table-responsive">
+              <table class="data-table screen-native-table markdown-table">
+                <thead>
+                  <tr>
+                    <th v-for="(h, hIdx) in block.headers" :key="hIdx" v-html="h"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, rIdx) in block.rows" :key="rIdx">
+                    <td v-for="(cell, cIdx) in row" :key="cIdx" v-html="cell"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </template>
         </div>
       </article>

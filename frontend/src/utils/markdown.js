@@ -43,6 +43,23 @@ function flushCode(blocks, codeLines, language) {
   codeLines.length = 0
 }
 
+function flushTable(blocks, tableRows) {
+  if (!tableRows.length) return
+  const cleanRows = tableRows.filter(row => !row.every(cell => /^[:\s-]*$/.test(cell)))
+  if (cleanRows.length === 0) {
+    tableRows.length = 0
+    return
+  }
+  const headers = cleanRows[0]
+  const rows = cleanRows.slice(1)
+  blocks.push({
+    type: 'table',
+    headers: headers.map(cell => renderInline(cell)),
+    rows: rows.map(row => row.map(cell => renderInline(cell)))
+  })
+  tableRows.length = 0
+}
+
 export function parseMarkdownSections(content) {
   if (!String(content || '').trim()) return []
   const lines = String(content || '').replace(/\r\n/g, '\n').split('\n')
@@ -51,6 +68,7 @@ export function parseMarkdownSections(content) {
   const paragraph = []
   const listItems = []
   const codeLines = []
+  const tableRows = []
   let inCode = false
   let codeLanguage = ''
 
@@ -58,6 +76,7 @@ export function parseMarkdownSections(content) {
     flushParagraph(current.blocks, paragraph)
     flushList(current.blocks, listItems)
     flushCode(current.blocks, codeLines, codeLanguage)
+    flushTable(current.blocks, tableRows)
   }
 
   for (const rawLine of lines) {
@@ -73,6 +92,7 @@ export function parseMarkdownSections(content) {
       } else {
         flushParagraph(current.blocks, paragraph)
         flushList(current.blocks, listItems)
+        flushTable(current.blocks, tableRows)
         inCode = true
         codeLanguage = line.slice(3).trim()
       }
@@ -82,6 +102,19 @@ export function parseMarkdownSections(content) {
     if (inCode) {
       codeLines.push(rawLine)
       continue
+    }
+
+    const isTableRow = line.startsWith('|') && line.endsWith('|')
+    if (isTableRow) {
+      flushParagraph(current.blocks, paragraph)
+      flushList(current.blocks, listItems)
+      flushCode(current.blocks, codeLines, codeLanguage)
+      
+      const cells = line.split('|').slice(1, -1).map(c => c.trim())
+      tableRows.push(cells)
+      continue
+    } else {
+      flushTable(current.blocks, tableRows)
     }
 
     const heading = line.match(/^(#{1,3})\s+(.+)$/)

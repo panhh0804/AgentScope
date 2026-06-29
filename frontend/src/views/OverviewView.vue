@@ -114,36 +114,28 @@
 
       <section ref="agentTableRef" class="screen-panel agent-monitor-panel">
         <div class="screen-panel-head">
-          <div class="title-with-marquee">
-            <h3>Agent 监控</h3>
-            <div class="agent-rank-marquee">
-              <span class="marquee-label">实时排行：</span>
-              <div class="marquee-content">
-                <span v-for="(agent, index) in sortedAgents" :key="agent.agent_id" class="marquee-item">
-                  <span class="rank-num">#{{ index + 1 }}</span> {{ agent.agent_role }}: {{ percent(agent.success_rate) }} ({{ Math.round(agent.avg_latency_ms || 0) }}ms)
-                </span>
-              </div>
-            </div>
-          </div>
+          <h3>Agent 监控与实时排行</h3>
           <span>{{ realtimeAgents.length }} agents</span>
         </div>
         <div class="screen-table-wrap">
           <table class="data-table screen-native-table">
             <thead>
               <tr>
-                <th>Agent</th>
+                <th style="width: 70px;">排名</th>
+                <th>Agent ID</th>
                 <th>角色</th>
                 <th>状态</th>
                 <th>当前任务</th>
                 <th>成功率</th>
                 <th>平均时延</th>
                 <th>Token</th>
-                <th>重试</th>
-                <th>最近事件</th>
+                <th>重试次数</th>
+                <th>最近事件时间</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="agent in realtimeAgents" :key="agent.agent_id">
+            <TransitionGroup name="flip-list" tag="tbody">
+              <tr v-for="(agent, index) in sortedAgents" :key="agent.agent_id">
+                <td><span class="rank-badge">#{{ index + 1 }}</span></td>
                 <td>{{ agent.agent_id }}</td>
                 <td>{{ agent.agent_role }}</td>
                 <td><span :class="['tag', agent.status]">{{ agent.status }}</span></td>
@@ -154,7 +146,7 @@
                 <td>{{ agent.retry_count }}</td>
                 <td>{{ agent.last_event_time }}</td>
               </tr>
-            </tbody>
+            </TransitionGroup>
           </table>
         </div>
       </section>

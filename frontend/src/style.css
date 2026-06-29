@@ -1328,57 +1328,42 @@ h2 {
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
 }
 
-/* Title with marquee */
-.title-with-marquee {
-  display: flex;
+/* Rank Badge styles */
+.rank-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  flex-grow: 1;
-  min-width: 0;
-}
-
-.agent-rank-marquee {
-  display: flex;
-  align-items: center;
-  background: rgba(34, 211, 238, 0.05);
-  border: 1px solid rgba(34, 211, 238, 0.12);
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   border-radius: 4px;
-  padding: 4px 12px;
-  height: 28px;
-  overflow: hidden;
-  max-width: 600px;
-  flex-grow: 1;
-}
-
-.marquee-label {
   font-size: 11px;
-  color: #22d3ee;
   font-weight: bold;
-  white-space: nowrap;
-  margin-right: 8px;
+  color: #020617;
+  background: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.marquee-content {
-  display: flex;
-  gap: 24px;
-  animation: marquee-scroll 25s linear infinite;
-  white-space: nowrap;
+/* Style top 3 uniquely */
+tr:nth-child(1) .rank-badge {
+  background: #f59e0b; /* Gold */
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  color: #020617;
 }
 
-.marquee-item {
-  font-size: 12px;
-  color: #dbe7f3;
-  display: inline-block;
+tr:nth-child(2) .rank-badge {
+  background: #cbd5e1; /* Silver */
+  box-shadow: 0 0 8px rgba(203, 213, 225, 0.5);
+  color: #020617;
 }
 
-.rank-num {
-  color: #fbbf24;
-  font-weight: bold;
-  margin-right: 4px;
+tr:nth-child(3) .rank-badge {
+  background: #b45309; /* Bronze */
+  box-shadow: 0 0 8px rgba(180, 83, 9, 0.5);
+  color: #ffffff;
 }
 
-@keyframes marquee-scroll {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+/* Table sorting flip list animation */
+.flip-list-move {
+  transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
 }
 

@@ -90,7 +90,14 @@ import { FilePlus2 } from '@lucide/vue'
 import { generateReport } from '../api/dashboard'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 
-const date = ref('2026-06-23')
+const getTodayString = () => {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+const date = ref(getTodayString())
 const reportType = ref('daily')
 const report = ref({})
 const isGenerating = ref(false)

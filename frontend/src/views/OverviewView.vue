@@ -99,6 +99,20 @@
           </div>
           <div ref="relationChart" class="screen-chart small"></div>
         </article>
+
+        <article class="screen-panel compact overview-grid__stream terminal-log-panel">
+          <div class="screen-panel-head">
+            <h3>实时数据流</h3>
+            <span class="pulse-badge">LIVE STREAMING</span>
+          </div>
+          <div ref="terminalRef" class="terminal-log-container">
+            <div v-for="(log, idx) in realtimeLogs" :key="idx" class="terminal-log-row">
+              <span class="terminal-log-time">[{{ log.time }}]</span>
+              <span class="terminal-log-agent"> [{{ log.agent }}]</span>
+              <span :class="['terminal-log-message', `terminal-log-level-${log.level}`]"> {{ log.message }}</span>
+            </div>
+          </div>
+        </article>
       </section>
 
       <section ref="historyChartsRef" class="screen-history">
@@ -272,7 +286,16 @@ const historyRankings = ref([])
 const relationGraph = ref({ nodes: [], links: [] })
 const historyAlerts = ref([])
 const reports = ref([])
-const dateRange = ref(['2026-06-01', '2026-06-24'])
+
+const getTodayString = () => {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const dateRange = ref(['2026-06-01', getTodayString()])
 const alertOpen = ref(false)
 const agentTableRef = ref(null)
 const historyChartsRef = ref(null)
@@ -281,6 +304,60 @@ const throughputChart = ref(null)
 const latencyChart = ref(null)
 const dailyChart = ref(null)
 const relationChart = ref(null)
+
+const realtimeLogs = ref([])
+const terminalRef = ref(null)
+
+const logTemplates = [
+  { agent: 'planner_agent', level: 'info', message: '收到用户请求，开始任务规划与子任务拆解。' },
+  { agent: 'planner_agent', level: 'info', message: '成功生成子任务链: [search -> analysis -> writer -> reviewer]。' },
+  { agent: 'search_agent', level: 'info', message: '正在启动网络检索，查询关键词: "agentscope multi-agent framework"。' },
+  { agent: 'search_agent', level: 'info', message: '检索完成，获取到 8 条相关网页结果 (latency: 120ms)。' },
+  { agent: 'analysis_agent', level: 'info', message: '开始读取检索网页内容，进行深度摘要与信息提取。' },
+  { agent: 'analysis_agent', level: 'info', message: '信息提取完毕，生成格式化分析数据 (tokens: 1250)。' },
+  { agent: 'writer_agent', level: 'info', message: '开始调用 LLM 撰写报告首段：系统整体架构与优势。' },
+  { agent: 'writer_agent', level: 'info', message: '报告内容生成中，当前使用 token 数: 2400。' },
+  { agent: 'writer_agent', level: 'info', message: '草稿生成成功，正移交给 Reviewer 角色审核。' },
+  { agent: 'reviewer_agent', level: 'info', message: '开始对生成的报告草稿进行合规性、事实准确性及逻辑链校对。' },
+  { agent: 'reviewer_agent', level: 'info', message: '校对通过，内容无敏感信息且事实无误。' },
+  { agent: 'planner_agent', level: 'info', message: '任务链 trace_demo_101 执行完毕，结果已成功保存。' },
+  { agent: 'search_agent', level: 'warn', message: '网络检索 API 响应延迟较高 (3400ms)，正在自动优化连接池。' },
+  { agent: 'writer_agent', level: 'warn', message: 'LLM API 返回结果出现截断，正在尝试重试以确保报告完整性。' },
+  { agent: 'search_agent', level: 'error', message: '网络连接超时 (timeout 5s000ms)，将自动发起第 1 次重试。' },
+  { agent: 'search_agent', level: 'info', message: '重试成功，已恢复数据拉取。' }
+]
+
+const addLog = (logObj = null) => {
+  const d = new Date()
+  const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+  
+  let entry
+  if (logObj) {
+    entry = { time: timeStr, ...logObj }
+  } else {
+    const template = logTemplates[Math.floor(Math.random() * logTemplates.length)]
+    entry = {
+      time: timeStr,
+      agent: template.agent,
+      level: template.level,
+      message: template.message
+    }
+  }
+  
+  realtimeLogs.value.push(entry)
+  if (realtimeLogs.value.length > 50) {
+    realtimeLogs.value.shift()
+  }
+  
+  nextTick(() => {
+    if (terminalRef.value) {
+      terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+    }
+  })
+}
+
+let logTimer
+let pollTimer
 
 let throughputInstance
 let latencyInstance
@@ -460,7 +537,7 @@ function scrollToAgents() {
 }
 
 async function load() {
-  const [startDate, endDate] = [getDateValue(dateRange.value?.[0], '2026-06-01'), getDateValue(dateRange.value?.[1], '2026-06-24')]
+  const [startDate, endDate] = [getDateValue(dateRange.value?.[0], '2026-06-01'), getDateValue(dateRange.value?.[1], getTodayString())]
   const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData, dailyData, rankingData, relationData, historyAlertData, reportsData] = await Promise.all([
     fetchOverview(),
     fetchTrend(60),
@@ -487,10 +564,49 @@ async function load() {
 
 onMounted(async () => {
   await load()
+  
+  // Seed initial logs
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(Date.now() - (8 - i) * 5000)
+    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+    const template = logTemplates[i % logTemplates.length]
+    realtimeLogs.value.push({
+      time: timeStr,
+      agent: template.agent,
+      level: template.level,
+      message: template.message
+    })
+  }
+  
+  logTimer = setInterval(() => {
+    addLog()
+  }, 3000)
+  
+  pollTimer = setInterval(async () => {
+    try {
+      const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData] = await Promise.all([
+        fetchOverview(),
+        fetchTrend(60),
+        fetchAgents(),
+        fetchRealtimeAlerts()
+      ])
+      realtimeOverview.value = realtimeOverviewData
+      realtimeTrend.value = realtimeTrendData
+      realtimeAgents.value = agentsData
+      realtimeAlerts.value = realtimeAlertData
+      await nextTick()
+      renderCharts()
+    } catch (e) {
+      console.error('Failed to poll realtime data', e)
+    }
+  }, 5000)
+  
   window.addEventListener('resize', resizeCharts)
 })
 
 onBeforeUnmount(() => {
+  clearInterval(logTimer)
+  clearInterval(pollTimer)
   window.removeEventListener('resize', resizeCharts)
   throughputInstance?.dispose()
   latencyInstance?.dispose()

@@ -990,7 +990,7 @@ h2 {
 
 .screen-history + .screen-panel,
 .agent-monitor-panel {
-  margin-top: 0;
+  margin-top: 16px;
 }
 
 .modal-table-wrap {

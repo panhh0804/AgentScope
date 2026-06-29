@@ -397,12 +397,47 @@ function renderCharts() {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
     legend: { top: 0, textStyle: { color: '#bdefff' } },
-    grid: { top: 42, right: 20, bottom: 24, left: 50 },
+    grid: { top: 42, right: 50, bottom: 24, left: 50 },
     xAxis: { type: 'category', data: xDaily, ...baseAxis() },
-    yAxis: { type: 'value', ...baseAxis() },
+    yAxis: [
+      {
+        type: 'value',
+        name: '任务量',
+        position: 'left',
+        ...baseAxis()
+      },
+      {
+        type: 'value',
+        name: '成功率',
+        position: 'right',
+        min: 0,
+        max: 100,
+        ...baseAxis(),
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: '{value}%',
+          color: '#9bc7d9'
+        }
+      }
+    ],
     series: [
-      { name: '任务量', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), areaStyle: { color: 'rgba(34, 211, 238, 0.12)' }, lineStyle: { color: '#22d3ee' } },
-      { name: '成功率 %', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), lineStyle: { color: '#4ade80' } }
+      {
+        name: '任务量',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 0,
+        data: dailyMetrics.value.map((item) => item.task_count),
+        areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
+        lineStyle: { color: '#22d3ee' }
+      },
+      {
+        name: '成功率 %',
+        type: 'line',
+        smooth: true,
+        yAxisIndex: 1,
+        data: dailyMetrics.value.map((item) => Math.round(Number(item.success_rate) * 100)),
+        lineStyle: { color: '#4ade80' }
+      }
     ]
   }, true)
 

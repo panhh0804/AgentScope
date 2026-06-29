@@ -24,13 +24,14 @@ def realtime_overview() -> Dict:
 
 
 def realtime_trend(minutes: int) -> List[Dict]:
-    now = datetime.now().replace(second=0, microsecond=0)
+    seconds = minutes
+    now = datetime.now()
     rows = []
-    for idx in range(minutes):
-        ts = now - timedelta(minutes=minutes - idx - 1)
+    for idx in range(seconds):
+        ts = now - timedelta(seconds=seconds - idx - 1)
         rows.append(
             {
-                "time": ts.isoformat(timespec="minutes"),
+                "time": ts.isoformat(timespec="seconds"),
                 "events": 80 + (idx * 7) % 55,
                 "success": 70 + (idx * 5) % 45,
                 "failed": 3 + idx % 8,

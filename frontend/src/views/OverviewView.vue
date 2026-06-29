@@ -57,7 +57,7 @@
         <article class="screen-panel hero-panel overview-grid__throughput">
           <div class="screen-panel-head">
             <h3>实时吞吐 / 失败趋势</h3>
-            <span>last 60 minutes</span>
+            <span>last 60 seconds</span>
           </div>
           <div ref="throughputChart" class="screen-chart large"></div>
         </article>
@@ -498,8 +498,8 @@ function renderCharts() {
   dailyInstance ||= echarts.init(dailyChart.value)
   relationInstance ||= echarts.init(relationChart.value)
 
-  const xRealtime = realtimeTrend.value.map((item) => String(item.time || '').slice(11, 16))
-  setLineOption(throughputInstance, '最近 60 分钟吞吐', xRealtime, [
+  const xRealtime = realtimeTrend.value.map((item) => String(item.time || '').slice(11, 19))
+  setLineOption(throughputInstance, '最近 60 秒吞吐', xRealtime, [
     {
       name: '事件数',
       type: 'line',
@@ -646,7 +646,7 @@ onMounted(async () => {
     } catch (e) {
       console.error('Failed to poll realtime data', e)
     }
-  }, 5000)
+  }, 1000)
   
   window.addEventListener('resize', resizeCharts)
 })

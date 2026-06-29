@@ -28,18 +28,7 @@
                 <h3>Source -> Raw -> Clean -> Metric 漏斗</h3>
                 <span>{{ overview.recent_failed_task ? `最近失败 ${overview.recent_failed_task}` : 'pipeline' }}</span>
               </div>
-              <div class="funnel-flow">
-                <template v-for="(item, index) in overview.funnel || []" :key="item.name">
-                  <div class="funnel-node">
-                    <span>{{ item.name }}</span>
-                    <strong>{{ formatNumber(item.count) }} 条</strong>
-                  </div>
-                  <div v-if="item.processor" class="funnel-edge">
-                    <i></i>
-                    <b>{{ item.processor }}</b>
-                  </div>
-                </template>
-              </div>
+              <div ref="funnelChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
             </article>
 
             <article class="screen-panel">
@@ -158,13 +147,7 @@
                 <h3>简化数据血缘</h3>
                 <span>Source to Analytics</span>
               </div>
-              <div class="lineage-list">
-                <div v-for="edge in lineage.edges || []" :key="`${edge.from}-${edge.to}`" class="lineage-row">
-                  <span>{{ nodeName(edge.from) }}</span>
-                  <b>{{ edge.label }}</b>
-                  <strong>{{ nodeName(edge.to) }}</strong>
-                </div>
-              </div>
+              <div ref="lineageChartRef" class="screen-chart" style="height: 280px; margin-top: 10px;"></div>
             </article>
           </section>
         </a-tab-pane>
@@ -248,7 +231,7 @@
                     <td>{{ formatNumber(issue.total_count) }}</td>
                     <td>{{ issue.failed_count }}</td>
                     <td>{{ percent(issue.pass_rate) }}</td>
-                    <td><code>{{ JSON.stringify(issue.sample_data_json) }}</code></td>
+                    <td><a-button size="mini" @click="showJson(issue.sample_data_json)">查看样本</a-button></td>
                   </tr>
                 </tbody>
               </table>
@@ -328,7 +311,11 @@ const eventFilters = ref({ trace_id: '', run_id: '', agent_id: '', event_type: '
 const jsonModalOpen = ref(false)
 const jsonPreview = ref('')
 const trendChartRef = ref(null)
+const funnelChartRef = ref(null)
+const lineageChartRef = ref(null)
 let trendChart
+let funnelChart
+let lineageChart
 
 const overviewMetrics = computed(() => [
   { label: 'MySQL Source 总量', value: formatNumber(overview.value.source_total_count), hint: `今日新增 ${formatNumber(overview.value.today_new_count)}` },
@@ -406,6 +393,146 @@ async function retryRun(runId) {
   auditLogs.value = await fetchAuditLogs()
 }
 
+function renderFunnel() {
+  if (!funnelChartRef.value) return
+  funnelChart ||= echarts.init(funnelChartRef.value)
+  
+  const rawFunnel = overview.value.funnel || []
+  // Use a beautifully-proportioned visual scale to prevent the 120 count from collapsing the funnel shape
+  const visualScales = [100, 80, 60, 40]
+  const funnelData = rawFunnel.map((item, idx) => ({
+    name: item.name,
+    value: visualScales[idx] || 30,
+    realValue: item.count
+  }))
+  
+  funnelChart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        const valStr = Number(params.data.realValue || 0).toLocaleString()
+        return `${params.marker}${params.name} : <b>${valStr}</b> 条`
+      }
+    },
+    grid: { top: 10, bottom: 10 },
+    series: [
+      {
+        name: '数据生命周期漏斗',
+        type: 'funnel',
+        left: '20%',
+        width: '60%',
+        top: 20,
+        bottom: 10,
+        min: 0,
+        max: 100,
+        minSize: '30%',
+        maxSize: '100%',
+        sort: 'descending',
+        gap: 6,
+        label: {
+          show: true,
+          position: 'inside',
+          formatter: (params) => {
+            const valStr = Number(params.data.realValue || 0).toLocaleString()
+            return `${params.name}: ${valStr} 条`
+          },
+          color: '#ffffff',
+          fontWeight: 'bold',
+          fontSize: 12
+        },
+        labelLine: {
+          show: false
+        },
+        itemStyle: {
+          borderColor: 'rgba(103, 232, 249, 0.3)',
+          borderWidth: 1.5,
+          shadowBlur: 12,
+          shadowColor: 'rgba(34, 211, 238, 0.25)',
+          borderRadius: 4
+        },
+        color: ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'],
+        data: funnelData
+      }
+    ]
+  }, true)
+}
+
+function renderLineage() {
+  if (!lineageChartRef.value) return
+  lineageChart ||= echarts.init(lineageChartRef.value)
+  
+  const nodes = (lineage.value.nodes || []).map(n => ({
+    id: n.id,
+    name: n.name,
+    value: n.name,
+    symbolSize: 22,
+    itemStyle: { 
+      color: n.id.includes('mysql') ? '#3b82f6' : '#22d3ee',
+      shadowBlur: 10,
+      shadowColor: 'rgba(34, 211, 238, 0.4)'
+    }
+  }))
+  
+  const links = (lineage.value.edges || []).map(e => ({
+    source: e.from,
+    target: e.to,
+    label: { 
+      show: true, 
+      formatter: e.label, 
+      fontSize: 10, 
+      color: '#9bc7d9',
+      backgroundColor: 'rgba(8, 22, 34, 0.75)',
+      padding: [2, 4],
+      borderRadius: 2
+    },
+    lineStyle: { 
+      color: 'rgba(103, 232, 249, 0.35)', 
+      curveness: 0.15,
+      width: 1.5
+    }
+  }))
+  
+  lineageChart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: { 
+      trigger: 'item',
+      formatter: (params) => {
+        if (params.dataType === 'node') {
+          return `数据层: <b>${params.name}</b>`
+        } else {
+          return `血缘流动: <b>${params.data.source} ➔ ${params.data.target}</b> (${params.data.label.formatter})`
+        }
+      }
+    },
+    series: [
+      {
+        type: 'graph',
+        layout: 'force',
+        force: {
+          repulsion: 150,
+          edgeLength: 110,
+          gravity: 0.08
+        },
+        roam: true,
+        draggable: true,
+        symbol: 'circle',
+        edgeSymbol: ['none', 'arrow'],
+        edgeSymbolSize: [4, 8],
+        label: {
+          show: true,
+          position: 'bottom',
+          color: '#bdefff',
+          fontSize: 10,
+          fontWeight: 'bold'
+        },
+        data: nodes,
+        links: links
+      }
+    ]
+  }, true)
+}
+
 function renderTrend() {
   if (!trendChartRef.value) return
   trendChart ||= echarts.init(trendChartRef.value)
@@ -417,6 +544,8 @@ function renderTrend() {
 
 function resizeCharts() {
   trendChart?.resize()
+  funnelChart?.resize()
+  lineageChart?.resize()
 }
 
 async function loadAll() {
@@ -441,6 +570,8 @@ async function loadAll() {
   await Promise.all([loadEvents(), loadJobs()])
   await nextTick()
   renderTrend()
+  renderFunnel()
+  renderLineage()
 }
 
 onMounted(async () => {
@@ -451,5 +582,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
   trendChart?.dispose()
+  funnelChart?.dispose()
+  lineageChart?.dispose()
 })
 </script>

@@ -62,7 +62,8 @@ def realtime_agents() -> List[Dict]:
 
 def recent_alerts() -> List[Dict]:
     now = datetime.now()
-    return [
+    sec = now.second
+    alerts = [
         {
             "alert_id": "alert_demo_latency",
             "alert_type": "high_latency",
@@ -86,6 +87,35 @@ def recent_alerts() -> List[Dict]:
             "create_time": (now - timedelta(minutes=6)).isoformat(timespec="seconds"),
         },
     ]
+
+    # Dynamically inject extra alerts periodically to make the real-time panel dynamic
+    if 15 <= sec <= 45:
+        alerts.append({
+            "alert_id": "alert_demo_rate_limit",
+            "alert_type": "rate_limit_exceeded",
+            "level": "critical",
+            "agent_id": "planner_agent",
+            "current_value": 429,
+            "threshold": 200,
+            "source": "streaming",
+            "status": "open",
+            "create_time": (now - timedelta(seconds=sec - 15)).isoformat(timespec="seconds"),
+        })
+
+    if sec > 30:
+        alerts.append({
+            "alert_id": "alert_demo_token_overflow",
+            "alert_type": "token_limit",
+            "level": "warning",
+            "agent_id": "search_agent",
+            "current_value": 8500,
+            "threshold": 8000,
+            "source": "streaming",
+            "status": "open",
+            "create_time": (now - timedelta(seconds=sec - 30)).isoformat(timespec="seconds"),
+        })
+
+    return alerts
 
 
 def daily_metrics(start: date, end: date) -> List[Dict]:

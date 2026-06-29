@@ -108,7 +108,57 @@
             <h3>协作关系图</h3>
             <span>{{ relationGraph.nodes?.length || 0 }} nodes</span>
           </div>
-          <div ref="relationChart" class="screen-chart" style="height: 360px;"></div>
+          <div ref="relationChart" class="screen-chart" style="height: 260px;"></div>
+        </article>
+
+        <article class="screen-panel overview-grid__diagnostics">
+          <div class="screen-panel-head">
+            <h3>Agent 协作及拥堵诊断</h3>
+            <span>communication diagnostics</span>
+          </div>
+          <div class="diagnostics-list">
+            <div v-for="link in sortedRelations" :key="link.source + '-' + link.target" class="diagnostic-row">
+              <div class="route-info">
+                <span class="agent-name">{{ formatAgentName(link.source) }}</span>
+                <span class="arrow">➔</span>
+                <span class="agent-name">{{ formatAgentName(link.target) }}</span>
+                <span :class="['latency-badge', getLatencyLevel(link.avg_latency_ms)]">
+                  {{ link.avg_latency_ms }} ms
+                </span>
+              </div>
+              <div class="progress-bar-wrap">
+                <div 
+                  class="progress-bar-fill" 
+                  :class="getLatencyLevel(link.avg_latency_ms)"
+                  :style="{ width: Math.min(100, (link.avg_latency_ms / 3000) * 100) + '%' }"
+                ></div>
+              </div>
+              <div class="route-stats">
+                <span>交互次数: <b>{{ link.call_count }}</b> 次</span>
+                <span>失败次数: <b :class="{ 'has-failed': link.failed_count > 0 }">{{ link.failed_count }}</b> 次</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="screen-panel overview-grid__cost">
+          <div class="screen-panel-head">
+            <h3>LLM 资源与成本监控</h3>
+            <span>real-time & history</span>
+          </div>
+          <div class="cost-summary-cards">
+            <div class="cost-card token">
+              <span>实时 (5m) Token 消耗</span>
+              <strong>{{ formatNumber(realtimeOverview.token_total_5m) }}</strong>
+              <small>tokens</small>
+            </div>
+            <div class="cost-card price">
+              <span>实时 (5m) 估算成本</span>
+              <strong>${{ Number(realtimeOverview.estimated_cost_5m || 0).toFixed(4) }}</strong>
+              <small>USD</small>
+            </div>
+          </div>
+          <div ref="costChart" class="screen-chart" style="height: 200px; margin-top: 14px;"></div>
         </article>
       </section>
 
@@ -321,6 +371,7 @@ const throughputChart = ref(null)
 const latencyChart = ref(null)
 const dailyChart = ref(null)
 const relationChart = ref(null)
+const costChart = ref(null)
 
 const realtimeLogs = ref([])
 const terminalRef = ref(null)
@@ -397,6 +448,7 @@ let throughputInstance
 let latencyInstance
 let dailyInstance
 let relationInstance
+let costInstance
 
 const dailySummary = computed(() => {
   const rows = dailyMetrics.value
@@ -452,6 +504,20 @@ const historyRankingOption = computed(() => barOption(
 
 const allAlerts = computed(() => [...realtimeAlerts.value, ...historyAlerts.value])
 
+const sortedRelations = computed(() => {
+  return [...(relationGraph.value.links || [])].sort((a, b) => b.avg_latency_ms - a.avg_latency_ms)
+})
+
+function formatAgentName(name) {
+  return String(name || '').replace('_agent', '').toUpperCase()
+}
+
+function getLatencyLevel(ms) {
+  if (ms < 1000) return 'normal'
+  if (ms < 2000) return 'warning'
+  return 'critical'
+}
+
 function percent(value) {
   return `${Number((value || 0) * 100).toFixed(1)}%`
 }
@@ -505,9 +571,10 @@ function renderRealtimeCharts() {
 
 function renderCharts() {
   renderRealtimeCharts()
-  if (!dailyChart.value || !relationChart.value) return
+  if (!dailyChart.value || !relationChart.value || !costChart.value) return
   dailyInstance ||= echarts.init(dailyChart.value)
   relationInstance ||= echarts.init(relationChart.value)
+  costInstance ||= echarts.init(costChart.value)
 
   const xDaily = dailyMetrics.value.map((item) => item.metric_date)
   dailyInstance.setOption({
@@ -542,23 +609,84 @@ function renderCharts() {
         name: '任务量',
         type: 'line',
         smooth: true,
+        symbol: 'none',
+        showSymbol: false,
         yAxisIndex: 0,
         data: dailyMetrics.value.map((item) => item.task_count),
-        areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
-        lineStyle: { color: '#22d3ee' }
+        areaStyle: { color: 'rgba(34, 211, 238, 0.08)' },
+        itemStyle: { color: '#22d3ee' },
+        lineStyle: { width: 3 }
       },
       {
         name: '成功率 %',
         type: 'line',
         smooth: true,
+        symbol: 'none',
+        showSymbol: false,
         yAxisIndex: 1,
         data: dailyMetrics.value.map((item) => Math.round(Number(item.success_rate) * 100)),
-        lineStyle: { color: '#4ade80' }
+        itemStyle: { color: '#4ade80' },
+        lineStyle: { width: 3 }
       }
     ]
   }, true)
 
   relationInstance.setOption(graphOption(relationGraph.value), true)
+
+  costInstance.setOption({
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis' },
+    legend: { top: 0, textStyle: { color: '#bdefff' } },
+    grid: { top: 38, right: 48, bottom: 24, left: 48 },
+    xAxis: { type: 'category', data: xDaily, ...baseAxis() },
+    yAxis: [
+      {
+        type: 'value',
+        name: 'Tokens',
+        position: 'left',
+        ...baseAxis(),
+        axisLabel: {
+          formatter: (val) => val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : `${val/1000}k`,
+          color: '#9bc7d9'
+        }
+      },
+      {
+        type: 'value',
+        name: '成本 (USD)',
+        position: 'right',
+        ...baseAxis(),
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: '${value}',
+          color: '#9bc7d9'
+        }
+      }
+    ],
+    series: [
+      {
+        name: '每日 Token',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        showSymbol: false,
+        yAxisIndex: 0,
+        data: dailyMetrics.value.map((item) => item.total_tokens),
+        itemStyle: { color: '#06b6d4' },
+        lineStyle: { width: 3 }
+      },
+      {
+        name: '每日成本 ($)',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        showSymbol: false,
+        yAxisIndex: 1,
+        data: dailyMetrics.value.map((item) => item.estimated_cost_usd),
+        itemStyle: { color: '#10b981' },
+        lineStyle: { width: 3 }
+      }
+    ]
+  }, true)
 }
 
 function resizeCharts() {
@@ -566,6 +694,7 @@ function resizeCharts() {
   latencyInstance?.resize()
   dailyInstance?.resize()
   relationInstance?.resize()
+  costInstance?.resize()
 }
 
 function scrollToHistory() {
@@ -653,5 +782,6 @@ onBeforeUnmount(() => {
   latencyInstance?.dispose()
   dailyInstance?.dispose()
   relationInstance?.dispose()
+  costInstance?.dispose()
 })
 </script>

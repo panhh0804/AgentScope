@@ -153,3 +153,32 @@ frequent_retry
 | GET | `/reports` | 报告列表 |
 | GET | `/reports/{report_id}` | 报告详情 |
 
+## 数据管理端接口
+
+统一前缀：
+
+```text
+/api/v1/admin
+```
+
+数据管理端面向平台管理员，展示离线数据链路、数据资产、任务运行、质量治理和操作审计状态。当前实现优先保证页面和接口稳定可验收：如环境未提供完整 Admin 表，接口返回稳定 mock 数据或基于现有状态的聚合数据。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/data-overview` | 数据总览、分区、有效率、任务成功率、漏斗数据 |
+| GET | `/data-volume-trend` | 最近 7 天 Raw / Clean 数据量趋势 |
+| GET | `/pipeline-status` | Source -> Raw -> Clean -> Metric 链路状态 |
+| GET | `/datasets` | 数据资产目录 |
+| GET | `/data-lineage` | 简化数据血缘 |
+| GET | `/events` | Agent 原始事件列表，支持 trace_id、run_id、agent_id、event_type、status、时间过滤 |
+| GET | `/jobs` | 固定白名单任务列表 |
+| GET | `/job-runs` | 任务运行记录 |
+| POST | `/jobs/{job_code}/execute` | 按白名单 job_code 和 biz_date 执行任务 |
+| POST | `/job-runs/{run_id}/retry` | 重试失败任务运行 |
+| GET | `/job-runs/{run_id}/logs` | 查看任务日志摘要 |
+| GET | `/quality/overview` | 数据质量概览 |
+| GET | `/quality/issues` | 数据质量问题明细 |
+| GET | `/audit-logs` | 操作审计日志 |
+
+任务执行接口只接受固定 `job_code` 和 `biz_date`，不支持任意 SQL、shell 命令或脚本路径。
+

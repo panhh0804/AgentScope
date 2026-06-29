@@ -1,0 +1,16 @@
+import { getData, postData } from './client'
+
+export const fetchAdminOverview = () => getData('/admin/data-overview')
+export const fetchDataVolumeTrend = () => getData('/admin/data-volume-trend')
+export const fetchPipelineStatus = () => getData('/admin/pipeline-status')
+export const fetchDatasets = () => getData('/admin/datasets')
+export const fetchDataLineage = () => getData('/admin/data-lineage')
+export const fetchAdminEvents = (params = {}) => getData('/admin/events', params)
+export const fetchAdminJobs = () => getData('/admin/jobs')
+export const fetchAdminJobRuns = () => getData('/admin/job-runs')
+export const executeAdminJob = (jobCode, bizDate) => postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate })
+export const retryAdminJobRun = (runId) => postData(`/admin/job-runs/${runId}/retry`)
+export const fetchAdminJobLogs = (runId) => getData(`/admin/job-runs/${runId}/logs`)
+export const fetchQualityOverview = () => getData('/admin/quality/overview')
+export const fetchQualityIssues = () => getData('/admin/quality/issues')
+export const fetchAuditLogs = () => getData('/admin/audit-logs')

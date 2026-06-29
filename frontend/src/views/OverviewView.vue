@@ -37,20 +37,31 @@
       </section>
 
       <section class="screen-layout overview-grid">
-        <article class="screen-panel compact overview-grid__rank">
+        <article class="screen-panel overview-grid__stream terminal-log-panel">
           <div class="screen-panel-head">
-            <h3>实时 Agent 排行</h3>
-            <span>success / latency</span>
+            <h3>实时数据流</h3>
+            <span class="pulse-badge">LIVE STREAMING</span>
           </div>
-          <div class="agent-rank-list">
-            <div v-for="agent in realtimeAgents" :key="agent.agent_id" class="agent-rank-item">
-              <div>
-                <strong>{{ agent.agent_role }}</strong>
-                <span>{{ agent.agent_id }}</span>
+          <div ref="terminalRef" class="terminal-log-container stream-cards-container">
+            <TransitionGroup name="list" tag="div">
+              <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
+                <div :class="['event-icon-wrapper', log.level]">
+                  <component :is="getEventIcon(log.agent, log.level)" :size="14" />
+                </div>
+                <div class="event-card-body">
+                  <div class="event-card-meta">
+                    <span class="event-agent-tag">{{ log.agent }}</span>
+                    <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
+                    <span class="event-time-stamp">{{ log.time }}</span>
+                  </div>
+                  <p class="event-message-text">{{ log.message }}</p>
+                </div>
+                <div v-if="log.metric" class="event-card-metric">
+                  <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
+                  <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
+                </div>
               </div>
-              <b>{{ percent(agent.success_rate) }}</b>
-              <small>{{ Math.round(agent.avg_latency_ms || 0) }}ms</small>
-            </div>
+            </TransitionGroup>
           </div>
         </article>
 
@@ -99,55 +110,21 @@
           </div>
           <div ref="relationChart" class="screen-chart small"></div>
         </article>
-
-        <article class="screen-panel overview-grid__stream terminal-log-panel">
-          <div class="screen-panel-head">
-            <h3>实时数据流</h3>
-            <span class="pulse-badge">LIVE STREAMING</span>
-          </div>
-          <div ref="terminalRef" class="terminal-log-container stream-cards-container">
-            <TransitionGroup name="list" tag="div">
-              <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
-                <div :class="['event-icon-wrapper', log.level]">
-                  <component :is="getEventIcon(log.agent, log.level)" :size="14" />
-                </div>
-                <div class="event-card-body">
-                  <div class="event-card-meta">
-                    <span class="event-agent-tag">{{ log.agent }}</span>
-                    <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
-                    <span class="event-time-stamp">{{ log.time }}</span>
-                  </div>
-                  <p class="event-message-text">{{ log.message }}</p>
-                </div>
-                <div v-if="log.metric" class="event-card-metric">
-                  <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
-                  <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
-                </div>
-              </div>
-            </TransitionGroup>
-          </div>
-        </article>
-      </section>
-
-      <section ref="historyChartsRef" class="screen-history">
-        <div class="screen-panel-head screen-history-head">
-          <div>
-            <p class="screen-kicker">历史分析汇总</p>
-            <h3>历史分析图表</h3>
-          </div>
-          <span>daily / ranking</span>
-        </div>
-        <div class="history-grid">
-          <ChartPanel :option="historyTaskOption" />
-          <ChartPanel :option="historySuccessOption" />
-          <ChartPanel :option="historyLatencyOption" />
-          <ChartPanel :option="historyRankingOption" />
-        </div>
       </section>
 
       <section ref="agentTableRef" class="screen-panel agent-monitor-panel">
         <div class="screen-panel-head">
-          <h3>Agent 监控</h3>
+          <div class="title-with-marquee">
+            <h3>Agent 监控</h3>
+            <div class="agent-rank-marquee">
+              <span class="marquee-label">实时排行：</span>
+              <div class="marquee-content">
+                <span v-for="(agent, index) in sortedAgents" :key="agent.agent_id" class="marquee-item">
+                  <span class="rank-num">#{{ index + 1 }}</span> {{ agent.agent_role }}: {{ percent(agent.success_rate) }} ({{ Math.round(agent.avg_latency_ms || 0) }}ms)
+                </span>
+              </div>
+            </div>
+          </div>
           <span>{{ realtimeAgents.length }} agents</span>
         </div>
         <div class="screen-table-wrap">
@@ -179,6 +156,22 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section ref="historyChartsRef" class="screen-history">
+        <div class="screen-panel-head screen-history-head">
+          <div>
+            <p class="screen-kicker">历史分析汇总</p>
+            <h3>历史分析图表</h3>
+          </div>
+          <span>daily / ranking</span>
+        </div>
+        <div class="history-grid">
+          <ChartPanel :option="historyTaskOption" />
+          <ChartPanel :option="historySuccessOption" />
+          <ChartPanel :option="historyLatencyOption" />
+          <ChartPanel :option="historyRankingOption" />
         </div>
       </section>
 
@@ -309,6 +302,9 @@ import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 const realtimeOverview = ref({})
 const realtimeTrend = ref([])
 const realtimeAgents = ref([])
+const sortedAgents = computed(() => {
+  return [...realtimeAgents.value].sort((a, b) => b.success_rate - a.success_rate)
+})
 const realtimeAlerts = ref([])
 const dailyMetrics = ref([])
 const historyRankings = ref([])
@@ -491,12 +487,10 @@ function setLineOption(chart, title, xData, series) {
   chart.setOption(lineOption(title, xData, series), true)
 }
 
-function renderCharts() {
-  if (!throughputChart.value || !latencyChart.value || !dailyChart.value || !relationChart.value) return
+function renderRealtimeCharts() {
+  if (!throughputChart.value || !latencyChart.value) return
   throughputInstance ||= echarts.init(throughputChart.value)
   latencyInstance ||= echarts.init(latencyChart.value)
-  dailyInstance ||= echarts.init(dailyChart.value)
-  relationInstance ||= echarts.init(relationChart.value)
 
   const xRealtime = realtimeTrend.value.map((item) => String(item.time || '').slice(11, 19))
   setLineOption(throughputInstance, '最近 60 秒吞吐', xRealtime, [
@@ -514,6 +508,13 @@ function renderCharts() {
   setLineOption(latencyInstance, '平均时延趋势', xRealtime, [
     { name: '平均时延 ms', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.avg_latency_ms), lineStyle: { color: '#4ade80', width: 2 } }
   ])
+}
+
+function renderCharts() {
+  renderRealtimeCharts()
+  if (!dailyChart.value || !relationChart.value) return
+  dailyInstance ||= echarts.init(dailyChart.value)
+  relationInstance ||= echarts.init(relationChart.value)
 
   const xDaily = dailyMetrics.value.map((item) => item.metric_date)
   dailyInstance.setOption({
@@ -642,7 +643,7 @@ onMounted(async () => {
       realtimeAgents.value = agentsData
       realtimeAlerts.value = realtimeAlertData
       await nextTick()
-      renderCharts()
+      renderRealtimeCharts()
     } catch (e) {
       console.error('Failed to poll realtime data', e)
     }

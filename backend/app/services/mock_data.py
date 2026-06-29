@@ -8,17 +8,18 @@ AGENTS = ["planner", "search", "analysis", "writer", "reviewer"]
 
 
 def realtime_overview() -> Dict:
+    sec = datetime.now().second
     return {
-        "running_tasks": 18,
+        "running_tasks": 15 + sec % 10,
         "active_agents": 5,
-        "events_per_minute": 126,
-        "success_rate": 0.934,
-        "error_rate": 0.066,
-        "avg_latency_ms": 1840,
-        "token_total_5m": 48230,
-        "estimated_cost_5m": 0.0832,
-        "retry_tasks": 3,
-        "open_alerts": 4,
+        "events_per_minute": 120 + sec % 20,
+        "success_rate": 0.92 + (sec % 5) * 0.01,
+        "error_rate": 0.08 - (sec % 5) * 0.01,
+        "avg_latency_ms": 1500 + (sec % 15) * 100,
+        "token_total_5m": 45000 + sec * 200,
+        "estimated_cost_5m": 0.08 + (sec % 10) * 0.002,
+        "retry_tasks": sec % 4,
+        "open_alerts": sec % 3,
         "update_time": datetime.now().isoformat(timespec="seconds"),
     }
 
@@ -42,16 +43,17 @@ def realtime_trend(minutes: int) -> List[Dict]:
 
 
 def realtime_agents() -> List[Dict]:
+    sec = datetime.now().second
     return [
         {
             "agent_id": f"{role}_agent",
             "agent_role": role,
-            "status": "running" if role in {"search", "analysis"} else "idle",
-            "current_task": f"trace_demo_{idx + 1:03d}",
-            "success_rate": round(0.91 + idx * 0.012, 3),
-            "avg_latency_ms": 900 + idx * 430,
-            "token_total": 12000 + idx * 6800,
-            "retry_count": idx % 3,
+            "status": "running" if (idx + sec // 5) % 2 == 0 else "idle",
+            "current_task": f"trace_demo_{100 + (sec // 10):03d}",
+            "success_rate": round(0.91 + ((idx + sec) % 7) * 0.012, 3),
+            "avg_latency_ms": 900 + ((idx + sec) % 5) * 430,
+            "token_total": 12000 + ((idx + sec) % 20) * 1800,
+            "retry_count": (idx + sec // 15) % 3,
             "last_event_time": datetime.now().isoformat(timespec="seconds"),
         }
         for idx, role in enumerate(AGENTS)

@@ -559,13 +559,11 @@ h2 {
 
 .overview-grid {
   grid-template-areas:
-    "rank throughput daily"
-    "alerts latency relation"
-    "stream stream stream";
+    "stream throughput daily"
+    "alerts latency relation";
   align-items: stretch;
 }
 
-.overview-grid__rank { grid-area: rank; }
 .overview-grid__throughput { grid-area: throughput; }
 .overview-grid__daily { grid-area: daily; }
 .overview-grid__alerts { grid-area: alerts; }
@@ -1328,5 +1326,59 @@ h2 {
   0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
   70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+/* Title with marquee */
+.title-with-marquee {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.agent-rank-marquee {
+  display: flex;
+  align-items: center;
+  background: rgba(34, 211, 238, 0.05);
+  border: 1px solid rgba(34, 211, 238, 0.12);
+  border-radius: 4px;
+  padding: 4px 12px;
+  height: 28px;
+  overflow: hidden;
+  max-width: 600px;
+  flex-grow: 1;
+}
+
+.marquee-label {
+  font-size: 11px;
+  color: #22d3ee;
+  font-weight: bold;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.marquee-content {
+  display: flex;
+  gap: 24px;
+  animation: marquee-scroll 25s linear infinite;
+  white-space: nowrap;
+}
+
+.marquee-item {
+  font-size: 12px;
+  color: #dbe7f3;
+  display: inline-block;
+}
+
+.rank-num {
+  color: #fbbf24;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }
 

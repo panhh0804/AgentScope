@@ -100,7 +100,7 @@
           <div ref="relationChart" class="screen-chart small"></div>
         </article>
 
-        <article class="screen-panel compact overview-grid__stream terminal-log-panel">
+        <article class="screen-panel overview-grid__stream terminal-log-panel">
           <div class="screen-panel-head">
             <h3>实时数据流</h3>
             <span class="pulse-badge">LIVE STREAMING</span>

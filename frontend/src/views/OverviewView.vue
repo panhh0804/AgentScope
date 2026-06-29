@@ -105,12 +105,26 @@
             <h3>实时数据流</h3>
             <span class="pulse-badge">LIVE STREAMING</span>
           </div>
-          <div ref="terminalRef" class="terminal-log-container">
-            <div v-for="(log, idx) in realtimeLogs" :key="idx" class="terminal-log-row">
-              <span class="terminal-log-time">[{{ log.time }}]</span>
-              <span class="terminal-log-agent"> [{{ log.agent }}]</span>
-              <span :class="['terminal-log-message', `terminal-log-level-${log.level}`]"> {{ log.message }}</span>
-            </div>
+          <div ref="terminalRef" class="terminal-log-container stream-cards-container">
+            <TransitionGroup name="list" tag="div">
+              <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
+                <div :class="['event-icon-wrapper', log.level]">
+                  <component :is="getEventIcon(log.agent, log.level)" :size="14" />
+                </div>
+                <div class="event-card-body">
+                  <div class="event-card-meta">
+                    <span class="event-agent-tag">{{ log.agent }}</span>
+                    <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
+                    <span class="event-time-stamp">{{ log.time }}</span>
+                  </div>
+                  <p class="event-message-text">{{ log.message }}</p>
+                </div>
+                <div v-if="log.metric" class="event-card-metric">
+                  <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
+                  <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
+                </div>
+              </div>
+            </TransitionGroup>
           </div>
         </article>
       </section>
@@ -272,6 +286,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
+import { Cpu, Search, Brain, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend } from '../api/dashboard'
 import { barOption, graphOption, lineOption } from '../charts/options'
@@ -309,38 +324,55 @@ const realtimeLogs = ref([])
 const terminalRef = ref(null)
 
 const logTemplates = [
-  { agent: 'planner_agent', level: 'info', message: '收到用户请求，开始任务规划与子任务拆解。' },
-  { agent: 'planner_agent', level: 'info', message: '成功生成子任务链: [search -> analysis -> writer -> reviewer]。' },
-  { agent: 'search_agent', level: 'info', message: '正在启动网络检索，查询关键词: "agentscope multi-agent framework"。' },
-  { agent: 'search_agent', level: 'info', message: '检索完成，获取到 8 条相关网页结果 (latency: 120ms)。' },
-  { agent: 'analysis_agent', level: 'info', message: '开始读取检索网页内容，进行深度摘要与信息提取。' },
-  { agent: 'analysis_agent', level: 'info', message: '信息提取完毕，生成格式化分析数据 (tokens: 1250)。' },
-  { agent: 'writer_agent', level: 'info', message: '开始调用 LLM 撰写报告首段：系统整体架构与优势。' },
-  { agent: 'writer_agent', level: 'info', message: '报告内容生成中，当前使用 token 数: 2400。' },
-  { agent: 'writer_agent', level: 'info', message: '草稿生成成功，正移交给 Reviewer 角色审核。' },
-  { agent: 'reviewer_agent', level: 'info', message: '开始对生成的报告草稿进行合规性、事实准确性及逻辑链校对。' },
-  { agent: 'reviewer_agent', level: 'info', message: '校对通过，内容无敏感信息且事实无误。' },
-  { agent: 'planner_agent', level: 'info', message: '任务链 trace_demo_101 执行完毕，结果已成功保存。' },
-  { agent: 'search_agent', level: 'warn', message: '网络检索 API 响应延迟较高 (3400ms)，正在自动优化连接池。' },
-  { agent: 'writer_agent', level: 'warn', message: 'LLM API 返回结果出现截断，正在尝试重试以确保报告完整性。' },
-  { agent: 'search_agent', level: 'error', message: '网络连接超时 (timeout 5s000ms)，将自动发起第 1 次重试。' },
-  { agent: 'search_agent', level: 'info', message: '重试成功，已恢复数据拉取。' }
+  { agent: 'planner_agent', level: 'info', message: '收到用户请求，开始进行全局任务规划与子任务链拆解。', metric: null },
+  { agent: 'planner_agent', level: 'info', message: '成功生成子任务规划，生成任务执行拓扑链: [search -> analysis -> writer -> reviewer]。', metric: null },
+  { agent: 'search_agent', level: 'info', message: '启动搜索引擎检索，分析关键词: "agentscope multi-agent framework"。', metric: null },
+  { agent: 'search_agent', level: 'info', message: '检索查询响应成功，共拉取到 8 条最相关的网页数据。', metric: { latency: 120 } },
+  { agent: 'analysis_agent', level: 'info', message: '开始对检索拉取的文档内容进行分析摘要与核心信息抽取。', metric: null },
+  { agent: 'analysis_agent', level: 'info', message: '核心知识和文本片段提取成功，已生成清洗后的结构化 JSON 数据。', metric: { tokens: 1250 } },
+  { agent: 'writer_agent', level: 'info', message: '开始根据提取的上下文材料，调用 LLM 撰写报告首章。', metric: null },
+  { agent: 'writer_agent', level: 'info', message: '报告首章草稿撰写成功，已渲染 Markdown 节点。', metric: { tokens: 2400 } },
+  { agent: 'writer_agent', level: 'info', message: '所有报告章节撰写完毕，提交给 Reviewer 角色执行审核流程。', metric: null },
+  { agent: 'reviewer_agent', level: 'info', message: '开始对提交的报告内容进行深度校验（包含敏感性校验、事实准确性校验和逻辑完备度校验）。', metric: null },
+  { agent: 'reviewer_agent', level: 'info', message: '审核完毕，所有安全及格式校验点全部通过，可以安全发布。', metric: null },
+  { agent: 'planner_agent', level: 'info', message: '任务链 trace_demo_101 整体执行完毕，数据已持久化并提交至 Hive 归档。', metric: { latency: 5400 } },
+  { agent: 'search_agent', level: 'warn', message: '检测到外部网络检索 API 响应延迟偏高，将自动开启连接池扩容。', metric: { latency: 3400 } },
+  { agent: 'writer_agent', level: 'warn', message: 'LLM 生成响应出现潜在截断风险，将自动进行单次请求重试以恢复生成。', metric: null },
+  { agent: 'search_agent', level: 'error', message: '连接检索服务超时，连接失败。将自动触发第 1 次故障自愈重试。', metric: { latency: 5000 } },
+  { agent: 'search_agent', level: 'info', message: '故障重试成功，搜索引擎服务连接已自动恢复。', metric: null }
 ]
+
+const getEventIcon = (agent, level) => {
+  if (level === 'error') return AlertCircle
+  if (level === 'warn') return AlertTriangle
+  
+  switch (agent) {
+    case 'planner_agent': return Brain
+    case 'search_agent': return Search
+    case 'analysis_agent': return Cpu
+    case 'writer_agent': return FileText
+    case 'reviewer_agent': return ShieldAlert
+    default: return Info
+  }
+}
 
 const addLog = (logObj = null) => {
   const d = new Date()
   const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+  const idStr = Math.random().toString(36).substring(2, 9)
   
   let entry
   if (logObj) {
-    entry = { time: timeStr, ...logObj }
+    entry = { id: idStr, time: timeStr, ...logObj }
   } else {
     const template = logTemplates[Math.floor(Math.random() * logTemplates.length)]
     entry = {
+      id: idStr,
       time: timeStr,
       agent: template.agent,
       level: template.level,
-      message: template.message
+      message: template.message,
+      metric: template.metric
     }
   }
   
@@ -570,11 +602,12 @@ onMounted(async () => {
     const d = new Date(Date.now() - (8 - i) * 5000)
     const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
     const template = logTemplates[i % logTemplates.length]
-    realtimeLogs.value.push({
+    addLog({
       time: timeStr,
       agent: template.agent,
       level: template.level,
-      message: template.message
+      message: template.message,
+      metric: template.metric
     })
   }
   

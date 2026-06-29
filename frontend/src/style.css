@@ -1140,49 +1140,168 @@ h2 {
 }
 
 .terminal-log-container {
-  font-family: 'Consolas', 'Courier New', Courier, monospace;
-  font-size: 13px; /* Larger font */
-  color: #e2e8f0;
   height: 360px; /* Taller height (360px) */
   overflow-y: auto;
   padding: 14px;
-  background: rgba(2, 8, 16, 0.6);
+  background: rgba(2, 8, 16, 0.45);
   border-radius: 6px;
-  border: 1px solid rgba(103, 232, 249, 0.18);
+  border: 1px solid rgba(103, 232, 249, 0.15);
   margin-top: 10px;
-  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.8);
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.6);
 }
 
-.terminal-log-row {
-  line-height: 1.8;
-  margin-bottom: 6px;
-  padding-bottom: 6px;
-  border-bottom: 1px dashed rgba(103, 232, 249, 0.08); /* Dashed separator */
-  white-space: pre-wrap;
-  word-break: break-all;
-  text-shadow: 0 0 1px rgba(226, 232, 240, 0.1);
-  letter-spacing: 0.03em;
+/* Stream Cards styling */
+.stream-cards-container {
+  background: rgba(2, 8, 16, 0.3) !important;
+  border: 1px solid rgba(103, 232, 249, 0.12) !important;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5) !important;
 }
 
-.terminal-log-time {
-  color: #94a3b8; /* Brighter timestamp */
+.stream-event-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(15, 34, 54, 0.35);
+  border: 1px solid rgba(103, 232, 249, 0.08);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.terminal-log-agent {
+.stream-event-card:hover {
+  background: rgba(15, 34, 54, 0.6);
+  border-color: rgba(103, 232, 249, 0.22);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.08);
+}
+
+.event-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(34, 211, 238, 0.1);
   color: #22d3ee;
-  font-weight: bold;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.terminal-log-message.terminal-log-level-info {
+.event-icon-wrapper.info {
+  background: rgba(34, 211, 238, 0.1);
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.2);
+}
+
+.event-icon-wrapper.warn {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.event-icon-wrapper.error {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.event-card-body {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.event-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.event-agent-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.06);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.event-level-badge {
+  font-size: 9px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+}
+
+.event-level-badge.info {
+  background: rgba(74, 222, 128, 0.1);
   color: #4ade80;
 }
 
-.terminal-log-message.terminal-log-level-warn {
+.event-level-badge.warn {
+  background: rgba(251, 191, 36, 0.1);
   color: #fbbf24;
 }
 
-.terminal-log-message.terminal-log-level-error {
+.event-level-badge.error {
+  background: rgba(248, 113, 113, 0.1);
   color: #f87171;
+}
+
+.event-time-stamp {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.event-message-text {
+  margin: 0;
+  font-size: 13px;
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+
+.event-card-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  text-align: right;
+  height: 100%;
+}
+
+.event-card-metric span {
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Transition Group Animations */
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.4s ease;
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
 }
 
 .pulse-badge {

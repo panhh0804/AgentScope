@@ -41,7 +41,7 @@ export function barOption(title, xData, data, name) {
       axisLine: { lineStyle: { color: '#3f5a70' } },
       splitLine: { lineStyle: { color: 'rgba(139, 192, 217, 0.12)' } }
     },
-    series: [{ name, type: 'bar', data, itemStyle: { color: '#3f5f82' } }]
+    series: [{ name, type: 'bar', data, itemStyle: { color: '#6366f1' } }]
   }
 }
 
@@ -53,16 +53,16 @@ export function graphOption(graph) {
         type: 'graph',
         layout: 'force',
         roam: true,
-        label: { show: true },
+        label: { show: true, color: '#f8fafc', fontSize: 11 },
         force: { repulsion: 240, edgeLength: 130 },
         data: (graph.nodes || []).map((node) => ({
           ...node,
           symbolSize: Math.max(36, Math.min(82, node.value || 36)),
-          itemStyle: { color: '#2563eb' }
+          itemStyle: { color: '#06b6d4' }
         })),
         links: (graph.links || []).map((link) => ({
           ...link,
-          lineStyle: { width: Math.max(1, Math.min(8, (link.call_count || 1) / 150)), color: '#64748b' }
+          lineStyle: { width: Math.max(1, Math.min(8, (link.call_count || 1) / 150)), color: 'rgba(103, 232, 249, 0.35)' }
         }))
       }
     ]

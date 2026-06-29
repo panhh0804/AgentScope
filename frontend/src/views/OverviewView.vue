@@ -103,12 +103,12 @@
           <div ref="latencyChart" class="screen-chart large"></div>
         </article>
 
-        <article class="screen-panel compact overview-grid__relation">
+        <article class="screen-panel overview-grid__relation">
           <div class="screen-panel-head">
             <h3>协作关系图</h3>
             <span>{{ relationGraph.nodes?.length || 0 }} nodes</span>
           </div>
-          <div ref="relationChart" class="screen-chart small"></div>
+          <div ref="relationChart" class="screen-chart" style="height: 360px;"></div>
         </article>
       </section>
 
@@ -431,16 +431,16 @@ const metrics = computed(() => [
 ])
 
 const historyTaskOption = computed(() => lineOption('每日任务量', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), lineStyle: { color: '#5f79ad' } }
+  { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), lineStyle: { color: '#3b82f6', width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
 ]))
 
 const historySuccessOption = computed(() => lineOption('每日成功率', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), lineStyle: { color: '#7aa06f' } }
+  { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), lineStyle: { color: '#10b981', width: 3 }, areaStyle: { color: 'rgba(16, 185, 129, 0.08)' } }
 ]))
 
 const historyLatencyOption = computed(() => lineOption('平均 / P95 时延', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), lineStyle: { color: '#6d90a8' } },
-  { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), lineStyle: { color: '#8f6c6c' } }
+  { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), lineStyle: { color: '#06b6d4', width: 3 } },
+  { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), lineStyle: { color: '#f43f5e', width: 3 } }
 ]))
 
 const historyRankingOption = computed(() => barOption(

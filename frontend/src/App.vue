@@ -30,11 +30,12 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Activity, FileText, LayoutDashboard, Server } from '@lucide/vue'
+import { Activity, Database, FileText, LayoutDashboard, Server } from '@lucide/vue'
 
 const route = useRoute()
 const navItems = [
   { path: '/overview', label: '系统总览', icon: LayoutDashboard },
+  { path: '/data-admin', label: '数据管理', icon: Database },
   { path: '/reports', label: 'AI 报告', icon: FileText }
 ]
 </script>

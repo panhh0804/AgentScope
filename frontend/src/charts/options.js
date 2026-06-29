@@ -41,7 +41,7 @@ export function barOption(title, xData, data, name) {
       axisLine: { lineStyle: { color: '#3f5a70' } },
       splitLine: { lineStyle: { color: 'rgba(139, 192, 217, 0.12)' } }
     },
-    series: [{ name, type: 'bar', data, itemStyle: { color: '#6366f1' } }]
+    series: [{ name, type: 'bar', data, itemStyle: { color: '#3b82f6' } }]
   }
 }
 

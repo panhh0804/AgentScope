@@ -505,7 +505,7 @@ h2 {
 
 .screen-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.1fr 1.1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -561,7 +561,7 @@ h2 {
   grid-template-areas:
     "daily alerts throughput latency"
     "stream stream stream relation";
-  grid-template-columns: 1fr 1fr 1.1fr 1.1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
 }
 

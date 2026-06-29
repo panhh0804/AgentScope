@@ -431,16 +431,16 @@ const metrics = computed(() => [
 ])
 
 const historyTaskOption = computed(() => lineOption('每日任务量', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), lineStyle: { color: '#3b82f6', width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
+  { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
 ]))
 
 const historySuccessOption = computed(() => lineOption('每日成功率', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), lineStyle: { color: '#10b981', width: 3 }, areaStyle: { color: 'rgba(16, 185, 129, 0.08)' } }
+  { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), itemStyle: { color: '#10b981' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(16, 185, 129, 0.08)' } }
 ]))
 
 const historyLatencyOption = computed(() => lineOption('平均 / P95 时延', dailyMetrics.value.map((item) => item.metric_date), [
-  { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), lineStyle: { color: '#06b6d4', width: 3 } },
-  { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), lineStyle: { color: '#f43f5e', width: 3 } }
+  { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), itemStyle: { color: '#06b6d4' }, lineStyle: { width: 3 } },
+  { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), itemStyle: { color: '#f97316' }, lineStyle: { width: 3 } }
 ]))
 
 const historyRankingOption = computed(() => barOption(
@@ -492,13 +492,14 @@ function renderRealtimeCharts() {
       smooth: true,
       data: realtimeTrend.value.map((item) => item.events),
       areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
-      lineStyle: { color: '#22d3ee', width: 2 }
+      itemStyle: { color: '#22d3ee' },
+      lineStyle: { width: 2 }
     },
-    { name: '失败数', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.failed), lineStyle: { color: '#fb7185', width: 2 } }
+    { name: '失败数', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.failed), itemStyle: { color: '#fb7185' }, lineStyle: { width: 2 } }
   ])
 
   setLineOption(latencyInstance, '平均时延趋势', xRealtime, [
-    { name: '平均时延 ms', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.avg_latency_ms), lineStyle: { color: '#4ade80', width: 2 } }
+    { name: '平均时延 ms', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.avg_latency_ms), itemStyle: { color: '#4ade80' }, lineStyle: { width: 2 } }
   ])
 }
 

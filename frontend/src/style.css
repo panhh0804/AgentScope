@@ -559,10 +559,9 @@ h2 {
 
 .overview-grid {
   grid-template-areas:
-    "stream stream relation"
-    "daily alerts throughput"
-    "daily alerts latency";
-  grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 1.1fr) minmax(380px, 1.3fr);
+    "daily alerts throughput latency"
+    "stream stream stream relation";
+  grid-template-columns: 1fr 1fr 1.1fr 1.1fr;
   align-items: stretch;
 }
 

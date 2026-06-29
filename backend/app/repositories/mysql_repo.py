@@ -66,7 +66,7 @@ class MySQLAnalyticsRepository:
 
     def history_alerts(self, metric_date: date) -> Optional[List[Dict]]:
         return self._query(
-            "SELECT * FROM historical_alerts WHERE metric_date = %s ORDER BY created_at DESC",
+            "SELECT * FROM historical_alerts WHERE metric_date = %s ORDER BY create_time DESC",
             (metric_date,),
         )
 

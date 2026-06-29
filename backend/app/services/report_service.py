@@ -43,7 +43,7 @@ class ReportService:
                 "alerts": alerts,
                 "relation": relation,
             },
-            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "create_time": datetime.now().isoformat(timespec="seconds"),
         }
         self._reports[report_id] = item
         return item
@@ -51,7 +51,7 @@ class ReportService:
     def list_reports(self) -> List[Dict]:
         return [
             {key: value for key, value in report.items() if key != "content"}
-            for report in sorted(self._reports.values(), key=lambda x: x["created_at"], reverse=True)
+            for report in sorted(self._reports.values(), key=lambda x: x["create_time"], reverse=True)
         ]
 
     def get_report(self, report_id: str) -> Dict:

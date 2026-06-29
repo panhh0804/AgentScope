@@ -29,7 +29,7 @@
     <section class="report-hero panel">
       <div class="panel-header">
         <h2>报告概览</h2>
-        <span v-if="report.created_at" class="muted">{{ report.created_at }}</span>
+        <span v-if="report.create_time" class="muted">{{ report.create_time }}</span>
       </div>
 
       <div class="report-meta-grid">

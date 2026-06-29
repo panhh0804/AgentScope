@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS agent_events_source (
   error_type VARCHAR(64) NULL,
   retry_count INT NOT NULL DEFAULT 0,
   metadata_json TEXT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_event_id (event_id),
   KEY idx_event_time (event_time),
   KEY idx_trace_id (trace_id),

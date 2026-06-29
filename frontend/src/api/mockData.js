@@ -18,7 +18,7 @@ export function mockOverview() {
     estimated_cost_5m: 0.0832,
     retry_tasks: 3,
     open_alerts: 4,
-    updated_at: new Date().toISOString().slice(0, 19)
+    update_time: new Date().toISOString().slice(0, 19)
   }
 }
 
@@ -58,7 +58,7 @@ export function mockRealtimeAlerts() {
       threshold: 10000,
       source: 'streaming',
       status: 'open',
-      created_at: new Date(now.getTime() - 3 * 60 * 1000).toISOString().slice(0, 19)
+      create_time: new Date(now.getTime() - 3 * 60 * 1000).toISOString().slice(0, 19)
     },
     {
       alert_id: 'alert_demo_retry',
@@ -69,7 +69,7 @@ export function mockRealtimeAlerts() {
       threshold: 3,
       source: 'streaming',
       status: 'open',
-      created_at: new Date(now.getTime() - 6 * 60 * 1000).toISOString().slice(0, 19)
+      create_time: new Date(now.getTime() - 6 * 60 * 1000).toISOString().slice(0, 19)
     },
     {
       alert_id: 'alert_demo_recovery',
@@ -80,7 +80,7 @@ export function mockRealtimeAlerts() {
       threshold: 1,
       source: 'streaming',
       status: 'open',
-      created_at: new Date(now.getTime() - 9 * 60 * 1000).toISOString().slice(0, 19)
+      create_time: new Date(now.getTime() - 9 * 60 * 1000).toISOString().slice(0, 19)
     }
   ]
 }
@@ -168,7 +168,7 @@ export function mockReport(payload = {}) {
     report_id: `report_${date}`,
     report_date: date,
     report_type: payload.report_type || 'daily',
-    created_at: new Date().toISOString().slice(0, 19),
+    create_time: new Date().toISOString().slice(0, 19),
     content: `# AgentScope ${date} 运行分析报告
 
 ## 总体结论

@@ -11,7 +11,7 @@ case class RealtimeAlert(
   threshold: Double,
   source: String,
   status: String,
-  created_at: String
+  create_time: String
 )
 
 object RealtimeAlertDetector {
@@ -48,7 +48,7 @@ object RealtimeAlertDetector {
       threshold = threshold,
       source = "streaming",
       status = "open",
-      created_at = now
+      create_time = now
     )
   }
 }

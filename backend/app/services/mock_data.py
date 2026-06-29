@@ -19,7 +19,7 @@ def realtime_overview() -> Dict:
         "estimated_cost_5m": 0.0832,
         "retry_tasks": 3,
         "open_alerts": 4,
-        "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "update_time": datetime.now().isoformat(timespec="seconds"),
     }
 
 
@@ -69,7 +69,7 @@ def recent_alerts() -> List[Dict]:
             "threshold": 10000,
             "source": "streaming",
             "status": "open",
-            "created_at": (now - timedelta(minutes=3)).isoformat(timespec="seconds"),
+            "create_time": (now - timedelta(minutes=3)).isoformat(timespec="seconds"),
         },
         {
             "alert_id": "alert_demo_retry",
@@ -80,7 +80,7 @@ def recent_alerts() -> List[Dict]:
             "threshold": 3,
             "source": "streaming",
             "status": "open",
-            "created_at": (now - timedelta(minutes=6)).isoformat(timespec="seconds"),
+            "create_time": (now - timedelta(minutes=6)).isoformat(timespec="seconds"),
         },
     ]
 

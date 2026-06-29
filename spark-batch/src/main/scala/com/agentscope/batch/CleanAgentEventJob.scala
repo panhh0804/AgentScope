@@ -19,7 +19,7 @@ object CleanAgentEventJob extends SparkJobSupport {
       "parent_agent_id", "agent_role", "event_type", "status", "event_time",
       "latency_ms", "prompt_tokens", "completion_tokens", "total_tokens",
       "cost_usd", "model_name", "tool_name", "error_type", "retry_count",
-      "metadata_json", "created_at"
+      "metadata_json", "create_time"
     )
       .filter($"event_id".isNotNull && $"trace_id".isNotNull && $"run_id".isNotNull)
       .filter($"event_type".isin("agent_start", "agent_complete", "agent_failed", "llm_request", "llm_response", "tool_call", "tool_result", "retry", "alert"))

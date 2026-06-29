@@ -94,7 +94,7 @@ cat >"${job_conf}" <<EOF
               "error_type",
               "retry_count",
               "metadata_json",
-              "created_at"
+              "create_time"
             ],
             "where": "DATE(event_time) = '${BIZ_DATE}'",
             "connection": [
@@ -142,7 +142,7 @@ cat >"${job_conf}" <<EOF
               {"name": "error_type", "type": "string"},
               {"name": "retry_count", "type": "string"},
               {"name": "metadata_json", "type": "string"},
-              {"name": "created_at", "type": "string"}
+              {"name": "create_time", "type": "string"}
             ]
           }
         }

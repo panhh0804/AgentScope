@@ -79,7 +79,7 @@
             <div v-for="alert in realtimeAlerts" :key="alert.alert_id" class="ticker-item">
               <span :class="['level-dot', alert.level]">{{ alert.level }}</span>
               <strong>{{ alert.alert_type }}</strong>
-              <small>{{ alert.agent_id }} / {{ alert.created_at }}</small>
+              <small>{{ alert.agent_id }} / {{ alert.create_time }}</small>
             </div>
           </div>
         </article>
@@ -191,7 +191,7 @@
         <article class="screen-panel report-summary-panel">
           <div class="screen-panel-head">
             <h3>AI 报告摘要</h3>
-            <span>{{ latestReport.created_at || '未生成' }}</span>
+            <span>{{ latestReport.create_time || '未生成' }}</span>
           </div>
           <p class="report-summary-intro">
             {{ latestReport.content ? reportIntro : '暂无报告内容，点击右上角进入报告页或先生成一份日报。' }}
@@ -246,7 +246,7 @@
               <td>{{ alert.agent_id }}</td>
               <td>{{ alert.current_value }}</td>
               <td>{{ alert.threshold ?? alert.threshold_value }}</td>
-              <td>{{ alert.created_at }}</td>
+              <td>{{ alert.create_time }}</td>
             </tr>
           </tbody>
         </table>

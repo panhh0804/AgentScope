@@ -155,7 +155,6 @@
         <a-tab-pane key="jobs" title="数据任务管理">
           <!-- Scheduling and Pipeline Banner -->
           <div class="scheduler-banner">
-            <div class="banner-icon">⏰</div>
             <div class="banner-content">
               <h4>自动调度与数据补数说明</h4>
               <p>离线计算流水线在生产环境中由 <strong>Crontab 定时任务（每天凌晨 02:00）</strong> 自动触发运行。此控制台主要用于开发与运维进行历史日期补数（Backfill）或失败作业的手动重试。运行前请确认源数据库（MySQL Source）在所选业务日期是否有数据。</p>
@@ -178,7 +177,7 @@
             <!-- Horizontal Pipeline Workflow Layout -->
             <div class="pipeline-flow-layout">
               <!-- Stage 1 -->
-              <div class="pipeline-stage-box">
+              <div class="pipeline-stage-box" :class="{ 'stage-running': isStageRunning(1) }">
                 <div class="stage-badge">01</div>
                 <div class="stage-info">
                   <h4>数据接入</h4>
@@ -206,7 +205,7 @@
               <div class="pipeline-flow-arrow">➔</div>
 
               <!-- Stage 2 -->
-              <div class="pipeline-stage-box">
+              <div class="pipeline-stage-box" :class="{ 'stage-running': isStageRunning(2) }">
                 <div class="stage-badge">02</div>
                 <div class="stage-info">
                   <h4>数据清洗</h4>
@@ -234,7 +233,7 @@
               <div class="pipeline-flow-arrow">➔</div>
 
               <!-- Stage 3 -->
-              <div class="pipeline-stage-box stage-box-wide">
+              <div class="pipeline-stage-box stage-box-wide" :class="{ 'stage-running': isStageRunning(3) }">
                 <div class="stage-badge">03</div>
                 <div class="stage-info">
                   <h4>多维离线计算</h4>
@@ -262,7 +261,7 @@
               <div class="pipeline-flow-arrow">➔</div>
 
               <!-- Stage 4 -->
-              <div class="pipeline-stage-box">
+              <div class="pipeline-stage-box" :class="{ 'stage-running': isStageRunning(4) }">
                 <div class="stage-badge">04</div>
                 <div class="stage-info">
                   <h4>报告生成</h4>
@@ -445,6 +444,10 @@ function getJobsByStage(stage) {
   if (stage === 3) return jobs.value.filter(j => ['daily_metric', 'agent_ranking', 'error_analysis', 'relation_analysis', 'historical_alert'].includes(j.job_code))
   if (stage === 4) return jobs.value.filter(j => j.job_code === 'report_generate')
   return []
+}
+
+function isStageRunning(stage) {
+  return getJobsByStage(stage).some(job => runningJobs.value[job.job_code])
 }
 const jsonModalOpen = ref(false)
 const jsonPreview = ref('')

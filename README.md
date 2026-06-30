@@ -63,8 +63,8 @@ graph TD
     end
 
     %% 数据链路关联关系
-    Sim -.->|实时写入 (Kafka Producer)| Kafka
-    Sim -->|离线落地 (JDBC)| MySQL_Src
+    Sim -. 实时写入 Kafka Producer .-> Kafka
+    Sim -->|离线落地 JDBC| MySQL_Src
     
     %% 实时流转
     Kafka -->|微批次 Pull| SparkStreaming
@@ -73,7 +73,7 @@ graph TD
     %% 离线数仓流转
     MySQL_Src -->|定时 DataX 调度| DataX
     DataX -->|HDFS Write| HDFS_Raw
-    HDFS_Raw -->|CleanJob (Scala)| SparkClean
+    HDFS_Raw -->|CleanJob Scala| SparkClean
     SparkClean -->|Parquet| SparkBatch
     SparkBatch -->|JDBC Write| MySQL_Ana
     

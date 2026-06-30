@@ -201,3 +201,83 @@ class MySQLAnalyticsRepository:
             ]
         return issues
 
+    def get_source_total_count(self) -> int:
+        sql = "SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source"
+        res = self._query(sql, ())
+        if res and len(res) > 0:
+            return res[0].get("cnt") or 0
+        return 0
+
+    def get_today_new_count(self, today_date: date) -> int:
+        sql = "SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s"
+        res = self._query(sql, (today_date,))
+        if res and len(res) > 0:
+            return res[0].get("cnt") or 0
+        return 0
+
+    def get_metric_overview_stats(self) -> Dict[str, Any]:
+        sql = """
+        SELECT 
+            COUNT(DISTINCT metric_date) as metric_partition_count,
+            MAX(metric_date) as metric_latest_biz_date
+        FROM daily_metrics
+        """
+        res = self._query(sql, ())
+        if res and len(res) > 0:
+            row = res[0]
+            latest_date = row.get("metric_latest_biz_date")
+            if latest_date:
+                if hasattr(latest_date, "isoformat"):
+                    latest_date = latest_date.isoformat()
+                else:
+                    latest_date = str(latest_date)
+            return {
+                "metric_partition_count": row.get("metric_partition_count") or 0,
+                "metric_latest_biz_date": latest_date or None,
+            }
+        return {"metric_partition_count": 0, "metric_latest_biz_date": None}
+
+    def get_data_volume_trend(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
+        # Query raw count from source database
+        sql_raw = """
+        SELECT DATE(event_time) as dt, COUNT(*) as cnt 
+        FROM agentscope_source.agent_events_source 
+        WHERE event_time BETWEEN %s AND %s 
+        GROUP BY dt
+        """
+        raw_res = self._query(sql_raw, (start_date.isoformat() + " 00:00:00", end_date.isoformat() + " 23:59:59"))
+        raw_map = {}
+        if raw_res:
+            for row in raw_res:
+                d = row.get("dt")
+                if hasattr(d, "isoformat"):
+                    d = d.isoformat()
+                raw_map[str(d)] = row.get("cnt") or 0
+
+        # Query clean count from daily_metrics
+        sql_clean = """
+        SELECT metric_date as dt, total_count as cnt 
+        FROM daily_metrics 
+        WHERE metric_date BETWEEN %s AND %s
+        """
+        clean_res = self._query(sql_clean, (start_date, end_date))
+        clean_map = {}
+        if clean_res:
+            for row in clean_res:
+                d = row.get("dt")
+                if hasattr(d, "isoformat"):
+                    d = d.isoformat()
+                clean_map[str(d)] = row.get("cnt") or 0
+
+        trend = []
+        curr = start_date
+        while curr <= end_date:
+            curr_str = curr.isoformat()
+            trend.append({
+                "biz_date": curr_str,
+                "raw_count": raw_map.get(curr_str, 0),
+                "clean_count": clean_map.get(curr_str, 0)
+            })
+            curr += timedelta(days=1)
+        return trend
+

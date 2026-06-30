@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import subprocess
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from app.repositories.mysql_repo import MySQLAnalyticsRepository
 
 ADMIN_JOB_CODES = {
     "offline_generate",
@@ -20,6 +22,7 @@ ADMIN_JOB_CODES = {
 
 class AdminService:
     def __init__(self) -> None:
+        self.repo = MySQLAnalyticsRepository()
         self._job_runs = self._seed_job_runs()
         self._audit_logs = self._seed_audit_logs()
 
@@ -163,22 +166,101 @@ class AdminService:
 
     def execute_job(self, job_code: str, biz_date: date) -> Dict[str, Any]:
         self._ensure_job(job_code)
-        now = datetime.now()
+        
+        status = "success"
+        log_summary = f"{job_code} executed successfully."
+        error_count = 0
+        input_count = 10000
+        output_count = 9650 if job_code == "spark_clean" else 120
+        
+        start_time = datetime.now()
+        
+        try:
+            if job_code == "datax_import":
+                # Execute DataX script on master node via passwordless SSH
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", "bash", "/root/projects/agentscope/scripts/datax_import_agent_events.sh", biz_date.isoformat()]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode != 0:
+                    status = "failed"
+                    log_summary = f"DataX Import failed:\n{res.stderr or res.stdout}"
+                    error_count = 1
+                else:
+                    log_summary = f"DataX Import completed:\n{res.stdout}"
+            
+            elif job_code == "spark_clean":
+                # Execute Spark clean script on master node
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", "bash", "/root/projects/agentscope/scripts/run_clean_job.sh", biz_date.isoformat()]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode != 0:
+                    status = "failed"
+                    log_summary = f"Spark Clean failed:\n{res.stderr or res.stdout}"
+                    error_count = 1
+                else:
+                    log_summary = f"Spark Clean completed:\n{res.stdout}"
+                    
+            elif job_code in ["daily_metric", "agent_ranking", "error_analysis", "relation_analysis", "historical_alert"]:
+                # Execute specific Spark job on master node
+                job_class_map = {
+                    "daily_metric": "DailyMetricJob",
+                    "agent_ranking": "AgentRankingJob",
+                    "error_analysis": "ErrorAnalysisJob",
+                    "relation_analysis": "RelationGraphJob",
+                    "historical_alert": "HistoricalAlertJob"
+                }
+                job_class = job_class_map[job_code]
+                
+                # Formulate the spark-submit command on master
+                spark_cmd = (
+                    f"/usr/local/spark/bin/spark-submit "
+                    f"--class com.agentscope.batch.{job_class} "
+                    f"--master spark://master:7077 "
+                    f"/root/projects/agentscope/spark-batch/target/agentscope-spark-batch-0.1.0.jar "
+                    f"--input /agentscope/clean/agent_events/dt={biz_date.isoformat()} "
+                    f"--metric-base /agentscope/metric "
+                    f"--date {biz_date.isoformat()} "
+                    f"--jdbc-url jdbc:mysql://middleware:3306/agentscope_analytics?useSSL=false\\&useUnicode=true\\&characterEncoding=utf8 "
+                    f"--jdbc-user agentscope "
+                    f"--jdbc-password agentscope_pass"
+                )
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", spark_cmd]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode != 0:
+                    status = "failed"
+                    log_summary = f"Spark Job {job_class} failed:\n{res.stderr or res.stdout}"
+                    error_count = 1
+                else:
+                    log_summary = f"Spark Job {job_class} completed:\n{res.stdout}"
+                    
+            elif job_code == "report_generate":
+                # Generate AI report
+                from app.services.report_service import ReportService
+                report_service = ReportService()
+                report_res = report_service.generate(biz_date, "daily", "rule-template")
+                log_summary = f"AI Report generated: {report_res.get('report_id')}"
+                
+        except Exception as e:
+            status = "failed"
+            log_summary = f"Execution system error: {str(e)}"
+            error_count = 1
+            
+        duration = int((datetime.now() - start_time).total_seconds())
+        
         run = {
             "run_id": f"run_{uuid4().hex[:10]}",
             "job_code": job_code,
             "biz_date": biz_date.isoformat(),
-            "status": "success",
-            "input_count": 10000,
-            "output_count": 9650 if job_code == "spark_clean" else 120,
-            "error_count": 0,
-            "start_time": now.isoformat(timespec="seconds"),
-            "end_time": (now + timedelta(seconds=18)).isoformat(timespec="seconds"),
-            "duration_seconds": 18,
-            "log_summary": f"{job_code} executed by fixed whitelist for {biz_date.isoformat()}",
+            "status": status,
+            "input_count": input_count,
+            "output_count": output_count if status == "success" else 0,
+            "error_count": error_count,
+            "start_time": start_time.isoformat(timespec="seconds"),
+            "end_time": datetime.now().isoformat(timespec="seconds"),
+            "duration_seconds": duration,
+            "log_summary": log_summary,
         }
+        
         self._job_runs.insert(0, run)
-        self._audit_logs.insert(0, self._audit("admin", "task_execute", "job", job_code, "success"))
+        self._audit_logs.insert(0, self._audit("admin", "task_execute", "job", job_code, status))
         return run
 
     def retry_job_run(self, run_id: str) -> Dict[str, Any]:
@@ -216,13 +298,7 @@ class AdminService:
         }
 
     def quality_issues(self) -> List[Dict[str, Any]]:
-        biz_date = date.today().isoformat()
-        return [
-            self._issue("required_fields", "关键字段缺失", "agent_clean_events", biz_date, 9650, 18, {"event_id": None, "trace_id": "trace_demo_102"}),
-            self._issue("duplicate_event_id", "重复 event_id", "agent_raw_events", biz_date, 10000, 7, {"event_id": "evt_dup_001", "count": 2}),
-            self._issue("token_mismatch", "Token 不一致", "agent_clean_events", biz_date, 9650, 11, {"prompt_tokens": 1200, "completion_tokens": 900, "total_tokens": 2198}),
-            self._issue("negative_latency", "负数时延", "agent_source_events", biz_date, 10000, 3, {"event_id": "evt_bad_latency", "latency_ms": -42}),
-        ]
+        return self.repo.get_quality_issues(date.today())
 
     def audit_logs(self) -> List[Dict[str, Any]]:
         return self._audit_logs

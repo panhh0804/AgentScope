@@ -21,7 +21,10 @@ class MetricService:
         return self.repo.agent_rankings(metric_date) or mock_data.rankings(metric_date)
 
     def agent_relations(self, metric_date: date) -> Dict:
-        return self.repo.agent_relations(metric_date) or mock_data.relation_graph(metric_date)
+        res = self.repo.agent_relations(metric_date)
+        if res and res.get("nodes") and res.get("links"):
+            return res
+        return mock_data.relation_graph(metric_date)
 
     def history_alerts(self, metric_date: date) -> List[Dict]:
         return self.repo.history_alerts(metric_date) or mock_data.history_alerts(metric_date)

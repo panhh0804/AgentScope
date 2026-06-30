@@ -8,7 +8,13 @@ export const fetchDataLineage = () => getData('/admin/data-lineage')
 export const fetchAdminEvents = (params = {}) => getData('/admin/events', params)
 export const fetchAdminJobs = () => getData('/admin/jobs')
 export const fetchAdminJobRuns = () => getData('/admin/job-runs')
-export const executeAdminJob = (jobCode, bizDate) => postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate })
+export const executeAdminJob = (jobCode, bizDate) => {
+  const config = {}
+  if (jobCode === 'report_generate') {
+    config.timeout = 180000 // 3 minutes
+  }
+  return postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate }, config)
+}
 export const retryAdminJobRun = (runId) => postData(`/admin/job-runs/${runId}/retry`)
 export const fetchAdminJobLogs = (runId) => getData(`/admin/job-runs/${runId}/logs`)
 export const fetchQualityOverview = () => getData('/admin/quality/overview')

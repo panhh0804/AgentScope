@@ -118,7 +118,7 @@ class AdminService:
         clean_total = clean_res[0].get("total_clean") if clean_res and clean_res[0].get("total_clean") else 0
         
         # Metric count (number of report records or metrics)
-        sql_metric = "SELECT COUNT(*) as total_reports FROM reports"
+        sql_metric = "SELECT COUNT(*) as total_reports FROM ai_reports"
         metric_res = self.repo._query(sql_metric, ())
         metric_total = metric_res[0].get("total_reports") if metric_res and metric_res[0].get("total_reports") else 0
         
@@ -162,7 +162,7 @@ class AdminService:
         alerts_res = self.repo._query(sql_alerts, ())
         alerts_total = int(alerts_res[0].get("total_alerts") or 0) if alerts_res else 0
         
-        sql_reports = "SELECT COUNT(*) as total_reports FROM reports"
+        sql_reports = "SELECT COUNT(*) as total_reports FROM ai_reports"
         reports_res = self.repo._query(sql_reports, ())
         reports_total = int(reports_res[0].get("total_reports") or 0) if reports_res else 0
 
@@ -173,7 +173,7 @@ class AdminService:
             self._dataset("agent_daily_metrics", "Agent 每日指标", "MySQL Analytics", "Metric", metrics_total),
             self._dataset("agent_relations", "Agent 调用关系", "MySQL Analytics", "Analytics", relations_total),
             self._dataset("historical_alerts", "历史告警", "MySQL Analytics", "Analytics", alerts_total),
-            self._dataset("ai_reports", "AI 分析报告", "MySQL Analytics", "Report", reports_reports_total if 'reports_reports_total' in locals() else reports_total),
+            self._dataset("ai_reports", "AI 分析报告", "MySQL Analytics", "Report", reports_total),
         ]
 
     def data_lineage(self) -> Dict[str, Any]:
@@ -260,7 +260,20 @@ class AdminService:
         start_time = datetime.now()
         
         try:
-            if job_code == "datax_import":
+            if job_code == "offline_generate":
+                # Execute simulator on master node via passwordless SSH to populate MySQL source db
+                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count 50"
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode != 0:
+                    status = "failed"
+                    log_summary = f"Mock Data Generation failed:\n{res.stderr or res.stdout}"
+                    error_count = 1
+                else:
+                    log_summary = f"Mock Data Generation completed successfully:\n{res.stdout}"
+                    output_count = 1126
+            
+            elif job_code == "datax_import":
                 # Execute DataX script on master node via passwordless SSH
                 exec_cmd = f"source /etc/profile && cd /root/projects/agentscope && bash scripts/datax_import_agent_events.sh {biz_date.isoformat()}"
                 cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]

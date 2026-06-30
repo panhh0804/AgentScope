@@ -35,7 +35,7 @@
       <div class="report-meta-grid">
         <article class="report-meta-card">
           <span>报告主题</span>
-          <strong>{{ reportTitle }}</strong>
+          <strong v-html="reportTitleHtml"></strong>
           <p>{{ reportIntro }}</p>
         </article>
         <article class="report-meta-card">
@@ -54,7 +54,7 @@
     <section v-if="sections.length" class="report-section-grid">
       <article v-for="(section, sectionIndex) in sections" :key="`${section.title}-${sectionIndex}`" class="panel report-section-card">
         <div class="panel-header">
-          <h2>{{ section.title }}</h2>
+          <h2 v-html="section.titleHtml"></h2>
           <span>{{ section.blocks.length }} 段</span>
         </div>
 
@@ -122,6 +122,7 @@ const reportError = ref('')
 
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))
 const reportTitle = computed(() => sections.value[0]?.title || 'AI 报告')
+const reportTitleHtml = computed(() => sections.value[0]?.titleHtml || 'AI 报告')
 const reportIntro = computed(() => {
   const content = String(report.value.content || '')
   return content ? excerptMarkdown(content, 160) : '生成结果会分成多个卡片区块，方便快速阅读和定位。'

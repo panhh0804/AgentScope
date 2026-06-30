@@ -64,7 +64,7 @@ export function parseMarkdownSections(content) {
   if (!String(content || '').trim()) return []
   const lines = String(content || '').replace(/\r\n/g, '\n').split('\n')
   const sections = []
-  let current = { title: '内容', blocks: [] }
+  let current = { title: '内容', titleHtml: '内容', blocks: [] }
   const paragraph = []
   const listItems = []
   const codeLines = []
@@ -143,8 +143,10 @@ export function parseMarkdownSections(content) {
       if (current.blocks.length || current.title !== '内容') {
         sections.push(current)
       }
+      const rawTitle = heading[2].trim()
       current = {
-        title: heading[2].trim(),
+        title: rawTitle,
+        titleHtml: renderInline(rawTitle),
         blocks: []
       }
       continue
@@ -167,7 +169,9 @@ export function parseMarkdownSections(content) {
 
     // First line title auto-detection (when no markdown heading is present)
     if (isFirstLine && current.title === '内容') {
-      current.title = line.trim()
+      const rawTitle = line.trim()
+      current.title = rawTitle
+      current.titleHtml = renderInline(rawTitle)
       isFirstLine = false
       continue
     }
@@ -181,7 +185,7 @@ export function parseMarkdownSections(content) {
     sections.push(current)
   }
 
-  return sections.length ? sections : [{ title: '内容', blocks: [] }]
+  return sections.length ? sections : [{ title: '内容', titleHtml: '内容', blocks: [] }]
 }
 
 export function excerptMarkdown(content, limit = 160) {

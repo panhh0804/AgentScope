@@ -256,7 +256,7 @@ class MySQLAnalyticsRepository:
 
         # Query clean count from daily_metrics
         sql_clean = """
-        SELECT metric_date as dt, total_count as cnt 
+        SELECT metric_date as dt, task_count as cnt 
         FROM daily_metrics 
         WHERE metric_date BETWEEN %s AND %s
         """

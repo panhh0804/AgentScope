@@ -73,9 +73,9 @@ class AdminService:
 
         # 5. Funnel count calculation for today (or latest date)
         # Fetch clean count from metrics if available
-        sql_clean_cnt = "SELECT total_count FROM daily_metrics WHERE metric_date = %s"
+        sql_clean_cnt = "SELECT task_count FROM daily_metrics WHERE metric_date = %s"
         clean_res = self.repo._query(sql_clean_cnt, (today_str,))
-        clean_cnt = clean_res[0]["total_count"] if clean_res and clean_res[0].get("total_count") else int(today_new * 0.965)
+        clean_cnt = clean_res[0]["task_count"] if clean_res and clean_res[0].get("task_count") else int(today_new * 0.965)
         
         return {
             "source_total_count": source_total,

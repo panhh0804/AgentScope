@@ -150,6 +150,45 @@
               <div ref="lineageChartRef" class="screen-chart" style="height: 280px; margin-top: 10px;"></div>
             </article>
           </section>
+
+          <!-- Three-Layer Data Warehouse Responsibility Section -->
+          <section class="screen-panel warehouse-layers-panel" style="margin-top: 12px;">
+            <div class="screen-panel-head">
+              <h3>数仓分层职责架构</h3>
+              <span>ODS ➔ DWD ➔ DWS</span>
+            </div>
+            <div class="warehouse-layers-flow">
+              <div class="layer-card ods-card">
+                <div class="layer-title">ODS 层</div>
+                <div class="layer-eng">Operational Data Store</div>
+                <p class="layer-desc">原始数据落地，保持数据原貌，接入格式各异的原始事件（JSON）。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>Source ➔ HDFS Raw</strong></div>
+                  <div>载体：<code>/agentscope/raw/</code> (JSON)</div>
+                </div>
+              </div>
+              <div class="layer-arrow">➔</div>
+              <div class="layer-card dwd-card">
+                <div class="layer-title">DWD 层</div>
+                <div class="layer-eng">Data Warehouse Detail</div>
+                <p class="layer-desc">数据清洗与标准化，过滤坏账去重，提供干净、无重复、字段统一的存储。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>HDFS Raw ➔ HDFS Clean</strong></div>
+                  <div>载体：<code>/agentscope/clean/</code> (Parquet)</div>
+                </div>
+              </div>
+              <div class="layer-arrow">➔</div>
+              <div class="layer-card dws-card">
+                <div class="layer-title">DWS 层</div>
+                <div class="layer-eng">Data Warehouse Summary</div>
+                <p class="layer-desc">轻度汇总，按天/小时/Agent等多维主题聚合，提供下游可视化直接消费。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>HDFS Clean ➔ MySQL Analytics</strong></div>
+                  <div>载体：<code>daily_metrics</code> / <code>agent_rankings</code> 表</div>
+                </div>
+              </div>
+            </div>
+          </section>
         </a-tab-pane>
 
         <a-tab-pane key="jobs" title="数据任务管理">

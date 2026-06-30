@@ -15,4 +15,5 @@ export const fetchHistoryAlerts = (date) => getData('/alerts/history', { date })
 
 export const generateReport = (payload) => postData('/reports/generate', payload, { timeout: REPORT_TIMEOUT_MS })
 export const fetchReports = () => getData('/reports')
+export const fetchReportDetail = (reportId) => getData(`/reports/${reportId}`)
 

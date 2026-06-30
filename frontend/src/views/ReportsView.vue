@@ -102,9 +102,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { FilePlus2 } from '@lucide/vue'
-import { generateReport } from '../api/dashboard'
+import { generateReport, fetchReports, fetchReportDetail } from '../api/dashboard'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 
 const getTodayString = () => {
@@ -119,6 +119,22 @@ const reportType = ref('daily')
 const report = ref({})
 const isGenerating = ref(false)
 const reportError = ref('')
+const isLoadingReport = ref(false)
+
+onMounted(async () => {
+  isLoadingReport.value = true
+  try {
+    const list = await fetchReports()
+    if (list && list.length > 0) {
+      const detail = await fetchReportDetail(list[0].report_id)
+      report.value = detail
+    }
+  } catch (e) {
+    console.error('Failed to load latest report on mount', e)
+  } finally {
+    isLoadingReport.value = false
+  }
+})
 
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))
 const reportTitle = computed(() => sections.value[0]?.title || 'AI 报告')

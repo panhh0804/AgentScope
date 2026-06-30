@@ -337,7 +337,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
-import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend } from '../api/dashboard'
+import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend, fetchReportDetail } from '../api/dashboard'
 import { barOption, graphOption, lineOption } from '../charts/options'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 
@@ -727,7 +727,19 @@ async function load() {
   historyRankings.value = rankingData
   relationGraph.value = relationData
   historyAlerts.value = historyAlertData
-  reports.value = reportsData
+  
+  if (reportsData && reportsData.length > 0) {
+    try {
+      const detail = await fetchReportDetail(reportsData[0].report_id)
+      reports.value = [detail, ...reportsData.slice(1)]
+    } catch (err) {
+      console.error('Failed to load latest report detail', err)
+      reports.value = reportsData
+    }
+  } else {
+    reports.value = []
+  }
+
   await nextTick()
   renderCharts()
 }

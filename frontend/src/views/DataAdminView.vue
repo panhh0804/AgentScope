@@ -153,17 +153,139 @@
         </a-tab-pane>
 
         <a-tab-pane key="jobs" title="数据任务管理">
+          <!-- Scheduling and Pipeline Banner -->
+          <div class="scheduler-banner">
+            <div class="banner-icon">⏰</div>
+            <div class="banner-content">
+              <h4>自动调度与数据补数说明</h4>
+              <p>离线计算流水线在生产环境中由 <strong>Crontab 定时任务（每天凌晨 02:00）</strong> 自动触发运行。此控制台主要用于开发与运维进行历史日期补数（Backfill）或失败作业的手动重试。运行前请确认源数据库（MySQL Source）在所选业务日期是否有数据。</p>
+            </div>
+          </div>
+
           <section class="screen-panel">
             <div class="screen-panel-head">
-              <h3>白名单任务</h3>
-              <a-button type="primary" @click="runFullPipeline">一键执行完整离线链路</a-button>
+              <h3>白名单任务流水线</h3>
+              <a-button 
+                type="primary" 
+                :loading="pipelineRunning" 
+                :disabled="anyJobRunning" 
+                @click="runFullPipeline"
+              >
+                {{ pipelineRunning ? '整条链路执行中...' : '一键执行完整离线链路' }}
+              </a-button>
             </div>
-            <div class="job-grid">
-              <article v-for="job in jobs" :key="job.job_code" class="job-card">
-                <span>{{ job.job_name }}</span>
-                <strong>{{ job.job_code }}</strong>
-                <a-button size="small" type="outline" @click="runJob(job.job_code)">执行</a-button>
-              </article>
+
+            <!-- Horizontal Pipeline Workflow Layout -->
+            <div class="pipeline-flow-layout">
+              <!-- Stage 1 -->
+              <div class="pipeline-stage-box">
+                <div class="stage-badge">01</div>
+                <div class="stage-info">
+                  <h4>数据接入</h4>
+                  <small>Source ➔ Raw (DataX)</small>
+                </div>
+                <div class="stage-body">
+                  <div v-for="job in getJobsByStage(1)" :key="job.job_code" class="pipeline-job-item">
+                    <div class="job-meta">
+                      <h5>{{ job.job_name }}</h5>
+                      <code>{{ job.job_code }}</code>
+                    </div>
+                    <a-button 
+                      size="small" 
+                      type="outline" 
+                      :loading="runningJobs[job.job_code]" 
+                      :disabled="anyJobRunning" 
+                      @click="runJob(job.job_code)"
+                    >
+                      {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
+                    </a-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pipeline-flow-arrow">➔</div>
+
+              <!-- Stage 2 -->
+              <div class="pipeline-stage-box">
+                <div class="stage-badge">02</div>
+                <div class="stage-info">
+                  <h4>数据清洗</h4>
+                  <small>Raw ➔ Clean (Spark)</small>
+                </div>
+                <div class="stage-body">
+                  <div v-for="job in getJobsByStage(2)" :key="job.job_code" class="pipeline-job-item">
+                    <div class="job-meta">
+                      <h5>{{ job.job_name }}</h5>
+                      <code>{{ job.job_code }}</code>
+                    </div>
+                    <a-button 
+                      size="small" 
+                      type="outline" 
+                      :loading="runningJobs[job.job_code]" 
+                      :disabled="anyJobRunning" 
+                      @click="runJob(job.job_code)"
+                    >
+                      {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
+                    </a-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pipeline-flow-arrow">➔</div>
+
+              <!-- Stage 3 -->
+              <div class="pipeline-stage-box stage-box-wide">
+                <div class="stage-badge">03</div>
+                <div class="stage-info">
+                  <h4>多维离线计算</h4>
+                  <small>Clean ➔ Metrics (Spark Batch)</small>
+                </div>
+                <div class="stage-body stage-body-grid">
+                  <div v-for="job in getJobsByStage(3)" :key="job.job_code" class="pipeline-job-item">
+                    <div class="job-meta">
+                      <h5>{{ job.job_name }}</h5>
+                      <code>{{ job.job_code }}</code>
+                    </div>
+                    <a-button 
+                      size="small" 
+                      type="outline" 
+                      :loading="runningJobs[job.job_code]" 
+                      :disabled="anyJobRunning" 
+                      @click="runJob(job.job_code)"
+                    >
+                      {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
+                    </a-button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pipeline-flow-arrow">➔</div>
+
+              <!-- Stage 4 -->
+              <div class="pipeline-stage-box">
+                <div class="stage-badge">04</div>
+                <div class="stage-info">
+                  <h4>报告生成</h4>
+                  <small>Decision Support (LLM)</small>
+                </div>
+                <div class="stage-body">
+                  <div v-for="job in getJobsByStage(4)" :key="job.job_code" class="pipeline-job-item">
+                    <div class="job-meta">
+                      <h5>{{ job.job_name }}</h5>
+                      <code>{{ job.job_code }}</code>
+                    </div>
+                    <a-button 
+                      size="small" 
+                      type="outline" 
+                      :loading="runningJobs[job.job_code]" 
+                      :disabled="anyJobRunning" 
+                      @click="runJob(job.job_code)"
+                    >
+                      {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
+                    </a-button>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
           <section class="screen-panel">
@@ -276,6 +398,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
+import { Message } from '@arco-design/web-vue'
 import {
   executeAdminJob,
   fetchAdminEvents,
@@ -308,6 +431,21 @@ const qualityOverview = ref({})
 const qualityIssues = ref([])
 const auditLogs = ref([])
 const eventFilters = ref({ trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
+
+// Pipeline running states
+const runningJobs = ref({})
+const pipelineRunning = ref(false)
+const anyJobRunning = computed(() => {
+  return Object.values(runningJobs.value).some(Boolean) || pipelineRunning.value
+})
+
+function getJobsByStage(stage) {
+  if (stage === 1) return jobs.value.filter(j => j.job_code === 'datax_import')
+  if (stage === 2) return jobs.value.filter(j => j.job_code === 'spark_clean')
+  if (stage === 3) return jobs.value.filter(j => ['daily_metric', 'agent_ranking', 'error_analysis', 'relation_analysis', 'historical_alert'].includes(j.job_code))
+  if (stage === 4) return jobs.value.filter(j => j.job_code === 'report_generate')
+  return []
+}
 const jsonModalOpen = ref(false)
 const jsonPreview = ref('')
 const trendChartRef = ref(null)
@@ -374,23 +512,74 @@ async function loadJobs() {
 }
 
 async function runJob(jobCode) {
-  await executeAdminJob(jobCode, bizDate.value)
-  await loadJobs()
-  auditLogs.value = await fetchAuditLogs()
+  runningJobs.value[jobCode] = true
+  Message.info({ content: `正在调度执行作业: ${jobCode}...`, duration: 3000 })
+  try {
+    const res = await executeAdminJob(jobCode, bizDate.value)
+    if (res.status === 'failed') {
+      Message.error({ content: `作业 ${jobCode} 运行失败，请在下方列表查看详细日志！`, duration: 6000 })
+    } else {
+      Message.success({ content: `作业 ${jobCode} 执行成功！`, duration: 4000 })
+    }
+  } catch (err) {
+    Message.error({ content: `作业调度系统异常: ${err.message || err}`, duration: 5000 })
+  } finally {
+    runningJobs.value[jobCode] = false
+    await loadJobs()
+    auditLogs.value = await fetchAuditLogs()
+  }
 }
 
 async function runFullPipeline() {
-  for (const job of jobs.value) {
-    await executeAdminJob(job.job_code, bizDate.value)
+  pipelineRunning.value = true
+  Message.info({ content: '离线流水线已启动，各阶段任务正按顺序流式调度...', duration: 4000 })
+  try {
+    let failed = false
+    for (const job of jobs.value) {
+      runningJobs.value[job.job_code] = true
+      Message.info({ content: `正在执行：${job.job_name}...`, duration: 2500 })
+      try {
+        const res = await executeAdminJob(job.job_code, bizDate.value)
+        if (res.status === 'failed') {
+          failed = true
+          Message.error({ content: `流水线在 [${job.job_name}] 阶段运行失败，已中止后续任务！`, duration: 6000 })
+          break
+        }
+      } catch (e) {
+        failed = true
+        Message.error({ content: `流水线在 [${job.job_name}] 运行异常，已强制中止！`, duration: 6000 })
+        break
+      } finally {
+        runningJobs.value[job.job_code] = false
+        await loadJobs()
+      }
+    }
+    if (!failed) {
+      Message.success({ content: '一键离线计算流水线全段运行成功！', duration: 5000 })
+    }
+  } catch (err) {
+    Message.error({ content: `流水线运行系统异常: ${err.message || err}` })
+  } finally {
+    pipelineRunning.value = false
+    auditLogs.value = await fetchAuditLogs()
   }
-  await loadJobs()
-  auditLogs.value = await fetchAuditLogs()
 }
 
 async function retryRun(runId) {
-  await retryAdminJobRun(runId)
-  await loadJobs()
-  auditLogs.value = await fetchAuditLogs()
+  Message.info({ content: `正在重新提交运行记录 ${runId}...`, duration: 3000 })
+  try {
+    const res = await retryAdminJobRun(runId)
+    if (res.status === 'failed') {
+      Message.error({ content: `运行重试失败，请点查看日志分析！`, duration: 5000 })
+    } else {
+      Message.success({ content: `重试作业提交并运行成功！`, duration: 4000 })
+    }
+  } catch (err) {
+    Message.error({ content: `重试失败: ${err.message || err}` })
+  } finally {
+    await loadJobs()
+    auditLogs.value = await fetchAuditLogs()
+  }
 }
 
 function renderFunnel() {

@@ -1802,3 +1802,152 @@ tr:nth-child(3) .rank-badge {
   padding: 0 20px;
   font-weight: bold;
 }
+
+/* Scheduler Information Banner Styling */
+.scheduler-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(14, 56, 88, 0.45);
+  border: 1px dashed rgba(34, 211, 238, 0.35);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.scheduler-banner .banner-icon {
+  font-size: 20px;
+}
+
+.scheduler-banner .banner-content h4 {
+  margin: 0 0 4px 0;
+  color: #22d3ee;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.scheduler-banner .banner-content p {
+  margin: 0;
+  color: #9bc7d9;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Flow Timeline for Offline Whitelist Pipeline */
+.pipeline-flow-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px 0;
+  overflow-x: auto;
+}
+
+.pipeline-stage-box {
+  flex: 1;
+  min-width: 220px;
+  background: rgba(8, 22, 34, 0.65);
+  border: 1px solid rgba(103, 232, 249, 0.15);
+  border-radius: 8px;
+  padding: 14px;
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pipeline-stage-box:hover {
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.08);
+}
+
+.stage-box-wide {
+  flex: 2;
+  min-width: 380px;
+}
+
+.pipeline-stage-box .stage-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 20px;
+  font-weight: 900;
+  color: rgba(34, 211, 238, 0.1);
+  font-style: italic;
+  font-family: monospace;
+}
+
+.pipeline-stage-box .stage-info h4 {
+  margin: 0 0 2px 0;
+  color: #bdefff;
+  font-size: 13.5px;
+  font-weight: bold;
+}
+
+.pipeline-stage-box .stage-info small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pipeline-stage-box .stage-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pipeline-stage-box .stage-body-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pipeline-job-item {
+  background: rgba(10, 30, 48, 0.7);
+  border: 1px solid rgba(103, 232, 249, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.pipeline-job-item:hover {
+  background: rgba(14, 42, 68, 0.85);
+}
+
+.pipeline-job-item .job-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pipeline-job-item .job-meta h5 {
+  margin: 0;
+  color: #dbe7f3;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pipeline-job-item .job-meta code {
+  color: #67e8f9;
+  font-size: 9.5px;
+  background: rgba(34, 211, 238, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  width: fit-content;
+}
+
+.pipeline-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(34, 211, 238, 0.45);
+  font-size: 18px;
+  font-weight: bold;
+  animation: pulse-arrow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-arrow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.15); }
+}

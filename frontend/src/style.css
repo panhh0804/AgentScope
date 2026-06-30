@@ -1950,3 +1950,16 @@ tr:nth-child(3) .rank-badge {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.9; transform: scale(1.15); }
 }
+
+.scrollable-table-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.scrollable-table-wrap table thead th {
+  position: sticky;
+  top: 0;
+  background: #0d2235;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 rgba(103, 232, 249, 0.2);
+}

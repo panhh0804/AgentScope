@@ -223,7 +223,7 @@
             <h3>历史告警</h3>
             <span>{{ historyAlerts.length }} records</span>
           </div>
-          <div class="screen-table-wrap">
+          <div class="screen-table-wrap scrollable-table-wrap">
             <table class="data-table screen-native-table">
               <thead>
                 <tr>

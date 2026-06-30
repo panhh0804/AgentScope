@@ -39,6 +39,32 @@ class MySQLAnalyticsRepository:
         finally:
             conn.close()
 
+    def _execute(self, sql: str, params: tuple) -> bool:
+        conn = self._connect()
+        if not conn:
+            return False
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, params)
+            conn.commit()
+            return True
+        except Exception:
+            return False
+        finally:
+            conn.close()
+
+    def clear_metrics_for_date(self, metric_date: date, job_code: str) -> None:
+        table_map = {
+            "daily_metric": ["daily_metrics"],
+            "agent_ranking": ["agent_rankings"],
+            "error_analysis": ["error_distribution"],
+            "relation_analysis": ["agent_relation_nodes", "agent_relation_edges"],
+            "historical_alert": ["historical_alerts"]
+        }
+        tables = table_map.get(job_code, [])
+        for table in tables:
+            self._execute(f"DELETE FROM {table} WHERE metric_date = %s", (metric_date,))
+
     def daily_metrics(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
         return self._query(
             "SELECT * FROM daily_metrics WHERE metric_date BETWEEN %s AND %s ORDER BY metric_date",

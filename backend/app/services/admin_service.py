@@ -201,6 +201,9 @@ class AdminService:
                     log_summary = f"Spark Clean completed:\n{res.stdout}"
                     
             elif job_code in ["daily_metric", "agent_ranking", "error_analysis", "relation_analysis", "historical_alert"]:
+                # Clear existing metrics for the selected business date to ensure idempotency and avoid MySQL PK violation
+                self.repo.clear_metrics_for_date(biz_date, job_code)
+                
                 # Execute specific Spark job on master node
                 job_class_map = {
                     "daily_metric": "DailyMetricJob",

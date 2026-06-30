@@ -1,5 +1,7 @@
 import { getData, postData } from './client'
 
+const REPORT_TIMEOUT_MS = Number(import.meta.env.VITE_REPORT_TIMEOUT || 180000)
+
 export const fetchAdminOverview = () => getData('/admin/data-overview')
 export const fetchDataVolumeTrend = () => getData('/admin/data-volume-trend')
 export const fetchPipelineStatus = () => getData('/admin/pipeline-status')
@@ -11,7 +13,7 @@ export const fetchAdminJobRuns = () => getData('/admin/job-runs')
 export const executeAdminJob = (jobCode, bizDate) => {
   const config = {}
   if (jobCode === 'report_generate') {
-    config.timeout = 180000 // 3 minutes
+    config.timeout = REPORT_TIMEOUT_MS
   }
   return postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate }, config)
 }

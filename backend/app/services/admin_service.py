@@ -241,7 +241,7 @@ class AdminService:
                 # Generate AI report
                 from app.services.report_service import ReportService
                 report_service = ReportService()
-                report_res = report_service.generate(biz_date, "daily", "rule-template")
+                report_res = report_service.generate(biz_date, "daily", None)
                 log_summary = f"AI Report generated: {report_res.get('report_id')}"
                 
         except Exception as e:

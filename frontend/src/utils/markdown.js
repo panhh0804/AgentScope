@@ -71,6 +71,7 @@ export function parseMarkdownSections(content) {
   const tableRows = []
   let inCode = false
   let codeLanguage = ''
+  let isFirstLine = true
 
   const pushCurrent = () => {
     flushParagraph(current.blocks, paragraph)
@@ -82,7 +83,13 @@ export function parseMarkdownSections(content) {
   for (const rawLine of lines) {
     const line = rawLine.trimEnd()
 
+    // Skip empty lines at the very beginning of the document
+    if (isFirstLine && !line.trim()) {
+      continue
+    }
+
     if (line.startsWith('```')) {
+      isFirstLine = false
       if (inCode) {
         flushParagraph(current.blocks, paragraph)
         flushList(current.blocks, listItems)
@@ -104,8 +111,20 @@ export function parseMarkdownSections(content) {
       continue
     }
 
+    // Check for horizontal rule divider
+    const isHr = /^[*-]{3,}$/.test(line.trim())
+    if (isHr) {
+      isFirstLine = false
+      pushCurrent()
+      current.blocks.push({
+        type: 'hr'
+      })
+      continue
+    }
+
     const isTableRow = line.startsWith('|') && line.endsWith('|')
     if (isTableRow) {
+      isFirstLine = false
       flushParagraph(current.blocks, paragraph)
       flushList(current.blocks, listItems)
       flushCode(current.blocks, codeLines, codeLanguage)
@@ -119,6 +138,7 @@ export function parseMarkdownSections(content) {
 
     const heading = line.match(/^(#{1,3})\s+(.+)$/)
     if (heading) {
+      isFirstLine = false
       pushCurrent()
       if (current.blocks.length || current.title !== '内容') {
         sections.push(current)
@@ -133,6 +153,7 @@ export function parseMarkdownSections(content) {
     const bullet = line.match(/^\s*[-*]\s+(.+)$/)
     const ordered = line.match(/^\s*\d+\.\s+(.+)$/)
     if (bullet || ordered) {
+      isFirstLine = false
       flushParagraph(current.blocks, paragraph)
       listItems.push((bullet || ordered)[1].trim())
       continue
@@ -144,6 +165,14 @@ export function parseMarkdownSections(content) {
       continue
     }
 
+    // First line title auto-detection (when no markdown heading is present)
+    if (isFirstLine && current.title === '内容') {
+      current.title = line.trim()
+      isFirstLine = false
+      continue
+    }
+
+    isFirstLine = false
     paragraph.push(line.trim())
   }
 

@@ -61,6 +61,9 @@
         <div class="report-blocks">
           <template v-for="(block, blockIndex) in section.blocks" :key="`${sectionIndex}-${blockIndex}`">
             <div v-if="block.type === 'paragraph'" class="report-block report-block--paragraph" v-html="block.html"></div>
+            <div v-else-if="block.type === 'hr'" class="report-block report-block--hr">
+              <hr style="border: 0; border-top: 1px dashed rgba(34, 211, 238, 0.25); margin: 15px 0;" />
+            </div>
             <div v-else-if="block.type === 'list'" class="report-block report-block--list">
               <ul>
                 <li v-for="(item, itemIndex) in block.items" :key="itemIndex" v-html="item"></li>

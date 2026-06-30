@@ -164,14 +164,24 @@
           <section class="screen-panel">
             <div class="screen-panel-head">
               <h3>白名单任务流水线</h3>
-              <a-button 
-                type="primary" 
-                :loading="pipelineRunning" 
-                :disabled="anyJobRunning" 
-                @click="runFullPipeline"
-              >
-                {{ pipelineRunning ? '整条链路执行中...' : '一键执行完整离线链路' }}
-              </a-button>
+              <div class="header-actions" style="display: flex; gap: 10px;">
+                <a-button 
+                  type="outline" 
+                  :loading="runningJobs['offline_generate']" 
+                  :disabled="anyJobRunning" 
+                  @click="runJob('offline_generate')"
+                >
+                  {{ runningJobs['offline_generate'] ? '数据生成中...' : '生成所选日期模拟数据' }}
+                </a-button>
+                <a-button 
+                  type="primary" 
+                  :loading="pipelineRunning" 
+                  :disabled="anyJobRunning" 
+                  @click="runFullPipeline"
+                >
+                  {{ pipelineRunning ? '整条链路执行中...' : '一键执行完整离线链路' }}
+                </a-button>
+              </div>
             </div>
 
             <!-- Horizontal Pipeline Workflow Layout -->

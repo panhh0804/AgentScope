@@ -178,7 +178,8 @@ class AdminService:
         try:
             if job_code == "datax_import":
                 # Execute DataX script on master node via passwordless SSH
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", "bash", "/root/projects/agentscope/scripts/datax_import_agent_events.sh", biz_date.isoformat()]
+                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope && bash scripts/datax_import_agent_events.sh {biz_date.isoformat()}"
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
                     status = "failed"
@@ -189,7 +190,8 @@ class AdminService:
             
             elif job_code == "spark_clean":
                 # Execute Spark clean script on master node
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", "bash", "/root/projects/agentscope/scripts/run_clean_job.sh", biz_date.isoformat()]
+                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope && bash scripts/run_clean_job.sh {biz_date.isoformat()}"
+                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
                     status = "failed"
@@ -211,6 +213,7 @@ class AdminService:
                 
                 # Formulate the spark-submit command on master
                 spark_cmd = (
+                    f"source /etc/profile && cd /root/projects/agentscope && "
                     f"/usr/local/spark/bin/spark-submit "
                     f"--class com.agentscope.batch.{job_class} "
                     f"--master spark://master:7077 "

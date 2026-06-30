@@ -110,12 +110,31 @@ class AdminService:
         return self.repo.get_data_volume_trend(start, end)
 
     def pipeline_status(self) -> Dict[str, Any]:
+        source_total = self.repo.get_source_total_count()
+        
+        # Clean count (sum of all task_counts in daily_metrics)
+        sql_clean = "SELECT SUM(task_count) as total_clean FROM daily_metrics"
+        clean_res = self.repo._query(sql_clean, ())
+        clean_total = clean_res[0].get("total_clean") if clean_res and clean_res[0].get("total_clean") else 0
+        
+        # Metric count (number of report records or metrics)
+        sql_metric = "SELECT COUNT(*) as total_reports FROM reports"
+        metric_res = self.repo._query(sql_metric, ())
+        metric_total = metric_res[0].get("total_reports") if metric_res and metric_res[0].get("total_reports") else 0
+        
+        # Find latest statuses of jobs in memory
+        status_map = {"datax_import": "success", "spark_clean": "success", "daily_metric": "success"}
+        for job_code in status_map.keys():
+            runs = [r for r in self._job_runs if r.get("job_code") == job_code]
+            if runs:
+                status_map[job_code] = runs[-1]["status"]
+
         return {
             "nodes": [
-                {"code": "source", "name": "MySQL Source", "status": "success", "count": 10000},
-                {"code": "raw", "name": "HDFS Raw", "status": "success", "count": 10000},
-                {"code": "clean", "name": "HDFS Clean", "status": "success", "count": 9650},
-                {"code": "metric", "name": "Metric", "status": "success", "count": 120},
+                {"code": "source", "name": "MySQL Source", "status": "success", "count": source_total},
+                {"code": "raw", "name": "HDFS Raw", "status": status_map["datax_import"], "count": source_total if status_map["datax_import"] == "success" else 0},
+                {"code": "clean", "name": "HDFS Clean", "status": status_map["spark_clean"], "count": int(clean_total or 0)},
+                {"code": "metric", "name": "Metric", "status": status_map["daily_metric"], "count": int(metric_total or 0)},
             ],
             "edges": [
                 {"from": "source", "to": "raw", "job_code": "datax_import"},
@@ -125,14 +144,36 @@ class AdminService:
         }
 
     def datasets(self) -> List[Dict[str, Any]]:
+        source_total = self.repo.get_source_total_count()
+        
+        sql_clean = "SELECT SUM(task_count) as total_clean FROM daily_metrics"
+        clean_res = self.repo._query(sql_clean, ())
+        clean_total = int(clean_res[0].get("total_clean") or 0) if clean_res else 0
+        
+        sql_metrics = "SELECT COUNT(*) as total_metrics FROM daily_metrics"
+        metrics_res = self.repo._query(sql_metrics, ())
+        metrics_total = int(metrics_res[0].get("total_metrics") or 0) if metrics_res else 0
+        
+        sql_relations = "SELECT COUNT(*) as total_relations FROM agent_relation_edges"
+        relations_res = self.repo._query(sql_relations, ())
+        relations_total = int(relations_res[0].get("total_relations") or 0) if relations_res else 0
+        
+        sql_alerts = "SELECT COUNT(*) as total_alerts FROM historical_alerts"
+        alerts_res = self.repo._query(sql_alerts, ())
+        alerts_total = int(alerts_res[0].get("total_alerts") or 0) if alerts_res else 0
+        
+        sql_reports = "SELECT COUNT(*) as total_reports FROM reports"
+        reports_res = self.repo._query(sql_reports, ())
+        reports_total = int(reports_res[0].get("total_reports") or 0) if reports_res else 0
+
         return [
-            self._dataset("agent_source_events", "Agent 原始事件", "MySQL Source", "Source", 10000),
-            self._dataset("agent_raw_events", "Agent 原始事件文件", "HDFS Raw", "Raw", 10000),
-            self._dataset("agent_clean_events", "Agent 清洗事件", "HDFS Clean", "Clean", 9650),
-            self._dataset("agent_daily_metrics", "Agent 每日指标", "MySQL Analytics", "Metric", 120),
-            self._dataset("agent_relations", "Agent 调用关系", "MySQL Analytics", "Analytics", 48),
-            self._dataset("historical_alerts", "历史告警", "MySQL Analytics", "Analytics", 36),
-            self._dataset("ai_reports", "AI 分析报告", "MySQL Analytics", "Report", 14),
+            self._dataset("agent_source_events", "Agent 原始事件", "MySQL Source", "Source", source_total),
+            self._dataset("agent_raw_events", "Agent 原始事件文件", "HDFS Raw", "Raw", source_total),
+            self._dataset("agent_clean_events", "Agent 清洗事件", "HDFS Clean", "Clean", clean_total),
+            self._dataset("agent_daily_metrics", "Agent 每日指标", "MySQL Analytics", "Metric", metrics_total),
+            self._dataset("agent_relations", "Agent 调用关系", "MySQL Analytics", "Analytics", relations_total),
+            self._dataset("historical_alerts", "历史告警", "MySQL Analytics", "Analytics", alerts_total),
+            self._dataset("ai_reports", "AI 分析报告", "MySQL Analytics", "Report", reports_reports_total if 'reports_reports_total' in locals() else reports_total),
         ]
 
     def data_lineage(self) -> Dict[str, Any]:

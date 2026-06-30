@@ -453,7 +453,8 @@ let costInstance
 const dailySummary = computed(() => {
   const rows = dailyMetrics.value
   const taskCount = rows.reduce((sum, row) => sum + Number(row.task_count || 0), 0)
-  const successRate = rows.length ? rows.reduce((sum, row) => sum + Number(row.success_rate || 0), 0) / rows.length : 0
+  const successCount = rows.reduce((sum, row) => sum + Number(row.success_count || 0), 0)
+  const successRate = taskCount > 0 ? successCount / taskCount : 0
   const avgLatency = rows.length ? rows.reduce((sum, row) => sum + Number(row.avg_latency_ms || 0), 0) / rows.length : 0
   const p95Latency = rows.length ? rows.reduce((sum, row) => sum + Number(row.p95_latency_ms || 0), 0) / rows.length : 0
   const tokens = rows.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0)

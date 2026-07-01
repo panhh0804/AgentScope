@@ -14,6 +14,13 @@ from app.repositories.mysql_repo import MySQLAnalyticsRepository
 logger = logging.getLogger(__name__)
 
 
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 class ReportService:
     def __init__(self) -> None:
         self.metrics = MetricService()
@@ -61,7 +68,7 @@ class ReportService:
                 report_date,
                 model,
                 content,
-                json.dumps(metrics_snapshot)
+                json.dumps(metrics_snapshot, cls=DateEncoder)
             ))
         else:
             self._reports[report_id] = item

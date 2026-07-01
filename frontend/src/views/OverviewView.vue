@@ -11,7 +11,7 @@
           <a-button type="outline" size="large" @click="load">刷新</a-button>
           <a-button type="outline" size="large" @click="scrollToAgents">Agent 监控</a-button>
           <a-button type="outline" size="large" @click="scrollToHistory">历史图表</a-button>
-          <a-button type="outline" size="large" @click="router.push('/data-admin')" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">进入数据管理端</a-button>
+          <a-button type="outline" size="large" @click="router.push('/data-admin')" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回数据后台</a-button>
           <a-button type="primary" size="large" @click="alertOpen = true">告警 {{ realtimeAlerts.length + historyAlerts.length }}</a-button>
         </div>
       </header>

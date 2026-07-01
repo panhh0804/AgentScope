@@ -14,6 +14,10 @@
           <component :is="item.icon" :size="16" />
           <span>{{ item.label }}</span>
         </RouterLink>
+        <a href="/overview" target="_blank" class="nav-link nav-link--screen" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.35);">
+          <LayoutDashboard :size="16" />
+          <span>实时大屏 ↗</span>
+        </a>
       </nav>
 
       <div class="cluster-pill">
@@ -34,7 +38,6 @@ import { Activity, Database, FileText, LayoutDashboard, Server } from '@lucide/v
 
 const route = useRoute()
 const navItems = [
-  { path: '/overview', label: '系统总览', icon: LayoutDashboard },
   { path: '/data-admin', label: '数据管理', icon: Database },
   { path: '/reports', label: 'AI 报告', icon: FileText }
 ]

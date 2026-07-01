@@ -8,7 +8,7 @@
         </div>
         <div class="screen-tools">
           <a-date-picker v-model="bizDate" value-format="YYYY-MM-DD" size="large" />
-          <a-button type="outline" size="large" @click="router.push('/overview')" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">返回实时大屏</a-button>
+          <a-button type="outline" size="large" @click="openScreen" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">进入实时大屏 ↗</a-button>
           <a-button type="primary" size="large" @click="loadAll">刷新</a-button>
         </div>
       </header>
@@ -467,6 +467,9 @@ import {
 } from '../api/admin'
 import { lineOption } from '../charts/options'
 const router = useRouter()
+const openScreen = () => {
+  window.open('/overview', '_blank')
+}
 
 const activeTab = ref('overview')
 const bizDate = ref(todayString())

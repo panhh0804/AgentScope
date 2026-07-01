@@ -20,7 +20,7 @@ class DateEncoder(json.JSONEncoder):
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
         if isinstance(obj, Decimal):
-            return int(obj) if obj == obj.to_integral_value() else float(obj)
+            return float(obj)
         return super().default(obj)
 
 
@@ -37,7 +37,7 @@ class ReportService:
         alerts = self.metrics.history_alerts(report_date)
         relation = self.metrics.agent_relations(report_date)
         report_id = f"report_{uuid4().hex[:12]}"
-        model = model_name or os.getenv("OPENAI_MODEL_NAME") or "rule-template"
+        model = model_name or self._env("OPENAI_MODEL_NAME", "SILICONFLOW_MODEL_NAME") or "rule-template"
         content = self._render_markdown(report_date, report_type, daily, rankings, alerts, relation)
         try:
             content = self._render_llm_markdown(report_date, report_type, model, daily, rankings, alerts, relation)
@@ -147,15 +147,17 @@ class ReportService:
         relation: Dict,
     ) -> str:
         if model == "rule-template":
-            raise ValueError("OPENAI_MODEL_NAME is not configured")
+            raise ValueError("OPENAI_MODEL_NAME/SILICONFLOW_MODEL_NAME is not configured")
 
         from openai import OpenAI
 
         prompt = self._build_prompt(report_date, report_type, daily, rankings, alerts, relation)
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_BASE_URL")
-        timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "300"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))
+        api_key = self._env("OPENAI_API_KEY", "SILICONFLOW_API_KEY")
+        base_url = self._env("OPENAI_BASE_URL", "SILICONFLOW_BASE_URL")
+        timeout = float(self._env("OPENAI_TIMEOUT_SECONDS", "SILICONFLOW_TIMEOUT_SECONDS") or "300")
+        max_retries = int(self._env("OPENAI_MAX_RETRIES", "SILICONFLOW_MAX_RETRIES") or "0")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY/SILICONFLOW_API_KEY is not configured")
         client_kwargs = {"api_key": api_key, "timeout": timeout, "max_retries": max_retries}
         if base_url:
             client_kwargs["base_url"] = base_url
@@ -172,6 +174,13 @@ class ReportService:
         if not content or not content.strip():
             raise ValueError("LLM returned empty report content")
         return content.strip()
+
+    @staticmethod
+    def _env(primary: str, fallback: str) -> Optional[str]:
+        value = os.getenv(primary)
+        if value:
+            return value
+        return os.getenv(fallback)
 
     def _build_prompt(
         self,

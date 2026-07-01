@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from uuid import uuid4
 
 from app.services.metric_service import MetricService
+from app.repositories.mysql_repo import MySQLAnalyticsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 class ReportService:
     def __init__(self) -> None:
         self.metrics = MetricService()
+        self.repo = MySQLAnalyticsRepository()
         self._reports: Dict[str, Dict] = {}
         self._prompt_path = Path(__file__).resolve().parents[1] / "report" / "prompt.md"
 
@@ -31,30 +33,90 @@ class ReportService:
             content = self._render_llm_markdown(report_date, report_type, model, daily, rankings, alerts, relation)
         except Exception as exc:
             logger.exception("LLM report generation failed, falling back to rule report: %s", exc)
+        
+        metrics_snapshot = {
+            "daily": daily,
+            "rankings": rankings,
+            "alerts": alerts,
+            "relation": relation,
+        }
         item = {
             "report_id": report_id,
             "report_type": report_type,
             "report_date": report_date.isoformat(),
             "model_name": model,
             "content": content,
-            "metrics_snapshot": {
-                "daily": daily,
-                "rankings": rankings,
-                "alerts": alerts,
-                "relation": relation,
-            },
+            "metrics_snapshot": metrics_snapshot,
             "create_time": datetime.now().isoformat(timespec="seconds"),
         }
-        self._reports[report_id] = item
+        
+        if self.repo._enabled:
+            sql = """
+                INSERT INTO ai_reports (report_id, report_type, report_date, model_name, content_md, metrics_snapshot_json)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            self.repo._execute(sql, (
+                report_id,
+                report_type,
+                report_date,
+                model,
+                content,
+                json.dumps(metrics_snapshot)
+            ))
+        else:
+            self._reports[report_id] = item
+            
         return item
 
     def list_reports(self) -> List[Dict]:
+        if self.repo._enabled:
+            sql = """
+                SELECT report_id, report_type, report_date, model_name, create_time 
+                FROM ai_reports 
+                ORDER BY create_time DESC
+            """
+            rows = self.repo._query(sql, ())
+            if rows is not None:
+                res = []
+                for row in rows:
+                    res.append({
+                        "report_id": row["report_id"],
+                        "report_type": row["report_type"],
+                        "report_date": row["report_date"].isoformat() if isinstance(row["report_date"], date) else str(row["report_date"]),
+                        "model_name": row["model_name"],
+                        "create_time": row["create_time"].isoformat() if hasattr(row["create_time"], "isoformat") else str(row["create_time"])
+                    })
+                return res
+
         return [
             {key: value for key, value in report.items() if key != "content"}
             for report in sorted(self._reports.values(), key=lambda x: x["create_time"], reverse=True)
         ]
 
     def get_report(self, report_id: str) -> Dict:
+        if self.repo._enabled:
+            sql = """
+                SELECT report_id, report_type, report_date, model_name, content_md, metrics_snapshot_json, create_time
+                FROM ai_reports
+                WHERE report_id = %s
+            """
+            rows = self.repo._query(sql, (report_id,))
+            if rows:
+                row = rows[0]
+                try:
+                    metrics_snapshot = json.loads(row["metrics_snapshot_json"]) if row.get("metrics_snapshot_json") else {}
+                except Exception:
+                    metrics_snapshot = {}
+                return {
+                    "report_id": row["report_id"],
+                    "report_type": row["report_type"],
+                    "report_date": row["report_date"].isoformat() if isinstance(row["report_date"], date) else str(row["report_date"]),
+                    "model_name": row["model_name"],
+                    "content": row["content_md"],
+                    "metrics_snapshot": metrics_snapshot,
+                    "create_time": row["create_time"].isoformat() if hasattr(row["create_time"], "isoformat") else str(row["create_time"])
+                }
+
         return self._reports.get(
             report_id,
             {

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import uuid4
@@ -18,6 +19,8 @@ class DateEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return int(obj) if obj == obj.to_integral_value() else float(obj)
         return super().default(obj)
 
 
@@ -47,6 +50,7 @@ class ReportService:
             "alerts": alerts,
             "relation": relation,
         }
+        metrics_snapshot = json.loads(json.dumps(metrics_snapshot, cls=DateEncoder))
         item = {
             "report_id": report_id,
             "report_type": report_type,
@@ -68,7 +72,7 @@ class ReportService:
                 report_date,
                 model,
                 content,
-                json.dumps(metrics_snapshot, cls=DateEncoder)
+                json.dumps(metrics_snapshot, ensure_ascii=False)
             ))
         else:
             self._reports[report_id] = item

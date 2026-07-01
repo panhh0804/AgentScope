@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 class MySQLAnalyticsRepository:
@@ -36,6 +40,9 @@ class MySQLAnalyticsRepository:
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return list(cursor.fetchall())
+        except Exception as exc:
+            logger.warning("MySQL query failed, falling back when possible: %s", exc)
+            return None
         finally:
             conn.close()
 
@@ -48,7 +55,8 @@ class MySQLAnalyticsRepository:
                 cursor.execute(sql, params)
             conn.commit()
             return True
-        except Exception:
+        except Exception as exc:
+            logger.warning("MySQL execute failed: %s", exc)
             return False
         finally:
             conn.close()

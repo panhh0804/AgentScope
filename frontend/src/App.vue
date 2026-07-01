@@ -1,6 +1,6 @@
 <template>
   <div class="app-shell">
-    <header class="site-header">
+    <header v-if="route.path !== '/overview'" class="site-header">
       <div class="brand">
         <Activity :size="20" />
         <div>

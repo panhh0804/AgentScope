@@ -8,6 +8,7 @@
         </div>
         <div class="screen-tools">
           <a-date-picker v-model="bizDate" value-format="YYYY-MM-DD" size="large" />
+          <a-button type="outline" size="large" @click="router.push('/overview')" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">返回实时大屏</a-button>
           <a-button type="primary" size="large" @click="loadAll">刷新</a-button>
         </div>
       </header>
@@ -445,6 +446,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
 import {
@@ -464,6 +466,7 @@ import {
   retryAdminJobRun
 } from '../api/admin'
 import { lineOption } from '../charts/options'
+const router = useRouter()
 
 const activeTab = ref('overview')
 const bizDate = ref(todayString())

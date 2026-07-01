@@ -11,6 +11,7 @@
           <a-button type="outline" size="large" @click="load">刷新</a-button>
           <a-button type="outline" size="large" @click="scrollToAgents">Agent 监控</a-button>
           <a-button type="outline" size="large" @click="scrollToHistory">历史图表</a-button>
+          <a-button type="outline" size="large" @click="router.push('/data-admin')" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">进入数据管理端</a-button>
           <a-button type="primary" size="large" @click="alertOpen = true">告警 {{ realtimeAlerts.length + historyAlerts.length }}</a-button>
         </div>
       </header>
@@ -334,13 +335,14 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend, fetchReportDetail } from '../api/dashboard'
 import { barOption, graphOption, lineOption } from '../charts/options'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
-
+const router = useRouter()
 const realtimeOverview = ref({})
 const realtimeTrend = ref([])
 const realtimeAgents = ref([])

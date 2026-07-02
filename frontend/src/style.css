@@ -1836,6 +1836,44 @@ tr:nth-child(3) .rank-badge {
   font-weight: bold;
 }
 
+.warehouse-filter {
+  margin-top: 12px;
+}
+
+.layer-table-wrap {
+  margin-top: 12px;
+}
+
+.layer-table-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(103, 232, 249, 0.14);
+  background: rgba(12, 27, 42, 0.72);
+}
+
+.layer-table-title strong {
+  color: #bdefff;
+  font-size: 14px;
+}
+
+.layer-table-title span {
+  color: #9bc7d9;
+  font-size: 12px;
+}
+
+.empty-cell {
+  height: 72px;
+  text-align: center !important;
+  color: #7895a8 !important;
+}
+
+.data-admin-page .screen-panel-head {
+  flex-wrap: wrap;
+}
+
 /* Scheduler Information Banner Styling */
 .scheduler-banner {
   background: rgba(14, 56, 88, 0.45);

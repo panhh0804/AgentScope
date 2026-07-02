@@ -8,6 +8,8 @@ export const fetchPipelineStatus = () => getData('/admin/pipeline-status')
 export const fetchDatasets = () => getData('/admin/datasets')
 export const fetchDataLineage = () => getData('/admin/data-lineage')
 export const fetchAdminEvents = (params = {}) => getData('/admin/events', params)
+export const fetchDwdEvents = (params = {}) => getData('/admin/dwd-events', params)
+export const fetchDwsMetrics = (params = {}) => getData('/admin/dws-metrics', params)
 export const fetchAdminJobs = () => getData('/admin/jobs')
 export const fetchAdminJobRuns = () => getData('/admin/job-runs')
 export const executeAdminJob = (jobCode, bizDate) => {

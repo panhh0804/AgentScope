@@ -114,6 +114,59 @@ class MySQLAnalyticsRepository:
             (limit,),
         )
 
+    def get_dws_metrics(
+        self,
+        limit: int = 50,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Optional[List[Dict]]:
+        where = []
+        params = []
+        if start_date:
+            where.append("metric_date >= %s")
+            params.append(start_date)
+        if end_date:
+            where.append("metric_date <= %s")
+            params.append(end_date)
+        sql = "SELECT * FROM daily_metrics"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY metric_date DESC LIMIT %s"
+        params.append(limit)
+        return self._query(sql, tuple(params))
+
+    def get_dwd_events(
+        self,
+        limit: int = 50,
+        event_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Optional[List[Dict]]:
+        where = ["latency_ms >= 0", "trace_id IS NOT NULL"]
+        params = []
+        filters = {
+            "event_id": event_id,
+            "trace_id": trace_id,
+            "agent_id": agent_id,
+            "event_type": event_type,
+            "status": status,
+        }
+        for field, value in filters.items():
+            if value:
+                where.append(f"{field} = %s")
+                params.append(value)
+        sql = f"""
+            SELECT *
+            FROM agentscope_source.agent_events_source
+            WHERE {' AND '.join(where)}
+            ORDER BY event_time DESC
+            LIMIT %s
+        """
+        params.append(limit)
+        return self._query(sql, tuple(params))
+
     def get_agent_stats(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
         return self._query(
             """

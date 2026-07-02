@@ -72,21 +72,44 @@
           </section>
         </a-tab-pane>
 
-        <a-tab-pane key="events" title="原始数据管理">
-          <section class="toolbar admin-filter">
-            <label>trace_id<input v-model="eventFilters.trace_id" /></label>
-            <label>run_id<input v-model="eventFilters.run_id" /></label>
-            <label>agent_id<input v-model="eventFilters.agent_id" /></label>
-            <label>event_type<input v-model="eventFilters.event_type" /></label>
-            <label>status<select v-model="eventFilters.status"><option value="">全部</option><option>success</option><option>failed</option></select></label>
-            <a-button type="primary" @click="loadEvents">筛选</a-button>
-          </section>
+        <a-tab-pane key="events" title="数仓分层数据管理">
           <section class="screen-panel">
             <div class="screen-panel-head">
-              <h3>Agent 原始事件</h3>
-              <span>{{ events.length }} records</span>
+              <h3>数仓物理数据查看</h3>
+              <a-radio-group v-model="selectedLayer" type="button" size="large" @change="handleLayerChange">
+                <a-radio value="ods">ODS 原始层 (事件源)</a-radio>
+                <a-radio value="dwd">DWD 明细层 (清洗去重)</a-radio>
+                <a-radio value="dws">DWS 汇总层 (每日指标)</a-radio>
+              </a-radio-group>
             </div>
-            <div class="screen-table-wrap">
+            <section v-if="selectedLayer === 'ods'" class="toolbar admin-filter warehouse-filter">
+              <label>event_id<input v-model="eventFilters.event_id" /></label>
+              <label>trace_id<input v-model="eventFilters.trace_id" /></label>
+              <label>run_id<input v-model="eventFilters.run_id" /></label>
+              <label>agent_id<select v-model="eventFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
+              <label>event_type<select v-model="eventFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
+              <label>status<select v-model="eventFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
+              <a-button type="primary" @click="loadEvents">筛选</a-button>
+            </section>
+            <section v-if="selectedLayer === 'dwd'" class="toolbar admin-filter warehouse-filter">
+              <label>event_id<input v-model="dwdFilters.event_id" /></label>
+              <label>trace_id<input v-model="dwdFilters.trace_id" /></label>
+              <label>agent_id<select v-model="dwdFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
+              <label>event_type<select v-model="dwdFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
+              <label>status<select v-model="dwdFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
+              <a-button type="primary" @click="loadLayerData">筛选</a-button>
+            </section>
+            <section v-if="selectedLayer === 'dws'" class="toolbar admin-filter warehouse-filter">
+              <label>开始日期<input v-model="dwsFilters.start_date" type="date" /></label>
+              <label>结束日期<input v-model="dwsFilters.end_date" type="date" /></label>
+              <a-button type="primary" @click="loadLayerData">筛选</a-button>
+            </section>
+
+            <div v-if="selectedLayer === 'ods'" class="screen-table-wrap layer-table-wrap">
+              <div class="layer-table-title">
+                <strong>Agent 原始事件</strong>
+                <span>{{ events.length }} records</span>
+              </div>
               <table class="data-table screen-native-table admin-table">
                 <thead>
                   <tr>
@@ -112,6 +135,78 @@
                     <td>{{ event.event_time }}</td>
                     <td>{{ event.latency_ms }}</td>
                     <td><a-button size="mini" @click="showJson(event.raw_json)">查看</a-button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="selectedLayer === 'dwd'" class="screen-table-wrap layer-table-wrap">
+              <div class="layer-table-title">
+                <strong>DWD 清洗明细事件</strong>
+                <span>{{ dwdEvents.length }} records</span>
+              </div>
+              <table class="data-table screen-native-table admin-table">
+                <thead>
+                  <tr>
+                    <th>event_id</th>
+                    <th>trace_id</th>
+                    <th>agent_id</th>
+                    <th>event_type</th>
+                    <th>status</th>
+                    <th>latency_ms</th>
+                    <th>event_time</th>
+                    <th>JSON</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="event in dwdEvents" :key="event.event_id">
+                    <td>{{ event.event_id }}</td>
+                    <td>{{ event.trace_id }}</td>
+                    <td>{{ event.agent_id }}</td>
+                    <td>{{ event.event_type }}</td>
+                    <td><span :class="['tag', event.status]">{{ event.status || '-' }}</span></td>
+                    <td>{{ event.latency_ms }}</td>
+                    <td>{{ event.event_time || event.create_time || '-' }}</td>
+                    <td><a-button size="mini" @click="showJson(event.raw_json || event)">查看</a-button></td>
+                  </tr>
+                  <tr v-if="!dwdEvents.length">
+                    <td colspan="8" class="empty-cell">暂无 DWD 明细数据</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="selectedLayer === 'dws'" class="screen-table-wrap layer-table-wrap">
+              <div class="layer-table-title">
+                <strong>DWS 每日汇总指标</strong>
+                <span>{{ dwsMetrics.length }} records</span>
+              </div>
+              <table class="data-table screen-native-table admin-table">
+                <thead>
+                  <tr>
+                    <th>metric_date</th>
+                    <th>task_count</th>
+                    <th>success_count</th>
+                    <th>failed_count</th>
+                    <th>success_rate</th>
+                    <th>avg_latency_ms</th>
+                    <th>p95_latency_ms</th>
+                    <th>estimated_cost_usd</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="metric in dwsMetrics" :key="metric.metric_date">
+                    <td>{{ metric.metric_date }}</td>
+                    <td>{{ formatNumber(metric.task_count) }}</td>
+                    <td>{{ formatNumber(metric.success_count) }}</td>
+                    <td>{{ formatNumber(metric.failed_count) }}</td>
+                    <td>{{ percent(metric.success_rate) }}</td>
+                    <td>{{ formatNumber(metric.avg_latency_ms) }}</td>
+                    <td>{{ formatNumber(metric.p95_latency_ms) }}</td>
+                    <td>{{ Number(metric.estimated_cost_usd || 0).toFixed(4) }}</td>
+                  </tr>
+                  <tr v-if="!dwsMetrics.length">
+                    <td colspan="8" class="empty-cell">暂无 DWS 指标数据</td>
                   </tr>
                 </tbody>
               </table>
@@ -460,6 +555,8 @@ import {
   fetchDataLineage,
   fetchDataVolumeTrend,
   fetchDatasets,
+  fetchDwdEvents,
+  fetchDwsMetrics,
   fetchPipelineStatus,
   fetchQualityIssues,
   fetchQualityOverview,
@@ -479,12 +576,20 @@ const pipeline = ref({})
 const datasets = ref([])
 const lineage = ref({})
 const events = ref([])
+const selectedLayer = ref('ods')
+const dwdEvents = ref([])
+const dwsMetrics = ref([])
+const dwdFilters = ref({ event_id: '', trace_id: '', agent_id: '', event_type: '', status: '' })
+const dwsFilters = ref({ start_date: '', end_date: '' })
 const jobs = ref([])
 const jobRuns = ref([])
 const qualityOverview = ref({})
 const qualityIssues = ref([])
 const auditLogs = ref([])
-const eventFilters = ref({ trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
+const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
+const agentOptions = ['planner_agent', 'search_agent', 'analysis_agent', 'writer_agent', 'reviewer_agent']
+const eventTypeOptions = ['task_start', 'tool_call', 'llm_call', 'handoff', 'task_finish', 'agent_start', 'agent_complete', 'llm_response']
+const statusOptions = ['success', 'failed', 'running']
 
 // Pipeline running states
 const runningJobs = ref({})
@@ -561,6 +666,28 @@ function compactParams(params) {
 
 async function loadEvents() {
   events.value = await fetchAdminEvents(compactParams(eventFilters.value))
+}
+
+async function loadLayerData() {
+  if (selectedLayer.value === 'ods') {
+    await loadEvents()
+    return
+  }
+  if (selectedLayer.value === 'dwd') {
+    dwdEvents.value = await fetchDwdEvents({ limit: 50, ...compactParams(dwdFilters.value) })
+    return
+  }
+  if (selectedLayer.value === 'dws') {
+    if (dwsFilters.value.start_date && dwsFilters.value.end_date && dwsFilters.value.start_date > dwsFilters.value.end_date) {
+      Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
+      return
+    }
+    dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...compactParams(dwsFilters.value) })
+  }
+}
+
+async function handleLayerChange() {
+  await loadLayerData()
 }
 
 async function loadJobs() {
@@ -814,7 +941,7 @@ async function loadAll() {
   qualityOverview.value = qualityOverviewData
   qualityIssues.value = qualityIssueData
   auditLogs.value = auditData
-  await Promise.all([loadEvents(), loadJobs()])
+  await Promise.all([loadLayerData(), loadJobs()])
   await nextTick()
   renderTrend()
   renderFunnel()

@@ -109,6 +109,33 @@ class AdminService:
         start = end - timedelta(days=6)
         return self.repo.get_data_volume_trend(start, end)
 
+    def dwd_events(
+        self,
+        limit: int = 50,
+        event_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        rows = self.repo.get_dwd_events(limit, event_id, trace_id, agent_id, event_type, status) or []
+        for row in rows:
+            self._normalize_row(row)
+        return rows
+
+    def dws_metrics(
+        self,
+        limit: int = 50,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> List[Dict[str, Any]]:
+        if start_date and end_date and start_date > end_date:
+            return []
+        rows = self.repo.get_dws_metrics(limit, start_date, end_date) or []
+        for row in rows:
+            self._normalize_row(row)
+        return rows
+
     def pipeline_status(self) -> Dict[str, Any]:
         source_total = self.repo.get_source_total_count()
         
@@ -204,6 +231,7 @@ class AdminService:
 
     def events(
         self,
+        event_id: Optional[str] = None,
         trace_id: Optional[str] = None,
         run_id: Optional[str] = None,
         agent_id: Optional[str] = None,
@@ -214,6 +242,7 @@ class AdminService:
     ) -> List[Dict[str, Any]]:
         rows = self._seed_events()
         filters = {
+            "event_id": event_id,
             "trace_id": trace_id,
             "run_id": run_id,
             "agent_id": agent_id,
@@ -506,3 +535,10 @@ class AdminService:
 
     def _ts(self, minutes: int) -> str:
         return (datetime.now() - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+
+    def _normalize_row(self, row: Dict[str, Any]) -> None:
+        for key, value in list(row.items()):
+            if hasattr(value, "isoformat"):
+                row[key] = value.isoformat()
+            elif value.__class__.__name__ == "Decimal":
+                row[key] = float(value)

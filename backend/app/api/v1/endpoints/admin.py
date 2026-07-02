@@ -28,6 +28,27 @@ def data_volume_trend():
     return ok(service.data_volume_trend())
 
 
+@router.get("/dwd-events")
+def dwd_events(
+    limit: int = Query(default=50, ge=1, le=500),
+    event_id: Optional[str] = None,
+    trace_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    return ok(service.dwd_events(limit, event_id, trace_id, agent_id, event_type, status))
+
+
+@router.get("/dws-metrics")
+def dws_metrics(
+    limit: int = Query(default=50, ge=1, le=500),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+):
+    return ok(service.dws_metrics(limit, start_date, end_date))
+
+
 @router.get("/pipeline-status")
 def pipeline_status():
     return ok(service.pipeline_status())
@@ -45,6 +66,7 @@ def data_lineage():
 
 @router.get("/events")
 def events(
+    event_id: Optional[str] = None,
     trace_id: Optional[str] = None,
     run_id: Optional[str] = None,
     agent_id: Optional[str] = None,
@@ -53,7 +75,7 @@ def events(
     start_time: Optional[datetime] = Query(default=None),
     end_time: Optional[datetime] = Query(default=None),
 ):
-    return ok(service.events(trace_id, run_id, agent_id, event_type, status, start_time, end_time))
+    return ok(service.events(event_id, trace_id, run_id, agent_id, event_type, status, start_time, end_time))
 
 
 @router.get("/jobs")

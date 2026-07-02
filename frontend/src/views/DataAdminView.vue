@@ -519,10 +519,8 @@
               </table>
             </div>
           </section>
-        </a-tab-pane>
 
-        <a-tab-pane key="audit" title="操作审计">
-          <section class="screen-panel">
+          <section class="screen-panel" style="margin-top: 16px;">
             <div class="screen-panel-head">
               <h3>操作审计</h3>
               <span>{{ auditLogs.length }} records</span>

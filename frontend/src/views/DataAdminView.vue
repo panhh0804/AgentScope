@@ -7,7 +7,6 @@
           <h2>数据管理端</h2>
         </div>
         <div class="screen-tools">
-          <a-date-picker v-model="bizDate" value-format="YYYY-MM-DD" size="large" />
           <a-button type="outline" size="large" @click="openScreen" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">进入实时大屏 ↗</a-button>
           <a-button type="primary" size="large" @click="loadAll">刷新</a-button>
         </div>
@@ -354,6 +353,12 @@
             <div class="screen-panel-head">
               <h3>白名单任务流水线</h3>
               <div class="header-actions" style="display: flex; gap: 10px;">
+                <a-date-picker
+                  v-model="bizDate"
+                  value-format="YYYY-MM-DD"
+                  size="large"
+                  :disabled-date="disableFutureBizDate"
+                />
                 <a-button 
                   type="outline" 
                   :loading="runningJobs['offline_generate']" 
@@ -648,6 +653,15 @@ const overviewMetrics = computed(() => [
 function todayString() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function disableFutureBizDate(current) {
+  if (!current) return false
+  const value = current instanceof Date ? current : new Date(current)
+  const selected = new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime()
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  return selected > today
 }
 
 function latestHint(value) {

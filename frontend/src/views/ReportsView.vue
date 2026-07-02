@@ -2,7 +2,7 @@
   <div class="page-stack">
     <section class="toolbar report-toolbar">
       <label>
-        报告日期
+        报告业务日期
         <input v-model="date" type="date" />
       </label>
       <label>
@@ -29,7 +29,7 @@
     <section class="report-hero panel">
       <div class="panel-header">
         <h2>报告概览</h2>
-        <span v-if="report.create_time" class="muted">{{ report.create_time }}</span>
+        <span v-if="report.create_time" class="muted">生成时间：{{ report.create_time }}</span>
       </div>
 
       <div class="report-meta-grid">
@@ -40,8 +40,8 @@
         </article>
         <article class="report-meta-card">
           <span>生成参数</span>
-          <strong>{{ reportType.toUpperCase() }}</strong>
-          <p>{{ date }}</p>
+          <strong>{{ reportDisplayType.toUpperCase() }}</strong>
+          <p>{{ reportDisplayDate }}</p>
         </article>
         <article class="report-meta-card">
           <span>内容块</span>
@@ -128,6 +128,10 @@ onMounted(async () => {
     if (list && list.length > 0) {
       const detail = await fetchReportDetail(list[0].report_id)
       report.value = detail
+      if (detail.report_date) {
+        date.value = detail.report_date
+        reportType.value = detail.report_type || 'daily'
+      }
     }
   } catch (e) {
     console.error('Failed to load latest report on mount', e)
@@ -137,6 +141,8 @@ onMounted(async () => {
 })
 
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))
+const reportDisplayDate = computed(() => report.value.report_date || date.value)
+const reportDisplayType = computed(() => report.value.report_type || reportType.value)
 const reportTitle = computed(() => sections.value[0]?.title || 'AI 报告')
 const reportTitleHtml = computed(() => sections.value[0]?.titleHtml || 'AI 报告')
 const reportIntro = computed(() => {
@@ -151,10 +157,15 @@ async function createReport() {
   reportError.value = ''
 
   try {
-    report.value = await generateReport({
+    const detail = await generateReport({
       report_date: date.value,
       report_type: reportType.value
     })
+    report.value = detail
+    if (detail.report_date) {
+      date.value = detail.report_date
+      reportType.value = detail.report_type || 'daily'
+    }
   } catch (error) {
     reportError.value = error?.response?.data?.detail || error?.message || '报告生成失败，请稍后重试。'
   } finally {

@@ -290,6 +290,8 @@ class AdminService:
 
     def execute_job(self, job_code: str, biz_date: date) -> Dict[str, Any]:
         self._ensure_job(job_code)
+        if biz_date > date.today():
+            raise ValueError("业务日期不能晚于今天")
         
         status = "success"
         log_summary = f"{job_code} executed successfully."

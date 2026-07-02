@@ -92,7 +92,7 @@
             <article class="screen-panel" style="grid-column: span 2; margin-top: 16px;">
               <div class="screen-panel-head">
                 <h3>数据质量检测与合规明细</h3>
-                <span>待处理问题: {{ qualityOverview.pending_count || 0 }} | 平均通过率: {{ percent(qualityOverview.avg_pass_rate) }}</span>
+                <span>待处理问题: {{ qualityOverview.pending_count || 0 }} | 平均通过率: {{ percent2(qualityOverview.avg_pass_rate) }}</span>
               </div>
               <div class="screen-table-wrap">
                 <table class="data-table screen-native-table">
@@ -116,7 +116,7 @@
                       <td>{{ issue.biz_date }}</td>
                       <td>{{ formatNumber(issue.total_count) }}</td>
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
-                      <td><strong>{{ percent(issue.pass_rate) }}</strong></td>
+                      <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
                       <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)">查看样本</a-button></td>
                     </tr>
                   </tbody>
@@ -660,6 +660,10 @@ function formatNumber(value) {
 
 function percent(value) {
   return `${(Number(value || 0) * 100).toFixed(1)}%`
+}
+
+function percent2(value) {
+  return `${(Number(value || 0) * 100).toFixed(2)}%`
 }
 
 function nodeName(id) {

@@ -2118,36 +2118,10 @@ tr:nth-child(3) .rank-badge {
   font-weight: bold;
 }
 
-/* Custom Layer Switching Tabs */
-.custom-layer-tabs {
-  display: flex;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(103, 232, 249, 0.15);
-  border-radius: 30px;
-  padding: 4px;
-  gap: 6px;
-}
-
-.custom-layer-tabs button {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  padding: 6px 18px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none;
-}
-
-.custom-layer-tabs button:hover {
-  color: #f8fafc;
-  background: rgba(34, 211, 238, 0.06);
-}
-
-.custom-layer-tabs button.active {
-  background: linear-gradient(135deg, #0891b2, #06b6d4);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+/* Active Card Highlight for Layer Switching */
+.layer-card.active {
+  border-color: rgba(34, 211, 238, 0.65) !important;
+  background: rgba(8, 38, 64, 0.65) !important;
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.16), inset 0 0 16px rgba(34, 211, 238, 0.08);
+  transform: translateY(-2px);
 }

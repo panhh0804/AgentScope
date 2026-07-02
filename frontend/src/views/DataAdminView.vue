@@ -158,14 +158,14 @@
             </article>
           </section>
 
-          <!-- Three-Layer Data Warehouse Responsibility Section -->
+          <!-- Three-Layer Data Warehouse Responsibility Section with Integrated Data Viewer -->
           <section class="screen-panel warehouse-layers-panel" style="margin-top: 12px;">
             <div class="screen-panel-head">
-              <h3>数仓分层职责架构</h3>
-              <span>ODS ➔ DWD ➔ DWS (点击卡片可查看对应层级物理数据)</span>
+              <h3>数仓分层职责架构与数据查看</h3>
+              <span>ODS ➔ DWD ➔ DWS (点击对应层级卡片可直接查看/筛选物理数据)</span>
             </div>
             <div class="warehouse-layers-flow">
-              <div class="layer-card ods-card" @click="selectLayer('ods')">
+              <div :class="['layer-card', 'ods-card', { active: selectedLayer === 'ods' }]" @click="selectLayer('ods')">
                 <div class="layer-title">ODS 层</div>
                 <div class="layer-eng">Operational Data Store</div>
                 <p class="layer-desc">原始数据落地，保持数据原貌，接入格式各异的原始事件（JSON）。</p>
@@ -175,7 +175,7 @@
                 </div>
               </div>
               <div class="layer-arrow">➔</div>
-              <div class="layer-card dwd-card" @click="selectLayer('dwd')">
+              <div :class="['layer-card', 'dwd-card', { active: selectedLayer === 'dwd' }]" @click="selectLayer('dwd')">
                 <div class="layer-title">DWD 层</div>
                 <div class="layer-eng">Data Warehouse Detail</div>
                 <p class="layer-desc">数据清洗与标准化，过滤坏账去重，提供干净、无重复、字段统一的存储。</p>
@@ -185,7 +185,7 @@
                 </div>
               </div>
               <div class="layer-arrow">➔</div>
-              <div class="layer-card dws-card" @click="selectLayer('dws')">
+              <div :class="['layer-card', 'dws-card', { active: selectedLayer === 'dws' }]" @click="selectLayer('dws')">
                 <div class="layer-title">DWS 层</div>
                 <div class="layer-eng">Data Warehouse Summary</div>
                 <p class="layer-desc">轻度汇总，按天/小时/Agent等多维主题聚合，提供下游可视化直接消费。</p>
@@ -195,146 +195,139 @@
                 </div>
               </div>
             </div>
-          </section>
 
-          <!-- 数仓物理数据查看 -->
-          <section ref="warehouseDataPanelRef" class="screen-panel" style="margin-top: 16px;">
-            <div class="screen-panel-head">
-              <h3>数仓物理数据查看</h3>
-              <div class="custom-layer-tabs">
-                <button :class="{ active: selectedLayer === 'ods' }" @click="selectLayer('ods')">ODS 原始层 (事件源)</button>
-                <button :class="{ active: selectedLayer === 'dwd' }" @click="selectLayer('dwd')">DWD 明细层 (清洗去重)</button>
-                <button :class="{ active: selectedLayer === 'dws' }" @click="selectLayer('dws')">DWS 汇总层 (每日指标)</button>
-              </div>
-            </div>
-            <section v-if="selectedLayer === 'ods'" class="toolbar admin-filter warehouse-filter">
-              <label>event_id<input v-model="eventFilters.event_id" /></label>
-              <label>trace_id<input v-model="eventFilters.trace_id" /></label>
-              <label>run_id<input v-model="eventFilters.run_id" /></label>
-              <label>agent_id<select v-model="eventFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
-              <label>event_type<select v-model="eventFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
-              <label>status<select v-model="eventFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
-              <a-button type="primary" @click="loadEvents">筛选</a-button>
-            </section>
-            <section v-if="selectedLayer === 'dwd'" class="toolbar admin-filter warehouse-filter">
-              <label>event_id<input v-model="dwdFilters.event_id" /></label>
-              <label>trace_id<input v-model="dwdFilters.trace_id" /></label>
-              <label>agent_id<select v-model="dwdFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
-              <label>event_type<select v-model="dwdFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
-              <label>status<select v-model="dwdFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
-              <a-button type="primary" @click="loadLayerData">筛选</a-button>
-            </section>
-            <section v-if="selectedLayer === 'dws'" class="toolbar admin-filter warehouse-filter">
-              <label>开始日期<input v-model="dwsFilters.start_date" type="date" /></label>
-              <label>结束日期<input v-model="dwsFilters.end_date" type="date" /></label>
-              <a-button type="primary" @click="loadLayerData">筛选</a-button>
-            </section>
+            <!-- Filters & Data Table for Selected Layer -->
+            <div style="margin-top: 24px; border-top: 1px dashed rgba(34, 211, 238, 0.15); padding-top: 20px;">
+              <section v-if="selectedLayer === 'ods'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
+                <label>event_id<input v-model="eventFilters.event_id" /></label>
+                <label>trace_id<input v-model="eventFilters.trace_id" /></label>
+                <label>run_id<input v-model="eventFilters.run_id" /></label>
+                <label>agent_id<select v-model="eventFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
+                <label>event_type<select v-model="eventFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
+                <label>status<select v-model="eventFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
+                <a-button type="primary" @click="loadEvents">筛选</a-button>
+              </section>
+              <section v-if="selectedLayer === 'dwd'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
+                <label>event_id<input v-model="dwdFilters.event_id" /></label>
+                <label>trace_id<input v-model="dwdFilters.trace_id" /></label>
+                <label>agent_id<select v-model="dwdFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
+                <label>event_type<select v-model="dwdFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
+                <label>status<select v-model="dwdFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
+                <a-button type="primary" @click="loadLayerData">筛选</a-button>
+              </section>
+              <section v-if="selectedLayer === 'dws'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
+                <label>开始日期<input v-model="dwsFilters.start_date" type="date" /></label>
+                <label>结束日期<input v-model="dwsFilters.end_date" type="date" /></label>
+                <a-button type="primary" @click="loadLayerData">筛选</a-button>
+              </section>
 
-            <div v-if="selectedLayer === 'ods'" class="screen-table-wrap layer-table-wrap">
-              <div class="layer-table-title">
-                <strong>Agent 原始事件</strong>
-                <span>{{ events.length }} records</span>
+              <!-- Tables -->
+              <div v-if="selectedLayer === 'ods'" class="screen-table-wrap layer-table-wrap" style="margin-top: 12px;">
+                <div class="layer-table-title">
+                  <strong>Agent 原始事件</strong>
+                  <span>{{ events.length }} records</span>
+                </div>
+                <table class="data-table screen-native-table admin-table">
+                  <thead>
+                    <tr>
+                      <th>event_id</th>
+                      <th>trace_id</th>
+                      <th>run_id</th>
+                      <th>agent_id</th>
+                      <th>event_type</th>
+                      <th>status</th>
+                      <th>event_time</th>
+                      <th>latency_ms</th>
+                      <th>JSON</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="event in events" :key="event.event_id">
+                      <td>{{ event.event_id }}</td>
+                      <td>{{ event.trace_id }}</td>
+                      <td>{{ event.run_id }}</td>
+                      <td>{{ event.agent_id }}</td>
+                      <td>{{ event.event_type }}</td>
+                      <td><span :class="['tag', event.status]">{{ event.status }}</span></td>
+                      <td>{{ event.event_time }}</td>
+                      <td>{{ event.latency_ms }}</td>
+                      <td><a-button size="mini" @click="showJson(event.raw_json)">查看</a-button></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <table class="data-table screen-native-table admin-table">
-                <thead>
-                  <tr>
-                    <th>event_id</th>
-                    <th>trace_id</th>
-                    <th>run_id</th>
-                    <th>agent_id</th>
-                    <th>event_type</th>
-                    <th>status</th>
-                    <th>event_time</th>
-                    <th>latency_ms</th>
-                    <th>JSON</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="event in events" :key="event.event_id">
-                    <td>{{ event.event_id }}</td>
-                    <td>{{ event.trace_id }}</td>
-                    <td>{{ event.run_id }}</td>
-                    <td>{{ event.agent_id }}</td>
-                    <td>{{ event.event_type }}</td>
-                    <td><span :class="['tag', event.status]">{{ event.status }}</span></td>
-                    <td>{{ event.event_time }}</td>
-                    <td>{{ event.latency_ms }}</td>
-                    <td><a-button size="mini" @click="showJson(event.raw_json)">查看</a-button></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
 
-            <div v-if="selectedLayer === 'dwd'" class="screen-table-wrap layer-table-wrap">
-              <div class="layer-table-title">
-                <strong>DWD 清洗明细事件</strong>
-                <span>{{ dwdEvents.length }} records</span>
+              <div v-if="selectedLayer === 'dwd'" class="screen-table-wrap layer-table-wrap" style="margin-top: 12px;">
+                <div class="layer-table-title">
+                  <strong>DWD 清洗明细事件</strong>
+                  <span>{{ dwdEvents.length }} records</span>
+                </div>
+                <table class="data-table screen-native-table admin-table">
+                  <thead>
+                    <tr>
+                      <th>event_id</th>
+                      <th>trace_id</th>
+                      <th>agent_id</th>
+                      <th>event_type</th>
+                      <th>status</th>
+                      <th>latency_ms</th>
+                      <th>event_time</th>
+                      <th>JSON</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="event in dwdEvents" :key="event.event_id">
+                      <td>{{ event.event_id }}</td>
+                      <td>{{ event.trace_id }}</td>
+                      <td>{{ event.agent_id }}</td>
+                      <td>{{ event.event_type }}</td>
+                      <td><span :class="['tag', event.status]">{{ event.status || '-' }}</span></td>
+                      <td>{{ event.latency_ms }}</td>
+                      <td>{{ event.event_time || event.create_time || '-' }}</td>
+                      <td><a-button size="mini" @click="showJson(event.raw_json || event)">查看</a-button></td>
+                    </tr>
+                    <tr v-if="!dwdEvents.length">
+                      <td colspan="8" class="empty-cell">暂无 DWD 明细数据</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <table class="data-table screen-native-table admin-table">
-                <thead>
-                  <tr>
-                    <th>event_id</th>
-                    <th>trace_id</th>
-                    <th>agent_id</th>
-                    <th>event_type</th>
-                    <th>status</th>
-                    <th>latency_ms</th>
-                    <th>event_time</th>
-                    <th>JSON</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="event in dwdEvents" :key="event.event_id">
-                    <td>{{ event.event_id }}</td>
-                    <td>{{ event.trace_id }}</td>
-                    <td>{{ event.agent_id }}</td>
-                    <td>{{ event.event_type }}</td>
-                    <td><span :class="['tag', event.status]">{{ event.status || '-' }}</span></td>
-                    <td>{{ event.latency_ms }}</td>
-                    <td>{{ event.event_time || event.create_time || '-' }}</td>
-                    <td><a-button size="mini" @click="showJson(event.raw_json || event)">查看</a-button></td>
-                  </tr>
-                  <tr v-if="!dwdEvents.length">
-                    <td colspan="8" class="empty-cell">暂无 DWD 明细数据</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
 
-            <div v-if="selectedLayer === 'dws'" class="screen-table-wrap layer-table-wrap">
-              <div class="layer-table-title">
-                <strong>DWS 每日汇总指标</strong>
-                <span>{{ dwsMetrics.length }} records</span>
+              <div v-if="selectedLayer === 'dws'" class="screen-table-wrap layer-table-wrap" style="margin-top: 12px;">
+                <div class="layer-table-title">
+                  <strong>DWS 每日汇总指标</strong>
+                  <span>{{ dwsMetrics.length }} records</span>
+                </div>
+                <table class="data-table screen-native-table admin-table">
+                  <thead>
+                    <tr>
+                      <th>metric_date</th>
+                      <th>task_count</th>
+                      <th>success_count</th>
+                      <th>failed_count</th>
+                      <th>success_rate</th>
+                      <th>avg_latency_ms</th>
+                      <th>p95_latency_ms</th>
+                      <th>estimated_cost_usd</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="metric in dwsMetrics" :key="metric.metric_date">
+                      <td>{{ metric.metric_date }}</td>
+                      <td>{{ formatNumber(metric.task_count) }}</td>
+                      <td>{{ formatNumber(metric.success_count) }}</td>
+                      <td>{{ formatNumber(metric.failed_count) }}</td>
+                      <td>{{ percent(metric.success_rate) }}</td>
+                      <td>{{ formatNumber(metric.avg_latency_ms) }}</td>
+                      <td>{{ formatNumber(metric.p95_latency_ms) }}</td>
+                      <td>{{ Number(metric.estimated_cost_usd || 0).toFixed(4) }}</td>
+                    </tr>
+                    <tr v-if="!dwsMetrics.length">
+                      <td colspan="8" class="empty-cell">暂无 DWS 指标数据</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <table class="data-table screen-native-table admin-table">
-                <thead>
-                  <tr>
-                    <th>metric_date</th>
-                    <th>task_count</th>
-                    <th>success_count</th>
-                    <th>failed_count</th>
-                    <th>success_rate</th>
-                    <th>avg_latency_ms</th>
-                    <th>p95_latency_ms</th>
-                    <th>estimated_cost_usd</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="metric in dwsMetrics" :key="metric.metric_date">
-                    <td>{{ metric.metric_date }}</td>
-                    <td>{{ formatNumber(metric.task_count) }}</td>
-                    <td>{{ formatNumber(metric.success_count) }}</td>
-                    <td>{{ formatNumber(metric.failed_count) }}</td>
-                    <td>{{ percent(metric.success_rate) }}</td>
-                    <td>{{ formatNumber(metric.avg_latency_ms) }}</td>
-                    <td>{{ formatNumber(metric.p95_latency_ms) }}</td>
-                    <td>{{ Number(metric.estimated_cost_usd || 0).toFixed(4) }}</td>
-                  </tr>
-                  <tr v-if="!dwsMetrics.length">
-                    <td colspan="8" class="empty-cell">暂无 DWS 指标数据</td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
           </section>
         </a-tab-pane>

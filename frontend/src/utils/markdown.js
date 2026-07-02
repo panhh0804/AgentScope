@@ -81,7 +81,7 @@ export function parseMarkdownSections(content) {
   }
 
   for (const rawLine of lines) {
-    const line = rawLine.trimEnd()
+    const line = rawLine.trim()
 
     // Skip empty lines at the very beginning of the document
     if (isFirstLine && !line.trim()) {
@@ -122,14 +122,17 @@ export function parseMarkdownSections(content) {
       continue
     }
 
-    const isTableRow = line.startsWith('|') && line.endsWith('|')
+    const isTableRow = line.startsWith('|')
     if (isTableRow) {
       isFirstLine = false
       flushParagraph(current.blocks, paragraph)
       flushList(current.blocks, listItems)
       flushCode(current.blocks, codeLines, codeLanguage)
       
-      const cells = line.split('|').slice(1, -1).map(c => c.trim())
+      const cells = line.split('|').slice(1).map(c => c.trim())
+      if (cells.length > 0 && cells[cells.length - 1] === '') {
+        cells.pop()
+      }
       tableRows.push(cells)
       continue
     } else {

@@ -125,8 +125,80 @@
           </section>
         </a-tab-pane>
 
-        <a-tab-pane key="events" title="数仓分层数据管理">
-          <section class="screen-panel">
+        <a-tab-pane key="assets" title="数据资产管理">
+          <section class="admin-assets-grid">
+            <article class="screen-panel">
+              <div class="screen-panel-head">
+                <h3>数据集目录</h3>
+                <span>{{ datasets.length }} datasets</span>
+              </div>
+              <div class="screen-table-wrap">
+                <table class="data-table screen-native-table">
+                  <thead>
+                    <tr><th>数据集</th><th>存储</th><th>层级</th><th>数据量</th><th>最新业务日期</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="dataset in datasets" :key="dataset.dataset_code">
+                      <td>{{ dataset.dataset_name }}</td>
+                      <td>{{ dataset.storage }}</td>
+                      <td><span class="tag">{{ dataset.layer }}</span></td>
+                      <td>{{ formatNumber(dataset.row_count) }}</td>
+                      <td>{{ dataset.latest_biz_date }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+            <article class="screen-panel">
+              <div class="screen-panel-head">
+                <h3>简化数据血缘</h3>
+                <span>Source to Analytics</span>
+              </div>
+              <div ref="lineageChartRef" class="screen-chart" style="height: 280px; margin-top: 10px;"></div>
+            </article>
+          </section>
+
+          <!-- Three-Layer Data Warehouse Responsibility Section -->
+          <section class="screen-panel warehouse-layers-panel" style="margin-top: 12px;">
+            <div class="screen-panel-head">
+              <h3>数仓分层职责架构</h3>
+              <span>ODS ➔ DWD ➔ DWS (点击卡片可查看对应层级物理数据)</span>
+            </div>
+            <div class="warehouse-layers-flow">
+              <div class="layer-card ods-card" @click="selectLayer('ods')">
+                <div class="layer-title">ODS 层</div>
+                <div class="layer-eng">Operational Data Store</div>
+                <p class="layer-desc">原始数据落地，保持数据原貌，接入格式各异的原始事件（JSON）。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>Source ➔ HDFS Raw</strong></div>
+                  <div>载体：<code>/agentscope/raw/</code> (JSON)</div>
+                </div>
+              </div>
+              <div class="layer-arrow">➔</div>
+              <div class="layer-card dwd-card" @click="selectLayer('dwd')">
+                <div class="layer-title">DWD 层</div>
+                <div class="layer-eng">Data Warehouse Detail</div>
+                <p class="layer-desc">数据清洗与标准化，过滤坏账去重，提供干净、无重复、字段统一的存储。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>HDFS Raw ➔ HDFS Clean</strong></div>
+                  <div>载体：<code>/agentscope/clean/</code> (Parquet)</div>
+                </div>
+              </div>
+              <div class="layer-arrow">➔</div>
+              <div class="layer-card dws-card" @click="selectLayer('dws')">
+                <div class="layer-title">DWS 层</div>
+                <div class="layer-eng">Data Warehouse Summary</div>
+                <p class="layer-desc">轻度汇总，按天/小时/Agent等多维主题聚合，提供下游可视化直接消费。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>HDFS Clean ➔ MySQL Analytics</strong></div>
+                  <div>载体：<code>daily_metrics</code> / <code>agent_rankings</code> 表</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 数仓物理数据查看 -->
+          <section ref="warehouseDataPanelRef" class="screen-panel" style="margin-top: 16px;">
             <div class="screen-panel-head">
               <h3>数仓物理数据查看</h3>
               <a-radio-group v-model="selectedLayer" type="button" size="large" @change="handleLayerChange">
@@ -263,79 +335,6 @@
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </section>
-        </a-tab-pane>
-
-        <a-tab-pane key="assets" title="数据资产管理">
-          <section class="admin-assets-grid">
-            <article class="screen-panel">
-              <div class="screen-panel-head">
-                <h3>数据集目录</h3>
-                <span>{{ datasets.length }} datasets</span>
-              </div>
-              <div class="screen-table-wrap">
-                <table class="data-table screen-native-table">
-                  <thead>
-                    <tr><th>数据集</th><th>存储</th><th>层级</th><th>数据量</th><th>最新业务日期</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="dataset in datasets" :key="dataset.dataset_code">
-                      <td>{{ dataset.dataset_name }}</td>
-                      <td>{{ dataset.storage }}</td>
-                      <td><span class="tag">{{ dataset.layer }}</span></td>
-                      <td>{{ formatNumber(dataset.row_count) }}</td>
-                      <td>{{ dataset.latest_biz_date }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
-            <article class="screen-panel">
-              <div class="screen-panel-head">
-                <h3>简化数据血缘</h3>
-                <span>Source to Analytics</span>
-              </div>
-              <div ref="lineageChartRef" class="screen-chart" style="height: 280px; margin-top: 10px;"></div>
-            </article>
-          </section>
-
-          <!-- Three-Layer Data Warehouse Responsibility Section -->
-          <section class="screen-panel warehouse-layers-panel" style="margin-top: 12px;">
-            <div class="screen-panel-head">
-              <h3>数仓分层职责架构</h3>
-              <span>ODS ➔ DWD ➔ DWS</span>
-            </div>
-            <div class="warehouse-layers-flow">
-              <div class="layer-card ods-card">
-                <div class="layer-title">ODS 层</div>
-                <div class="layer-eng">Operational Data Store</div>
-                <p class="layer-desc">原始数据落地，保持数据原貌，接入格式各异的原始事件（JSON）。</p>
-                <div class="layer-mapping">
-                  <div>链路：<strong>Source ➔ HDFS Raw</strong></div>
-                  <div>载体：<code>/agentscope/raw/</code> (JSON)</div>
-                </div>
-              </div>
-              <div class="layer-arrow">➔</div>
-              <div class="layer-card dwd-card">
-                <div class="layer-title">DWD 层</div>
-                <div class="layer-eng">Data Warehouse Detail</div>
-                <p class="layer-desc">数据清洗与标准化，过滤坏账去重，提供干净、无重复、字段统一的存储。</p>
-                <div class="layer-mapping">
-                  <div>链路：<strong>HDFS Raw ➔ HDFS Clean</strong></div>
-                  <div>载体：<code>/agentscope/clean/</code> (Parquet)</div>
-                </div>
-              </div>
-              <div class="layer-arrow">➔</div>
-              <div class="layer-card dws-card">
-                <div class="layer-title">DWS 层</div>
-                <div class="layer-eng">Data Warehouse Summary</div>
-                <p class="layer-desc">轻度汇总，按天/小时/Agent等多维主题聚合，提供下游可视化直接消费。</p>
-                <div class="layer-mapping">
-                  <div>链路：<strong>HDFS Clean ➔ MySQL Analytics</strong></div>
-                  <div>载体：<code>daily_metrics</code> / <code>agent_rankings</code> 表</div>
-                </div>
-              </div>
             </div>
           </section>
         </a-tab-pane>
@@ -722,6 +721,16 @@ async function loadLayerData() {
 
 async function handleLayerChange() {
   await loadLayerData()
+}
+
+const warehouseDataPanelRef = ref(null)
+
+function selectLayer(layer) {
+  selectedLayer.value = layer
+  loadLayerData()
+  nextTick(() => {
+    warehouseDataPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 async function loadJobs() {

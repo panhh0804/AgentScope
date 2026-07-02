@@ -39,7 +39,7 @@ MYSQL_HOST="${MYSQL_HOST:-middleware}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-agentscope}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-agentscope_pass}"
-BACKEND_HOST="${BACKEND_HOST:-visualization}"
+BACKEND_HOST="${BACKEND_PUBLIC_HOST:-${BACKEND_HOST:-master}}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 
 # ─────────────────────────────────────────────

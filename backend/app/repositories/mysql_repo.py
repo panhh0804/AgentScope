@@ -79,6 +79,61 @@ class MySQLAnalyticsRepository:
             (start_date, end_date),
         )
 
+    def analytics_trend(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
+        return self._query(
+            """
+            SELECT
+                metric_date,
+                task_count,
+                success_count,
+                failed_count,
+                success_rate,
+                avg_latency_ms,
+                p95_latency_ms,
+                total_tokens,
+                estimated_cost_usd
+            FROM daily_metrics
+            WHERE metric_date BETWEEN %s AND %s
+            ORDER BY metric_date
+            """,
+            (start_date, end_date),
+        )
+
+    def get_error_distribution(self, limit: int = 10) -> Optional[List[Dict]]:
+        return self._query(
+            """
+            SELECT
+                error_type,
+                SUM(error_count) AS total_count,
+                SUM(error_count) / NULLIF((SELECT SUM(error_count) FROM error_distribution), 0) AS percentage
+            FROM error_distribution
+            GROUP BY error_type
+            ORDER BY total_count DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+
+    def get_agent_stats(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
+        return self._query(
+            """
+            SELECT
+                agent_id,
+                agent_role,
+                SUM(execution_count) AS execution_count,
+                AVG(success_rate) AS success_rate,
+                SUM(total_tokens) AS total_tokens,
+                SUM(estimated_cost_usd) AS estimated_cost_usd,
+                SUM(avg_latency_ms * execution_count) / NULLIF(SUM(execution_count), 0) AS avg_latency_ms,
+                AVG(p95_latency_ms) AS p95_latency_ms
+            FROM agent_rankings
+            WHERE metric_date BETWEEN %s AND %s
+            GROUP BY agent_id, agent_role
+            ORDER BY total_tokens DESC
+            """,
+            (start_date, end_date),
+        )
+
     def hourly_metrics(self, metric_date: date) -> Optional[List[Dict]]:
         return self._query(
             "SELECT * FROM hourly_metrics WHERE metric_date = %s ORDER BY hour",

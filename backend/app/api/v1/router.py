@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, alerts, graph, metrics, rankings, realtime, reports
+from app.api.v1.endpoints import admin, alerts, analytics, graph, metrics, rankings, realtime, reports
 
 api_router = APIRouter()
 api_router.include_router(realtime.router, prefix="/realtime", tags=["realtime"])
@@ -12,4 +12,5 @@ api_router.include_router(graph.router, prefix="/graph", tags=["graph"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 

@@ -34,11 +34,12 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Activity, Database, FileText, LayoutDashboard, Server } from '@lucide/vue'
+import { Activity, BarChart2, Database, FileText, LayoutDashboard, Server } from '@lucide/vue'
 
 const route = useRoute()
 const navItems = [
   { path: '/data-admin', label: '数据管理', icon: Database },
+  { path: '/statistics', label: '数据统计', icon: BarChart2 },
   { path: '/reports', label: 'AI 报告', icon: FileText }
 ]
 </script>

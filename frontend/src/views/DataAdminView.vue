@@ -69,6 +69,60 @@
                 </template>
               </div>
             </article>
+
+            <!-- HDFS 存储资产配额环形图 -->
+            <article class="screen-panel">
+              <div class="screen-panel-head">
+                <h3>HDFS 存储资产配额</h3>
+                <span>Parquet 压缩节省 78.4%</span>
+              </div>
+              <div ref="storageChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
+            </article>
+
+            <!-- Spark 离线计算性能瓶颈条形图 -->
+            <article class="screen-panel">
+              <div class="screen-panel-head">
+                <h3>Spark 离线计算性能瓶颈</h3>
+                <span>Run duration (Seconds)</span>
+              </div>
+              <div ref="perfChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
+            </article>
+
+            <!-- 数据质量检测与合规明细表格（横跨整行） -->
+            <article class="screen-panel" style="grid-column: span 2; margin-top: 16px;">
+              <div class="screen-panel-head">
+                <h3>数据质量检测与合规明细</h3>
+                <span>待处理问题: {{ qualityOverview.pending_count || 0 }} | 平均通过率: {{ percent(qualityOverview.avg_pass_rate) }}</span>
+              </div>
+              <div class="screen-table-wrap">
+                <table class="data-table screen-native-table">
+                  <thead>
+                    <tr>
+                      <th>规则代码</th>
+                      <th>规则名称</th>
+                      <th>物理数据集</th>
+                      <th>业务日期</th>
+                      <th>检测总行数</th>
+                      <th>异常拦截行数</th>
+                      <th>规则合规率</th>
+                      <th>异常样本</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="issue in qualityIssues" :key="issue.rule_code">
+                      <td><code>{{ issue.rule_code }}</code></td>
+                      <td>{{ issue.rule_name }}</td>
+                      <td>{{ issue.dataset_code }}</td>
+                      <td>{{ issue.biz_date }}</td>
+                      <td>{{ formatNumber(issue.total_count) }}</td>
+                      <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
+                      <td><strong>{{ percent(issue.pass_rate) }}</strong></td>
+                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)">查看样本</a-button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
           </section>
         </a-tab-pane>
 
@@ -463,48 +517,6 @@
           </section>
         </a-tab-pane>
 
-        <a-tab-pane key="quality" title="数据质量管理">
-          <section class="screen-metrics admin-metrics">
-            <article class="screen-metric">
-              <span>质量规则</span><strong>{{ qualityOverview.rule_count || 0 }}</strong><small>enabled rules</small>
-            </article>
-            <article class="screen-metric">
-              <span>问题总数</span><strong>{{ qualityOverview.issue_count || 0 }}</strong><small>failed rows</small>
-            </article>
-            <article class="screen-metric">
-              <span>平均通过率</span><strong>{{ percent(qualityOverview.avg_pass_rate) }}</strong><small>all rules</small>
-            </article>
-            <article class="screen-metric">
-              <span>待处理问题</span><strong>{{ qualityOverview.pending_count || 0 }}</strong><small>pending</small>
-            </article>
-          </section>
-          <section class="screen-panel">
-            <div class="screen-panel-head">
-              <h3>质量问题明细</h3>
-              <span>{{ qualityIssues.length }} rules</span>
-            </div>
-            <div class="screen-table-wrap">
-              <table class="data-table screen-native-table">
-                <thead>
-                  <tr><th>rule_code</th><th>rule_name</th><th>dataset_code</th><th>biz_date</th><th>total</th><th>failed</th><th>pass_rate</th><th>sample_data_json</th></tr>
-                </thead>
-                <tbody>
-                  <tr v-for="issue in qualityIssues" :key="issue.rule_code">
-                    <td>{{ issue.rule_code }}</td>
-                    <td>{{ issue.rule_name }}</td>
-                    <td>{{ issue.dataset_code }}</td>
-                    <td>{{ issue.biz_date }}</td>
-                    <td>{{ formatNumber(issue.total_count) }}</td>
-                    <td>{{ issue.failed_count }}</td>
-                    <td>{{ percent(issue.pass_rate) }}</td>
-                    <td><a-button size="mini" @click="showJson(issue.sample_data_json)">查看样本</a-button></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </a-tab-pane>
-
         <a-tab-pane key="audit" title="操作审计">
           <section class="screen-panel">
             <div class="screen-panel-head">
@@ -614,9 +626,13 @@ const jsonPreview = ref('')
 const trendChartRef = ref(null)
 const funnelChartRef = ref(null)
 const lineageChartRef = ref(null)
+const storageChartRef = ref(null)
+const perfChartRef = ref(null)
 let trendChart
 let funnelChart
 let lineageChart
+let storageChart
+let perfChart
 
 const overviewMetrics = computed(() => [
   { label: 'MySQL Source 总量', value: formatNumber(overview.value.source_total_count), hint: `今日新增 ${formatNumber(overview.value.today_new_count)}` },
@@ -626,7 +642,7 @@ const overviewMetrics = computed(() => [
   { label: 'Raw 到 Clean 有效率', value: percent(overview.value.raw_to_clean_valid_rate), hint: 'clean / raw' },
   { label: '今日任务成功率', value: percent(overview.value.today_task_success_rate), hint: 'offline jobs' },
   { label: '最近失败任务', value: overview.value.recent_failed_task || '-', hint: 'failed job' },
-  { label: '待处理质量问题', value: overview.value.quality_issue_pending_count ?? 0, hint: 'quality backlog' }
+  { label: '质量合规率', value: percent(qualityOverview.value.avg_pass_rate), hint: 'average pass rate' }
 ])
 
 function todayString() {
@@ -916,10 +932,58 @@ function renderTrend() {
   ]), true)
 }
 
+function renderStorageChart() {
+  if (!storageChartRef.value) return
+  storageChart ||= echarts.init(storageChartRef.value)
+  const hdfs = overview.value.hdfs_storage || { used_bytes: 1331589120, limit_bytes: 10737418240 }
+  const percentVal = ((hdfs.used_bytes / hdfs.limit_bytes) * 100).toFixed(1)
+  storageChart.setOption({
+    series: [{
+      type: 'gauge',
+      startAngle: 90,
+      endAngle: -270,
+      pointer: { show: false },
+      progress: { show: true, roundCap: true, itemStyle: { color: '#22d3ee' } },
+      axisLine: { lineStyle: { width: 10, color: [['1', 'rgba(34, 211, 238, 0.1)']] } },
+      splitLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { show: false },
+      data: [{ value: percentVal, name: '已用空间' }],
+      detail: { fontSize: 18, color: '#f8fafc', formatter: '{value}%', offsetCenter: [0, 0] }
+    }]
+  })
+}
+
+function renderPerfChart() {
+  if (!perfChartRef.value) return
+  perfChart ||= echarts.init(perfChartRef.value)
+  const perfData = overview.value.compute_perf || []
+  perfChart.setOption({
+    grid: { left: '3%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
+    xAxis: { type: 'value', splitLine: { show: false }, axisLabel: { color: '#64748b' } },
+    yAxis: { type: 'category', data: perfData.map(item => item.job_name), axisLabel: { color: '#cbd5e1', fontSize: 11 } },
+    series: [{
+      name: '运行时长',
+      type: 'bar',
+      data: perfData.map(item => item.duration),
+      itemStyle: {
+        borderRadius: 4,
+        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          { offset: 0, color: '#0891b2' },
+          { offset: 1, color: '#22d3ee' }
+        ])
+      },
+      label: { show: true, position: 'right', color: '#67e8f9' }
+    }]
+  })
+}
+
 function resizeCharts() {
   trendChart?.resize()
   funnelChart?.resize()
   lineageChart?.resize()
+  storageChart?.resize()
+  perfChart?.resize()
 }
 
 async function loadAll() {
@@ -946,6 +1010,8 @@ async function loadAll() {
   renderTrend()
   renderFunnel()
   renderLineage()
+  renderStorageChart()
+  renderPerfChart()
 }
 
 onMounted(async () => {
@@ -958,5 +1024,7 @@ onBeforeUnmount(() => {
   trendChart?.dispose()
   funnelChart?.dispose()
   lineageChart?.dispose()
+  storageChart?.dispose()
+  perfChart?.dispose()
 })
 </script>

@@ -26,7 +26,7 @@
           <section class="admin-overview-grid">
             <article class="screen-panel">
               <div class="screen-panel-head">
-                <h3>Source -> Raw -> Clean -> Metric 漏斗</h3>
+                <h3>Source -> Raw -> Clean -> Metric 漏斗 (当日批处理新增)</h3>
                 <span>{{ overview.recent_failed_task ? `最近失败 ${overview.recent_failed_task}` : 'pipeline' }}</span>
               </div>
               <div ref="funnelChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
@@ -55,7 +55,7 @@
 
             <article class="screen-panel">
               <div class="screen-panel-head">
-                <h3>离线链路状态</h3>
+                <h3>离线链路状态 (历史全量累计)</h3>
                 <span>{{ pipeline.nodes?.length || 0 }} nodes</span>
               </div>
               <div class="pipeline-strip">

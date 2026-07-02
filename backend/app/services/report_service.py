@@ -12,6 +12,8 @@ from uuid import uuid4
 from app.services.metric_service import MetricService
 from app.repositories.mysql_repo import MySQLAnalyticsRepository
 
+from decimal import Decimal
+
 logger = logging.getLogger(__name__)
 
 

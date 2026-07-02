@@ -201,11 +201,11 @@
           <section ref="warehouseDataPanelRef" class="screen-panel" style="margin-top: 16px;">
             <div class="screen-panel-head">
               <h3>数仓物理数据查看</h3>
-              <a-radio-group v-model="selectedLayer" type="button" size="large" @change="handleLayerChange">
-                <a-radio value="ods">ODS 原始层 (事件源)</a-radio>
-                <a-radio value="dwd">DWD 明细层 (清洗去重)</a-radio>
-                <a-radio value="dws">DWS 汇总层 (每日指标)</a-radio>
-              </a-radio-group>
+              <div class="custom-layer-tabs">
+                <button :class="{ active: selectedLayer === 'ods' }" @click="selectLayer('ods')">ODS 原始层 (事件源)</button>
+                <button :class="{ active: selectedLayer === 'dwd' }" @click="selectLayer('dwd')">DWD 明细层 (清洗去重)</button>
+                <button :class="{ active: selectedLayer === 'dws' }" @click="selectLayer('dws')">DWS 汇总层 (每日指标)</button>
+              </div>
             </div>
             <section v-if="selectedLayer === 'ods'" class="toolbar admin-filter warehouse-filter">
               <label>event_id<input v-model="eventFilters.event_id" /></label>
@@ -728,9 +728,6 @@ const warehouseDataPanelRef = ref(null)
 function selectLayer(layer) {
   selectedLayer.value = layer
   loadLayerData()
-  nextTick(() => {
-    warehouseDataPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
 }
 
 async function loadJobs() {

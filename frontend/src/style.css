@@ -1429,7 +1429,7 @@ tr:nth-child(3) .rank-badge {
 }
 
 .admin-tabs .arco-tabs-nav {
-  margin-bottom: 14px;
+  display: none !important;
 }
 
 .admin-tabs .arco-tabs-tab {

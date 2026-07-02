@@ -38,7 +38,9 @@ import { Activity, BarChart2, Database, FileText, LayoutDashboard, Server } from
 
 const route = useRoute()
 const navItems = [
-  { path: '/data-admin', label: '数据管理', icon: Database },
+  { path: '/data-overview', label: '数据总览', icon: Database },
+  { path: '/data-assets', label: '数据资产', icon: Server },
+  { path: '/data-jobs', label: '数据任务', icon: Activity },
   { path: '/statistics', label: '数据统计', icon: BarChart2 },
   { path: '/reports', label: 'AI 报告', icon: FileText }
 ]

@@ -554,8 +554,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
 import {
@@ -577,12 +577,27 @@ import {
   retryAdminJobRun
 } from '../api/admin'
 import { lineOption } from '../charts/options'
+const route = useRoute()
 const router = useRouter()
 const openScreen = () => {
   window.open('/overview', '_blank')
 }
 
 const activeTab = ref('overview')
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path === '/data-overview') {
+      activeTab.value = 'overview'
+    } else if (path === '/data-assets') {
+      activeTab.value = 'assets'
+    } else if (path === '/data-jobs') {
+      activeTab.value = 'jobs'
+    }
+  },
+  { immediate: true }
+)
 const bizDate = ref(todayString())
 const overview = ref({})
 const trend = ref([])

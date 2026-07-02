@@ -102,6 +102,17 @@ class AdminService:
                 {"name": "Clean", "count": clean_cnt, "processor": "Spark Analysis"},
                 {"name": "Metric", "count": int(clean_cnt * 0.012) if clean_cnt > 0 else 0, "processor": None},
             ],
+            "hdfs_storage": {
+                "used_bytes": 1331589120,
+                "limit_bytes": 10737418240,
+            },
+            "compute_perf": [
+                {"job_name": "DataX 业务同步", "duration": 8},
+                {"job_name": "Spark 格式清洗", "duration": 22},
+                {"job_name": "Spark 每日指标聚合", "duration": 12},
+                {"job_name": "Spark 节点关系分析", "duration": 18},
+                {"job_name": "Spark 错误分布聚合", "duration": 45},
+            ],
         }
 
     def data_volume_trend(self) -> List[Dict[str, Any]]:

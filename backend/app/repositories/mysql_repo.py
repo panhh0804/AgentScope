@@ -155,7 +155,10 @@ class MySQLAnalyticsRepository:
         }
         for field, value in filters.items():
             if value:
-                where.append(f"{field} = %s")
+                if field == "event_id":
+                    where.append("LOWER(REPLACE(TRIM(event_id), ' ', '_')) = LOWER(%s)")
+                else:
+                    where.append(f"LOWER(TRIM({field})) = LOWER(%s)")
                 params.append(value)
         sql = f"""
             SELECT *

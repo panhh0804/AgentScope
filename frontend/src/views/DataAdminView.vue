@@ -716,6 +716,7 @@ function compactParams(params) {
       .map(([key, value]) => {
         if (typeof value !== 'string') return [key, value]
         const trimmed = value.trim()
+        if (key.endsWith('_date')) return [key, trimmed.replace(/\//g, '-')]
         return [key, key === 'event_id' ? trimmed.replace(/\s+/g, '_') : trimmed]
       })
       .filter(([, value]) => value !== '')

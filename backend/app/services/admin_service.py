@@ -150,9 +150,16 @@ class AdminService:
         if start_date and end_date and start_date > end_date:
             return []
         rows = self.repo.get_dws_metrics(limit, start_date, end_date) or []
+        filtered_rows = []
         for row in rows:
+            metric_date = self._coerce_date(row.get("metric_date"))
+            if start_date and metric_date and metric_date < start_date:
+                continue
+            if end_date and metric_date and metric_date > end_date:
+                continue
             self._normalize_row(row)
-        return rows
+            filtered_rows.append(row)
+        return filtered_rows
 
     def pipeline_status(self) -> Dict[str, Any]:
         source_total = self.repo.get_source_total_count()
@@ -579,3 +586,15 @@ class AdminService:
             return True
         actual_value = self._normalize_filter_value(str(actual or ""), field)
         return actual_value == expected
+
+    def _coerce_date(self, value: Any) -> Optional[date]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        try:
+            return date.fromisoformat(str(value)[:10].replace("/", "-"))
+        except ValueError:
+            return None

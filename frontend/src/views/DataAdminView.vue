@@ -216,8 +216,26 @@
                 <a-button type="primary" @click="loadLayerData">筛选</a-button>
               </section>
               <section v-if="selectedLayer === 'dws'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
-                <label>开始日期<input v-model="dwsFilters.start_date" type="date" /></label>
-                <label>结束日期<input v-model="dwsFilters.end_date" type="date" /></label>
+                <label>
+                  开始日期
+                  <a-date-picker
+                    v-model="dwsFilters.start_date"
+                    value-format="YYYY-MM-DD"
+                    format="YYYY/MM/DD"
+                    allow-clear
+                    @change="(value) => setDwsDate('start_date', value)"
+                  />
+                </label>
+                <label>
+                  结束日期
+                  <a-date-picker
+                    v-model="dwsFilters.end_date"
+                    value-format="YYYY-MM-DD"
+                    format="YYYY/MM/DD"
+                    allow-clear
+                    @change="(value) => setDwsDate('end_date', value)"
+                  />
+                </label>
                 <a-button type="primary" @click="loadLayerData">筛选</a-button>
               </section>
 
@@ -723,6 +741,19 @@ function compactParams(params) {
   )
 }
 
+function normalizeDateValue(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value.trim().replace(/\//g, '-')
+  if (value instanceof Date) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+  return String(value).trim().replace(/\//g, '-')
+}
+
+function setDwsDate(field, value) {
+  dwsFilters.value[field] = normalizeDateValue(value)
+}
+
 async function loadEvents() {
   try {
     events.value = await fetchAdminEvents(compactParams(eventFilters.value))
@@ -745,12 +776,16 @@ async function loadLayerData() {
     return
   }
   if (selectedLayer.value === 'dws') {
-    if (dwsFilters.value.start_date && dwsFilters.value.end_date && dwsFilters.value.start_date > dwsFilters.value.end_date) {
+    const dwsParams = compactParams({
+      start_date: normalizeDateValue(dwsFilters.value.start_date),
+      end_date: normalizeDateValue(dwsFilters.value.end_date)
+    })
+    if (dwsParams.start_date && dwsParams.end_date && dwsParams.start_date > dwsParams.end_date) {
       Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
       return
     }
     try {
-      dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...compactParams(dwsFilters.value) })
+      dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...dwsParams })
     } catch (err) {
       Message.error({ content: `DWS 查询失败: ${err.message || err}`, duration: 5000 })
     }

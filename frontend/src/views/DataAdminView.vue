@@ -4,7 +4,7 @@
       <header class="screen-titlebar">
         <div>
           <p class="screen-kicker">离线数据链路与数据治理</p>
-          <h2>数据管理端</h2>
+          <h2>{{ pageTitle }}</h2>
         </div>
         <div class="screen-tools">
           <a-button type="outline" size="large" @click="openScreen" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">进入实时大屏 ↗</a-button>
@@ -523,8 +523,8 @@
                     <td>{{ formatNumber(run.input_count) }}</td>
                     <td>{{ formatNumber(run.output_count) }}</td>
                     <td>{{ run.error_count }}</td>
-                    <td>{{ run.start_time }}</td>
-                    <td>{{ run.end_time || '-' }}</td>
+                    <td class="nowrap">{{ formatDateTime(run.start_time) }}</td>
+                    <td class="nowrap">{{ formatDateTime(run.end_time) }}</td>
                     <td>{{ run.duration_seconds ?? '-' }}s</td>
                     <td><a-button size="mini" @click="showLogs(run.run_id)">查看</a-button></td>
                     <td><a-button size="mini" :disabled="run.status !== 'failed'" @click="retryRun(run.run_id)">重试</a-button></td>
@@ -598,6 +598,12 @@ const openScreen = () => {
 }
 
 const activeTab = ref('overview')
+const pageTitle = computed(() => {
+  if (route.path === '/data-overview') return '数据总览'
+  if (route.path === '/data-assets') return '数据资产'
+  if (route.path === '/data-jobs') return '数据任务'
+  return '数据管理端'
+})
 
 watch(
   () => route.path,
@@ -712,6 +718,15 @@ function percent(value) {
 
 function percent2(value) {
   return `${(Number(value || 0) * 100).toFixed(2)}%`
+}
+
+function formatTrendDate(value) {
+  return String(value || '').slice(5, 10) || value
+}
+
+function formatDateTime(value) {
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 19)
 }
 
 function nodeName(id) {
@@ -964,8 +979,9 @@ function renderLineage() {
   const links = (lineage.value.edges || []).map(e => ({
     source: e.from,
     target: e.to,
+    value: e.label,
     label: { 
-      show: true, 
+      show: false, 
       formatter: e.label, 
       fontSize: 10, 
       color: '#9bc7d9',
@@ -988,7 +1004,7 @@ function renderLineage() {
         if (params.dataType === 'node') {
           return `数据层: <b>${params.name}</b>`
         } else {
-          return `血缘流动: <b>${params.data.source} ➔ ${params.data.target}</b> (${params.data.label.formatter})`
+          return `血缘流动: <b>${params.data.source} ➔ ${params.data.target}</b>${params.data.value ? ` (${params.data.value})` : ''}`
         }
       }
     },
@@ -996,10 +1012,14 @@ function renderLineage() {
       {
         type: 'graph',
         layout: 'force',
+        top: 24,
+        right: 28,
+        bottom: 30,
+        left: 28,
         force: {
-          repulsion: 150,
-          edgeLength: 110,
-          gravity: 0.08
+          repulsion: 280,
+          edgeLength: [150, 210],
+          gravity: 0.04
         },
         roam: true,
         draggable: true,
@@ -1023,10 +1043,13 @@ function renderLineage() {
 function renderTrend() {
   if (!trendChartRef.value) return
   trendChart ||= echarts.init(trendChartRef.value)
-  trendChart.setOption(lineOption('Raw / Clean 数据量趋势', trend.value.map((item) => item.biz_date), [
+  const option = lineOption('Raw / Clean 数据量趋势', trend.value.map((item) => formatTrendDate(item.biz_date)), [
     { name: 'Raw', type: 'line', smooth: true, data: trend.value.map((item) => item.raw_count), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
     { name: 'Clean', type: 'line', smooth: true, data: trend.value.map((item) => item.clean_count), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
-  ]), true)
+  ])
+  option.grid = { ...option.grid, right: 34, bottom: 30, containLabel: true }
+  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
+  trendChart.setOption(option, true)
 }
 
 function renderStorageChart() {

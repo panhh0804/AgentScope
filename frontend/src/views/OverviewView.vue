@@ -11,8 +11,8 @@
           <a-button type="outline" size="large" @click="load">刷新</a-button>
           <a-button type="outline" size="large" @click="scrollToAgents">Agent 监控</a-button>
           <a-button type="outline" size="large" @click="scrollToHistory">历史图表</a-button>
-          <a-button type="outline" size="large" @click="goBack" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回数据后台</a-button>
-          <a-button type="primary" size="large" @click="alertOpen = true">告警 {{ realtimeAlerts.length + historyAlerts.length }}</a-button>
+          <a-button type="outline" size="large" @click="goBack" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回后台</a-button>
+          <a-button type="primary" size="large" @click="alertOpen = true">当前告警 {{ realtimeAlerts.length }} / 历史 {{ historyAlerts.length }}</a-button>
         </div>
       </header>
 
@@ -90,7 +90,7 @@
           <div class="alert-ticker">
             <div v-for="alert in realtimeAlerts" :key="alert.alert_id" class="ticker-item">
               <span :class="['level-dot', alert.level]">{{ alert.level }}</span>
-              <strong>{{ alert.alert_type }}</strong>
+              <strong>{{ formatAlertType(alert.alert_type) }}</strong>
               <small>{{ alert.agent_id }} / {{ alert.create_time }}</small>
             </div>
           </div>
@@ -240,7 +240,7 @@
               <tbody>
                 <tr v-for="alert in historyAlerts" :key="alert.alert_id">
                   <td><span :class="['tag', alert.level]">{{ alert.level }}</span></td>
-                  <td>{{ alert.alert_type }}</td>
+                  <td>{{ formatAlertType(alert.alert_type) }}</td>
                   <td>{{ alert.agent_id }}</td>
                   <td>{{ alert.current_value }}</td>
                   <td>{{ alert.threshold ?? alert.threshold_value }}</td>
@@ -320,7 +320,7 @@
           <tbody>
             <tr v-for="alert in allAlerts" :key="alert.alert_id">
               <td><span :class="['tag', alert.level]">{{ alert.level }}</span></td>
-              <td>{{ alert.alert_type }}</td>
+              <td>{{ formatAlertType(alert.alert_type) }}</td>
               <td>{{ alert.agent_id }}</td>
               <td>{{ alert.current_value }}</td>
               <td>{{ alert.threshold ?? alert.threshold_value }}</td>
@@ -470,9 +470,16 @@ const reportSections = computed(() => parseMarkdownSections(latestReport.value.c
 const reportPreviewSections = computed(() => reportSections.value.slice(0, 2))
 
 const reportIntro = computed(() => {
-  const content = String(latestReport.value.content || '')
-  return content ? excerptMarkdown(content, 160) : '生成结果会以卡片方式展示，方便快速阅读和定位重点。'
+  const content = cleanReportIntroSource(latestReport.value.content)
+  return content ? excerptMarkdown(content, 150) : '生成结果会以卡片方式展示，方便快速阅读和定位重点。'
 })
+
+const alertTypeLabels = {
+  high_latency: '高时延',
+  frequent_retry: '频繁重试',
+  token_limit: 'Token 限制',
+  token_overuse: 'Token 超量'
+}
 
 const metrics = computed(() => [
   { label: '运行任务', value: realtimeOverview.value.running_tasks ?? '-', hint: '实时处理中的任务' },
@@ -485,15 +492,15 @@ const metrics = computed(() => [
   { label: '离线 Top Agent', value: historyRankings.value[0] ? `${historyRankings.value[0].agent_role} / ${formatNumber(historyRankings.value[0].execution_count)}` : '-', hint: '离线执行次数排行' },
 ])
 
-const historyTaskOption = computed(() => lineOption('每日任务量', dailyMetrics.value.map((item) => item.metric_date), [
+const historyTaskOption = computed(() => historyLineOption('每日任务量', [
   { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
 ]))
 
-const historySuccessOption = computed(() => lineOption('每日成功率', dailyMetrics.value.map((item) => item.metric_date), [
+const historySuccessOption = computed(() => historyLineOption('每日成功率', [
   { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), itemStyle: { color: '#10b981' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(16, 185, 129, 0.08)' } }
 ]))
 
-const historyLatencyOption = computed(() => lineOption('平均 / P95 时延', dailyMetrics.value.map((item) => item.metric_date), [
+const historyLatencyOption = computed(() => historyLineOption('平均 / P95 时延', [
   { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), itemStyle: { color: '#06b6d4' }, lineStyle: { width: 3 } },
   { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), itemStyle: { color: '#f97316' }, lineStyle: { width: 3 } }
 ]))
@@ -534,6 +541,37 @@ function getDateValue(value, fallback) {
   if (typeof value === 'string') return value
   if (typeof value?.format === 'function') return value.format('YYYY-MM-DD')
   return fallback
+}
+
+function formatShortDate(value) {
+  return String(value || '').slice(5, 10) || value
+}
+
+function formatAlertType(value) {
+  return alertTypeLabels[value] || value
+}
+
+function cleanReportIntroSource(value) {
+  return String(value || '')
+    .replace(/%[（(]\s*\/\s*[）)]/g, '')
+    .replace(/[（(]\s*\/\s*[）)]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function historyTooltipFormatter(params) {
+  const rows = Array.isArray(params) ? params : [params]
+  const date = dailyMetrics.value[rows[0]?.dataIndex]?.metric_date || rows[0]?.axisValue || ''
+  const lines = rows.map((item) => `${item.marker}${item.seriesName}: ${item.value}`)
+  return [date, ...lines].join('<br/>')
+}
+
+function historyLineOption(title, series) {
+  const option = lineOption(title, dailyMetrics.value.map((item) => formatShortDate(item.metric_date)), series)
+  option.tooltip = { ...option.tooltip, trigger: 'axis', formatter: historyTooltipFormatter }
+  option.grid = { ...option.grid, right: 34, bottom: 32, containLabel: true }
+  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
+  return option
 }
 
 function baseAxis() {
@@ -579,13 +617,13 @@ function renderCharts() {
   relationInstance ||= echarts.init(relationChart.value)
   costInstance ||= echarts.init(costChart.value)
 
-  const xDaily = dailyMetrics.value.map((item) => item.metric_date)
+  const xDaily = dailyMetrics.value.map((item) => formatShortDate(item.metric_date))
   dailyInstance.setOption({
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', formatter: historyTooltipFormatter },
     legend: { top: 0, textStyle: { color: '#bdefff' } },
-    grid: { top: 42, right: 50, bottom: 24, left: 50 },
-    xAxis: { type: 'category', data: xDaily, ...baseAxis() },
+    grid: { top: 42, right: 54, bottom: 28, left: 50 },
+    xAxis: { type: 'category', data: xDaily, boundaryGap: ['4%', '8%'], ...baseAxis() },
     yAxis: [
       {
         type: 'value',
@@ -634,14 +672,33 @@ function renderCharts() {
     ]
   }, true)
 
-  relationInstance.setOption(graphOption(relationGraph.value), true)
+  const relationOption = graphOption(relationGraph.value)
+  const relationSeries = relationOption.series?.[0]
+  if (relationSeries) {
+    relationSeries.label = { ...relationSeries.label, fontSize: 10, color: '#f8fafc' }
+    relationSeries.force = { ...relationSeries.force, repulsion: 260, edgeLength: 145 }
+    relationSeries.data = (relationSeries.data || []).map((node) => ({
+      ...node,
+      symbolSize: Math.max(28, Math.min(64, Number(node.symbolSize || node.value || 32) * 0.82))
+    }))
+    relationSeries.links = (relationSeries.links || []).map((link) => ({
+      ...link,
+      lineStyle: {
+        ...(link.lineStyle || {}),
+        color: 'rgba(56, 189, 248, 0.72)',
+        opacity: 0.85,
+        width: Math.max(1.5, link.lineStyle?.width || 1.5)
+      }
+    }))
+  }
+  relationInstance.setOption(relationOption, true)
 
   costInstance.setOption({
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', formatter: historyTooltipFormatter },
     legend: { top: 0, textStyle: { color: '#bdefff' } },
-    grid: { top: 38, right: 48, bottom: 24, left: 48 },
-    xAxis: { type: 'category', data: xDaily, ...baseAxis() },
+    grid: { top: 38, right: 54, bottom: 28, left: 48 },
+    xAxis: { type: 'category', data: xDaily, boundaryGap: ['4%', '8%'], ...baseAxis() },
     yAxis: [
       {
         type: 'value',

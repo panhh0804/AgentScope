@@ -22,7 +22,7 @@
       <section class="stats-chart-grid">
         <article class="screen-panel">
           <div class="screen-panel-head">
-            <h3>任务量与运行成功率 30 天走势</h3>
+            <h3>任务量与运行成功率 {{ trendPeriodLabel }}走势</h3>
             <span>daily_metrics</span>
           </div>
           <div ref="trendChartRef" class="statistics-chart"></div>
@@ -88,12 +88,26 @@ const summaryMetrics = computed(() => {
   const p95Values = agentStats.value.map((item) => Number(item.p95_latency_ms || 0)).filter(Boolean)
   const maxP95 = p95Values.length ? Math.max(...p95Values) : 0
   return [
-    { label: '30 天任务总量', value: formatNumber(totalTasks), hint: `${trend.value.length} 个业务日期` },
+    { label: `${trendPeriodLabel.value}任务总量`, value: formatNumber(totalTasks), hint: `${trend.value.length} 个业务日期` },
     { label: '综合成功率', value: percent(totalTasks ? totalSuccess / totalTasks : 0), hint: 'success / task' },
     { label: 'Agent Token 总量', value: compactNumber(totalTokens), hint: `${agentStats.value.length} 个 Agent` },
     { label: '累计估算成本', value: `$${totalCost.toFixed(2)}`, hint: `最高 P95 ${formatNumber(maxP95)} ms` }
   ]
 })
+
+const trendPeriodLabel = computed(() => `近 ${trend.value.length || 0} 天`)
+
+const errorTypeLabels = {
+  validation_error: '数据校验错误',
+  tool_error: '工具调用错误',
+  timeout: '请求超时',
+  model_error: '模型响应错误',
+  tool_timeout: '工具超时'
+}
+
+function formatErrorType(value) {
+  return errorTypeLabels[value] || value
+}
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString()
@@ -235,7 +249,7 @@ function renderErrors() {
     yAxis: {
       ...baseChartOption().yAxis,
       type: 'category',
-      data: sorted.map((item) => item.error_type),
+      data: sorted.map((item) => formatErrorType(item.error_type)),
       axisLabel: { color: '#9bc7d9', width: 112, overflow: 'truncate' }
     },
     series: [

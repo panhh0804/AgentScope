@@ -129,7 +129,14 @@ class AdminService:
         event_type: Optional[str] = None,
         status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        rows = self.repo.get_dwd_events(limit, event_id, trace_id, agent_id, event_type, status) or []
+        rows = self.repo.get_dwd_events(
+            limit,
+            self._normalize_filter_value(event_id, "event_id"),
+            self._normalize_filter_value(trace_id, "trace_id"),
+            self._normalize_filter_value(agent_id, "agent_id"),
+            self._normalize_filter_value(event_type, "event_type"),
+            self._normalize_filter_value(status, "status"),
+        ) or []
         for row in rows:
             self._normalize_row(row)
         return rows
@@ -262,7 +269,8 @@ class AdminService:
         }
         for field, value in filters.items():
             if value:
-                rows = [row for row in rows if str(row.get(field)) == value]
+                expected = self._normalize_filter_value(value, field)
+                rows = [row for row in rows if self._filter_equals(row.get(field), expected, field)]
         if start_time:
             rows = [row for row in rows if datetime.fromisoformat(row["event_time"]) >= start_time]
         if end_time:
@@ -555,3 +563,19 @@ class AdminService:
                 row[key] = value.isoformat()
             elif value.__class__.__name__ == "Decimal":
                 row[key] = float(value)
+
+    def _normalize_filter_value(self, value: Optional[str], field: str) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        if field == "event_id":
+            normalized = "_".join(normalized.split())
+        return normalized
+
+    def _filter_equals(self, actual: Any, expected: Optional[str], field: str) -> bool:
+        if expected is None:
+            return True
+        actual_value = self._normalize_filter_value(str(actual or ""), field)
+        return actual_value == expected

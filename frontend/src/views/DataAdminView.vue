@@ -253,6 +253,9 @@
                       <td>{{ event.latency_ms }}</td>
                       <td><a-button size="mini" @click="showJson(event.raw_json)">查看</a-button></td>
                     </tr>
+                    <tr v-if="!events.length">
+                      <td colspan="9" class="empty-cell">暂无 ODS 原始事件数据</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -708,11 +711,23 @@ async function showLogs(runId) {
 }
 
 function compactParams(params) {
-  return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== ''))
+  return Object.fromEntries(
+    Object.entries(params)
+      .map(([key, value]) => {
+        if (typeof value !== 'string') return [key, value]
+        const trimmed = value.trim()
+        return [key, key === 'event_id' ? trimmed.replace(/\s+/g, '_') : trimmed]
+      })
+      .filter(([, value]) => value !== '')
+  )
 }
 
 async function loadEvents() {
-  events.value = await fetchAdminEvents(compactParams(eventFilters.value))
+  try {
+    events.value = await fetchAdminEvents(compactParams(eventFilters.value))
+  } catch (err) {
+    Message.error({ content: `ODS 查询失败: ${err.message || err}`, duration: 5000 })
+  }
 }
 
 async function loadLayerData() {
@@ -721,7 +736,11 @@ async function loadLayerData() {
     return
   }
   if (selectedLayer.value === 'dwd') {
-    dwdEvents.value = await fetchDwdEvents({ limit: 50, ...compactParams(dwdFilters.value) })
+    try {
+      dwdEvents.value = await fetchDwdEvents({ limit: 50, ...compactParams(dwdFilters.value) })
+    } catch (err) {
+      Message.error({ content: `DWD 查询失败: ${err.message || err}`, duration: 5000 })
+    }
     return
   }
   if (selectedLayer.value === 'dws') {
@@ -729,7 +748,11 @@ async function loadLayerData() {
       Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
       return
     }
-    dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...compactParams(dwsFilters.value) })
+    try {
+      dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...compactParams(dwsFilters.value) })
+    } catch (err) {
+      Message.error({ content: `DWS 查询失败: ${err.message || err}`, duration: 5000 })
+    }
   }
 }
 

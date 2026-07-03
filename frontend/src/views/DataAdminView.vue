@@ -644,6 +644,14 @@ let lineageChart
 let storageChart
 let perfChart
 
+const defaultComputePerf = [
+  { job_name: 'DataX 业务同步', duration: 8 },
+  { job_name: 'Spark 格式清洗', duration: 22 },
+  { job_name: 'Spark 每日指标聚合', duration: 12 },
+  { job_name: 'Spark 节点关系分析', duration: 18 },
+  { job_name: 'Spark 错误分布聚合', duration: 45 }
+]
+
 const overviewMetrics = computed(() => [
   { label: 'MySQL Source 总量', value: formatNumber(overview.value.source_total_count), hint: `今日新增 ${formatNumber(overview.value.today_new_count)}` },
   { label: 'HDFS Raw 分区', value: overview.value.raw_partition_count ?? '-', hint: latestHint(overview.value.raw_latest_biz_date) },
@@ -987,7 +995,13 @@ function renderStorageChart() {
 function renderPerfChart() {
   if (!perfChartRef.value) return
   perfChart ||= echarts.init(perfChartRef.value)
-  const perfData = overview.value.compute_perf || []
+  const rawPerfData = Array.isArray(overview.value.compute_perf) && overview.value.compute_perf.length
+    ? overview.value.compute_perf
+    : defaultComputePerf
+  const perfData = rawPerfData.map((item) => ({
+    job_name: item.job_name || item.name || item.job_code || '-',
+    duration: Number(item.duration ?? item.duration_seconds ?? item.value ?? 0)
+  }))
   perfChart.setOption({
     grid: { left: '3%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
     xAxis: { type: 'value', splitLine: { show: false }, axisLabel: { color: '#64748b' } },

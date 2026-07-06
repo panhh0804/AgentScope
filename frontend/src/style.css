@@ -2430,7 +2430,7 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "latency agent_rank"
+      "latency llm_telemetry"
       "throughput agent_rank"
       "stream relation"
       "bigdata diagnostics"
@@ -2514,7 +2514,7 @@ tr:nth-child(3) .rank-badge {
   min-height: 0;
   overflow: hidden;
   grid-template-areas:
-    "latency agent_rank throughput"
+    "latency llm_telemetry throughput"
     "stream agent_rank relation"
     "bigdata diagnostics alerts";
   grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) minmax(280px, 1fr);
@@ -2612,7 +2612,7 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "latency agent_rank"
+      "latency llm_telemetry"
       "throughput agent_rank"
       "stream relation"
       "diagnostics bigdata"
@@ -2654,7 +2654,7 @@ tr:nth-child(3) .rank-badge {
 
 .screen-page--overview .overview-grid {
   grid-template-areas:
-    "latency agent_rank throughput"
+    "latency llm_telemetry throughput"
     "stream agent_rank relation"
     "bigdata diagnostics alerts";
 }
@@ -3150,6 +3150,73 @@ tr:nth-child(3) .rank-badge {
   border: 1px solid rgba(16, 185, 129, 0.15);
   border-radius: 5px;
   padding: 8px;
+}
+
+/* LLM Live Telemetry Grid styles */
+.overview-grid__llm_telemetry {
+  grid-area: llm_telemetry;
+}
+
+.llm-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  height: calc(100% - 32px);
+  align-content: center;
+}
+
+.tel-card {
+  background: rgba(9, 24, 43, 0.25);
+  border: 1px solid rgba(103, 232, 249, 0.08);
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tel-card .tel-label {
+  font-size: 9px;
+  color: #9bc7d9;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.tel-card .tel-value {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tel-card .tel-hint {
+  font-size: 8px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.text-cyan {
+  color: #22d3ee;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+}
+
+.text-emerald {
+  color: #34d399;
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.35);
+}
+
+.text-blue {
+  color: #60a5fa;
+  text-shadow: 0 0 8px rgba(96, 165, 250, 0.35);
+}
+
+.text-red {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
+}
+
+.text-gray {
+  color: #94a3b8;
 }
 
 

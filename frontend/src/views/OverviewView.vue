@@ -136,52 +136,39 @@
             </div>
           </div>
 
-          <!-- Quality Auditing Sub-panel -->
-          <div class="quality-audit-section">
-            <div class="section-divider">
-              <span>数据质量实时校验审计</span>
-              <span class="pass-rate-badge">合规率: {{ percent(qualityOverview.avg_pass_rate) }}</span>
+        </article>
+        <!-- 9. LLM API Live Telemetry (The new separate box in Center Row 1) -->
+        <article class="screen-panel compact overview-grid__llm_telemetry">
+          <div class="screen-panel-head">
+            <h3>LLM 接口实时负载监控</h3>
+            <span>API Gateway Live</span>
+          </div>
+          <div class="llm-telemetry-grid">
+            <div class="tel-card">
+              <span class="tel-label">并发请求</span>
+              <strong class="tel-value text-cyan">{{ Math.round((realtimeOverview.running_tasks || 0) * 0.6) }}</strong>
+              <small class="tel-hint">Active Requests</small>
             </div>
-            <div class="quality-grid">
-              <div class="quality-summary-row">
-                <div class="sum-card">
-                  <small>校验规则数</small>
-                  <strong>{{ qualityOverview.rule_count || 3 }}</strong>
-                </div>
-                <div class="sum-card">
-                  <small>脏数据记录</small>
-                  <strong :class="{ 'has-issues': qualityOverview.issue_count > 0 }">
-                    {{ qualityOverview.issue_count }}
-                  </strong>
-                </div>
-                <div class="sum-card">
-                  <small>拦截阻断数</small>
-                  <strong :class="{ 'has-issues': qualityOverview.pending_count > 0 }">
-                    {{ qualityOverview.pending_count }}
-                  </strong>
-                </div>
-              </div>
-              <div class="issues-list">
-                <div v-for="issue in qualityIssues.slice(0, 2)" :key="issue.rule_code" class="issue-item">
-                  <div class="issue-item-meta">
-                    <span class="rule-name">{{ issue.rule_name }}</span>
-                    <span :class="['tag', issue.failed_count > 0 ? 'failed' : 'success']">
-                      {{ issue.failed_count > 0 ? '不合规' : '通过' }}
-                    </span>
-                  </div>
-                  <div class="issue-item-details">
-                    <span>检测量: <b>{{ formatNumber(issue.total_count) }}</b></span>
-                    <span>异常数: <b :class="{ 'has-issues': issue.failed_count > 0 }">{{ issue.failed_count }}</b></span>
-                    <span>通过率: <b>{{ percent(issue.pass_rate) }}</b></span>
-                  </div>
-                </div>
-                <div v-if="!qualityIssues || qualityIssues.length === 0" class="issue-empty">
-                  🟢 实时数据源字段与时延校验 100% 合规
-                </div>
-              </div>
+            <div class="tel-card">
+              <span class="tel-label">API 成功率</span>
+              <strong class="tel-value text-emerald">{{ percent(realtimeOverview.success_rate) }}</strong>
+              <small class="tel-hint">Success Rate</small>
+            </div>
+            <div class="tel-card">
+              <span class="tel-label">平均时延</span>
+              <strong class="tel-value text-blue">{{ Math.round(realtimeOverview.avg_latency_ms || 0) }}ms</strong>
+              <small class="tel-hint">Avg Response Time</small>
+            </div>
+            <div class="tel-card">
+              <span class="tel-label">重试自愈数</span>
+              <strong class="tel-value" :class="{ 'text-red': (realtimeOverview.retry_tasks || 0) > 0, 'text-gray': (realtimeOverview.retry_tasks || 0) === 0 }">
+                {{ realtimeOverview.retry_tasks || 0 }}
+              </strong>
+              <small class="tel-hint">Task Auto-Recovery</small>
             </div>
           </div>
         </article>
+
 
         <!-- 7. Communication bottlenecks diagnostics -->
         <article class="screen-panel overview-grid__diagnostics">

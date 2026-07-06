@@ -167,15 +167,15 @@ redis-cli -h middleware -p 6379 get agentscope:realtime:alerts
 健康检查：
 
 ```bash
-curl http://59.110.123.179:8000/health
+curl http://your_server_ip:8000/health
 ```
 
 实时接口：
 
 ```bash
-curl http://59.110.123.179:8000/api/v1/realtime/overview
-curl http://59.110.123.179:8000/api/v1/realtime/agents
-curl http://59.110.123.179:8000/api/v1/realtime/alerts
+curl http://your_server_ip:8000/api/v1/realtime/overview
+curl http://your_server_ip:8000/api/v1/realtime/agents
+curl http://your_server_ip:8000/api/v1/realtime/alerts
 ```
 
 预期结果：
@@ -258,7 +258,7 @@ nginx -s reload
 浏览器访问：
 
 ```text
-http://59.110.123.179/
+http://your_server_ip/
 ```
 
 前端请求会通过 Nginx 转发到后端，例如：
@@ -275,21 +275,21 @@ http://59.110.123.179/
 通过 Nginx 验证健康检查：
 
 ```bash
-curl http://59.110.123.179/health
+curl http://your_server_ip/health
 ```
 
 通过 Nginx 验证实时接口：
 
 ```bash
-curl http://59.110.123.179/api/v1/realtime/overview
-curl http://59.110.123.179/api/v1/realtime/agents
-curl http://59.110.123.179/api/v1/realtime/alerts
+curl http://your_server_ip/api/v1/realtime/overview
+curl http://your_server_ip/api/v1/realtime/agents
+curl http://your_server_ip/api/v1/realtime/alerts
 ```
 
 通过 Nginx 验证报告接口：
 
 ```bash
-curl -X POST http://59.110.123.179/api/v1/reports/generate \
+curl -X POST http://your_server_ip/api/v1/reports/generate \
   -H "Content-Type: application/json" \
   -d '{"report_date":"2026-06-23","report_type":"daily"}'
 ```

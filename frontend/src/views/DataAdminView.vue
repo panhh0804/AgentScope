@@ -170,11 +170,11 @@
               <table class="data-table screen-native-table admin-table">
                 <thead>
                   <tr>
-                    <th>规则代码 (rule_id)</th>
-                    <th>规则名称 (rule_name)</th>
-                    <th>SQL 校验表达式 (rule_sql)</th>
-                    <th>启用状态 (is_active)</th>
-                    <th>操作</th>
+                    <th style="min-width: 120px;">规则代码 (rule_id)</th>
+                    <th style="min-width: 120px;">规则名称 (rule_name)</th>
+                    <th style="min-width: 320px;">SQL 校验表达式 (rule_sql)</th>
+                    <th style="min-width: 90px;">启用状态 (is_active)</th>
+                    <th style="min-width: 80px;">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -643,6 +643,22 @@
     <!-- 新增规则 Modal -->
     <a-modal v-model:visible="ruleModalVisible" title="新增数据质量检测规则" @ok="handleCreateRule" width="600px">
       <a-form :model="newRule" layout="vertical">
+        <a-form-item label="常用 SQL 模板参考 (点击可快捷输入)">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('negative_latency', '时延非负校验', 'latency_ms >= 0')">
+              时延非负
+            </a-tag>
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('token_non_negative', 'Token数非负', 'total_tokens >= 0')">
+              Token非负
+            </a-tag>
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('allowed_events', '事件类型合法', 'event_type IN (\'agent_start\', \'agent_complete\', \'agent_failed\', \'llm_request\', \'llm_response\', \'tool_call\', \'tool_result\', \'retry\', \'alert\')')">
+              合法事件类型
+            </a-tag>
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('non_empty_fields', '关键字段非空', 'event_id IS NOT NULL AND event_id != \'\' AND trace_id IS NOT NULL AND trace_id != \'\' AND run_id IS NOT NULL AND run_id != \'\'')">
+              关键字段非空
+            </a-tag>
+          </div>
+        </a-form-item>
         <a-form-item label="规则代码 (rule_id)">
           <a-input v-model="newRule.rule_id" placeholder="例如: non_negative_latency" />
         </a-form-item>
@@ -972,6 +988,12 @@ async function recleanData(dateVal) {
   } finally {
     recleaning.value[dateVal] = false
   }
+}
+
+function applySqlTemplate(id, name, sql) {
+  newRule.value.rule_id = id
+  newRule.value.rule_name = name
+  newRule.value.rule_sql = sql
 }
 
 

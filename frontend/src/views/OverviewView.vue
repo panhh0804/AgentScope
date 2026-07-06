@@ -9,7 +9,6 @@
         <div class="screen-tools">
           <a-button type="outline" size="large" @click="load">刷新</a-button>
           <a-button :type="activeSubTab === 'realtime' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'realtime'">实时大盘</a-button>
-          <a-button :type="activeSubTab === 'agent' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'agent'">Agent 监控</a-button>
           <a-button type="outline" size="large" @click="goBack" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回后台</a-button>
           <a-button type="primary" size="large" @click="alertOpen = true">当前告警 {{ realtimeAlerts.length }}</a-button>
         </div>
@@ -30,33 +29,54 @@
       </div>
 
       <section class="screen-layout overview-grid">
-        <article class="screen-panel overview-grid__stream terminal-log-panel">
-          <div class="screen-panel-head">
-            <h3>实时数据流</h3>
-            <span class="pulse-badge">LIVE STREAMING</span>
-          </div>
-          <div ref="terminalRef" class="terminal-log-container stream-cards-container">
-            <TransitionGroup name="list" tag="div">
-              <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
-                <div :class="['event-icon-wrapper', log.level]">
-                  <component :is="getEventIcon(log.agent, log.level)" :size="14" />
-                </div>
-                <div class="event-card-body">
-                  <div class="event-card-meta">
-                    <span class="event-agent-tag">{{ log.agent }}</span>
-                    <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
-                    <span class="event-time-stamp">{{ log.time }}</span>
+        <div class="overview-grid__stream stream-agent-stack">
+          <article class="screen-panel terminal-log-panel stream-stack-panel">
+            <div class="screen-panel-head">
+              <h3>实时数据流</h3>
+              <span class="pulse-badge">LIVE STREAMING</span>
+            </div>
+            <div ref="terminalRef" class="terminal-log-container stream-cards-container">
+              <TransitionGroup name="list" tag="div">
+                <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
+                  <div :class="['event-icon-wrapper', log.level]">
+                    <component :is="getEventIcon(log.agent, log.level)" :size="14" />
                   </div>
-                  <p class="event-message-text">{{ log.message }}</p>
+                  <div class="event-card-body">
+                    <div class="event-card-meta">
+                      <span class="event-agent-tag">{{ log.agent }}</span>
+                      <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
+                      <span class="event-time-stamp">{{ log.time }}</span>
+                    </div>
+                    <p class="event-message-text">{{ log.message }}</p>
+                  </div>
+                  <div v-if="log.metric" class="event-card-metric">
+                    <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
+                    <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
+                  </div>
                 </div>
-                <div v-if="log.metric" class="event-card-metric">
-                  <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
-                  <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
+              </TransitionGroup>
+            </div>
+          </article>
+
+          <article class="screen-panel agent-rank-panel stream-stack-panel">
+            <div class="screen-panel-head">
+              <h3>Agent 监控与实时排行</h3>
+              <span>{{ realtimeAgents.length }} agents</span>
+            </div>
+            <div class="agent-rank-compact">
+              <div v-for="(agent, index) in sortedAgents" :key="agent.agent_id" class="agent-rank-row">
+                <span class="rank-badge">#{{ index + 1 }}</span>
+                <div class="agent-rank-main">
+                  <strong>{{ agent.agent_id }}</strong>
+                  <small>{{ agent.current_task }}</small>
                 </div>
+                <span :class="['tag', agent.status]">{{ agent.status }}</span>
+                <b>{{ percent(agent.success_rate) }}</b>
+                <small>{{ Math.round(agent.avg_latency_ms || 0) }} ms</small>
               </div>
-            </TransitionGroup>
-          </div>
-        </article>
+            </div>
+          </article>
+        </div>
 
         <article class="screen-panel hero-panel overview-grid__throughput">
           <div class="screen-panel-head">
@@ -128,6 +148,23 @@
           </div>
         </article>
 
+        <article class="screen-panel overview-grid__bigdata">
+          <div class="screen-panel-head">
+            <h3>大数据链路监控</h3>
+            <span>pipeline monitor</span>
+          </div>
+          <div class="bigdata-link-monitor">
+            <div v-for="item in bigDataLinkStatus" :key="item.name" class="bigdata-link-row">
+              <div>
+                <strong>{{ item.name }}</strong>
+                <small>{{ item.hint }}</small>
+              </div>
+              <span :class="['link-status-badge', item.status]">{{ item.statusLabel }}</span>
+              <b>{{ item.metric }}</b>
+            </div>
+          </div>
+        </article>
+
         <article class="screen-panel overview-grid__cost">
           <div class="screen-panel-head">
             <h3>LLM 资源与成本监控</h3>
@@ -150,47 +187,6 @@
       </section>
         </div>
 
-        <!-- Tab 2: Agent Monitor -->
-        <div v-if="activeSubTab === 'agent'" class="tab-content-wrapper single-panel-wrapper">
-          <section class="screen-panel agent-monitor-panel" style="margin-top: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; height: 100%;">
-            <div class="screen-panel-head">
-              <h3>Agent 监控与实时排行</h3>
-              <span>{{ realtimeAgents.length }} agents</span>
-            </div>
-            <div class="screen-table-wrap" style="flex: 1; overflow: auto;">
-              <table class="data-table screen-native-table">
-                <thead>
-                  <tr>
-                    <th style="width: 70px;">排名</th>
-                    <th>Agent ID</th>
-                    <th>角色</th>
-                    <th>状态</th>
-                    <th>当前任务</th>
-                    <th>成功率</th>
-                    <th>平均时延</th>
-                    <th>Token</th>
-                    <th>重试次数</th>
-                    <th>最近事件时间</th>
-                  </tr>
-                </thead>
-                <TransitionGroup name="flip-list" tag="tbody">
-                  <tr v-for="(agent, index) in sortedAgents" :key="agent.agent_id">
-                    <td><span class="rank-badge">#{{ index + 1 }}</span></td>
-                    <td>{{ agent.agent_id }}</td>
-                    <td>{{ agent.agent_role }}</td>
-                    <td><span :class="['tag', agent.status]">{{ agent.status }}</span></td>
-                    <td>{{ agent.current_task }}</td>
-                    <td>{{ percent(agent.success_rate) }}</td>
-                    <td>{{ Math.round(agent.avg_latency_ms || 0) }} ms</td>
-                    <td>{{ Number(agent.token_total || 0).toLocaleString() }}</td>
-                    <td>{{ agent.retry_count }}</td>
-                    <td>{{ agent.last_event_time }}</td>
-                  </tr>
-                </TransitionGroup>
-              </table>
-            </div>
-          </section>
-        </div>
       </div>
     </div>
 
@@ -414,6 +410,37 @@ const allAlerts = computed(() => [...realtimeAlerts.value, ...historyAlerts.valu
 const sortedRelations = computed(() => {
   return [...(relationGraph.value.links || [])].sort((a, b) => b.avg_latency_ms - a.avg_latency_ms)
 })
+
+const bigDataLinkStatus = computed(() => [
+  {
+    name: '实时采集',
+    status: Number(realtimeOverview.value.events_per_minute || 0) > 0 ? 'normal' : 'warning',
+    statusLabel: Number(realtimeOverview.value.events_per_minute || 0) > 0 ? 'RUNNING' : 'IDLE',
+    metric: `${realtimeOverview.value.events_per_minute ?? '-'} /min`,
+    hint: 'Kafka / event ingress'
+  },
+  {
+    name: '流式计算',
+    status: Number(realtimeOverview.value.error_rate || 0) > 0.08 ? 'warning' : 'normal',
+    statusLabel: Number(realtimeOverview.value.error_rate || 0) > 0.08 ? 'CHECK' : 'OK',
+    metric: percent(1 - Number(realtimeOverview.value.error_rate || 0)),
+    hint: 'Spark Streaming window'
+  },
+  {
+    name: '离线指标',
+    status: dailyMetrics.value.length > 0 ? 'normal' : 'warning',
+    statusLabel: dailyMetrics.value.length > 0 ? 'READY' : 'WAIT',
+    metric: formatNumber(dailySummary.value.taskCount),
+    hint: 'DWS daily metrics'
+  },
+  {
+    name: '告警链路',
+    status: realtimeAlerts.value.length > 0 ? 'warning' : 'normal',
+    statusLabel: realtimeAlerts.value.length > 0 ? 'OPEN' : 'CLEAR',
+    metric: `${realtimeAlerts.value.length} open`,
+    hint: 'rules / notification'
+  }
+])
 
 function formatAgentName(name) {
   return String(name || '').replace('_agent', '').toUpperCase()

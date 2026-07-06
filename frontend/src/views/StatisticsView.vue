@@ -19,6 +19,23 @@
         </article>
       </section>
 
+      <section class="history-chart-grid">
+        <article class="screen-panel">
+          <div class="screen-panel-head">
+            <h3>智能体离线调用排行 (Top Roles)</h3>
+            <span>agent execution rank</span>
+          </div>
+          <ChartPanel :option="historyRankingOption" class="history-chart-panel" />
+        </article>
+        <article class="screen-panel">
+          <div class="screen-panel-head">
+            <h3>每日 Token 与成本趋势</h3>
+            <span>token / cost trend</span>
+          </div>
+          <ChartPanel :option="historyCostOption" class="history-chart-panel" />
+        </article>
+      </section>
+
       <section class="stats-chart-grid">
         <article class="screen-panel">
           <div class="screen-panel-head">
@@ -60,16 +77,21 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
+import ChartPanel from '../components/ChartPanel.vue'
+import { fetchDailyMetrics, fetchAgentRankings } from '../api/dashboard'
 import {
   fetchAnalyticsAgentStats,
   fetchAnalyticsErrors,
   fetchAnalyticsTrend
 } from '../api/statistics'
+import { barOption, lineOption } from '../charts/options'
 
 const loading = ref(false)
 const trend = ref([])
 const errors = ref([])
 const agentStats = ref([])
+const dailyMetrics = ref([])
+const historyRankings = ref([])
 
 const trendChartRef = ref(null)
 const tokenChartRef = ref(null)
@@ -97,6 +119,55 @@ const summaryMetrics = computed(() => {
 
 const trendPeriodLabel = computed(() => `近 ${trend.value.length || 0} 天`)
 
+const historyRankingOption = computed(() => barOption(
+  'Agent 执行次数排行',
+  historyRankings.value.map((item) => item.agent_role),
+  historyRankings.value.map((item) => item.execution_count),
+  '执行次数'
+))
+
+const historyCostOption = computed(() => {
+  const option = historyLineOption('Token / 成本趋势', [
+    {
+      name: '每日 Token',
+      type: 'line',
+      smooth: true,
+      yAxisIndex: 0,
+      data: dailyMetrics.value.map((item) => item.total_tokens),
+      itemStyle: { color: '#06b6d4' },
+      lineStyle: { width: 3 },
+      areaStyle: { color: 'rgba(6, 182, 212, 0.08)' }
+    },
+    {
+      name: '每日成本 ($)',
+      type: 'line',
+      smooth: true,
+      yAxisIndex: 1,
+      data: dailyMetrics.value.map((item) => item.estimated_cost_usd),
+      itemStyle: { color: '#10b981' },
+      lineStyle: { width: 3 }
+    }
+  ])
+  option.yAxis = [
+    {
+      type: 'value',
+      name: 'Tokens',
+      axisLabel: {
+        color: '#9bc7d9',
+        formatter: (value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${Math.round(value / 1000)}k`
+      },
+      splitLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.1)' } }
+    },
+    {
+      type: 'value',
+      name: '成本 ($)',
+      axisLabel: { color: '#9bc7d9', formatter: '${value}' },
+      splitLine: { show: false }
+    }
+  ]
+  return option
+})
+
 const errorTypeLabels = {
   validation_error: '数据校验错误',
   tool_error: '工具调用错误',
@@ -119,6 +190,37 @@ function compactNumber(value) {
 
 function percent(value) {
   return `${(Number(value || 0) * 100).toFixed(1)}%`
+}
+
+function getTodayString() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return ''
+  const parts = String(dateStr).split('-')
+  if (parts.length === 3) return `${parts[1]}-${parts[2]}`
+  return dateStr
+}
+
+function historyTooltipFormatter(params) {
+  if (!params || !params.length) return ''
+  const date = params[0].axisValueLabel
+  const rows = Array.isArray(params) ? params : [params]
+  const lines = rows.map((item) => `${item.marker}${item.seriesName}: ${item.value}`)
+  return [date, ...lines].join('<br/>')
+}
+
+function historyLineOption(title, series) {
+  const option = lineOption(title, dailyMetrics.value.map((item) => formatShortDate(item.metric_date)), series)
+  option.tooltip = { ...option.tooltip, trigger: 'axis', formatter: historyTooltipFormatter }
+  option.grid = { ...option.grid, right: 34, bottom: 32, containLabel: true }
+  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
+  return option
 }
 
 function baseChartOption() {
@@ -328,14 +430,19 @@ async function loadAll() {
   loading.value = true
   showLoading()
   try {
-    const [trendData, errorData, agentData] = await Promise.all([
+    const endDate = getTodayString()
+    const [trendData, errorData, agentData, dailyData, rankingData] = await Promise.all([
       fetchAnalyticsTrend(),
       fetchAnalyticsErrors(),
-      fetchAnalyticsAgentStats()
+      fetchAnalyticsAgentStats(),
+      fetchDailyMetrics('2026-06-01', endDate),
+      fetchAgentRankings(endDate)
     ])
     trend.value = trendData
     errors.value = errorData
     agentStats.value = agentData
+    dailyMetrics.value = dailyData || []
+    historyRankings.value = rankingData || []
     await nextTick()
     renderCharts()
   } catch (err) {

@@ -216,21 +216,46 @@ class MySQLAnalyticsRepository:
         )
 
     def get_quality_issues(self, metric_date: date) -> List[Dict]:
+        import subprocess
+        import json
+
+        # Attempt to read dirty samples from HDFS first (real-time sample fallback)
+        hdfs_samples = []
+        try:
+            dt_str = metric_date.isoformat()
+            cmd = f"/usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -cat /agentscope/dirty/agent_events/dt={dt_str}/*.json 2>/dev/null | head -n 10"
+            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, _ = proc.communicate(timeout=4)
+            if stdout:
+                for line in stdout.decode("utf-8").split("\n"):
+                    if line.strip():
+                        hdfs_samples.append(json.loads(line.strip()))
+        except Exception as e:
+            logging.warning(f"Failed to fetch HDFS dirty samples: {e}")
+
         # 1. Query real DB for negative latency
-        neg_latency = self._query(
-            "SELECT event_id, trace_id, run_id, agent_id, latency_ms FROM agentscope_source.agent_events_source WHERE latency_ms < 0 LIMIT 5",
-            ()
-        )
+        neg_latency = [s for s in hdfs_samples if s.get("latency_ms", 0) < 0]
+        if not neg_latency:
+            neg_latency = self._query(
+                "SELECT event_id, trace_id, run_id, agent_id, latency_ms FROM agentscope_source.agent_events_source WHERE latency_ms < 0 LIMIT 5",
+                ()
+            )
+
         # 2. Query real DB for token mismatch
-        token_mis = self._query(
-            "SELECT event_id, trace_id, run_id, agent_id, prompt_tokens, completion_tokens, total_tokens FROM agentscope_source.agent_events_source WHERE prompt_tokens + completion_tokens != total_tokens LIMIT 5",
-            ()
-        )
+        token_mis = [s for s in hdfs_samples if s.get("total_tokens", 0) < 0]
+        if not token_mis:
+            token_mis = self._query(
+                "SELECT event_id, trace_id, run_id, agent_id, prompt_tokens, completion_tokens, total_tokens FROM agentscope_source.agent_events_source WHERE prompt_tokens + completion_tokens != total_tokens LIMIT 5",
+                ()
+            )
+
         # 3. Query real DB for missing fields
-        missing_fields = self._query(
-            "SELECT event_id, trace_id, run_id, agent_id FROM agentscope_source.agent_events_source WHERE event_id = '' OR trace_id = '' OR run_id = '' OR agent_id = '' LIMIT 5",
-            ()
-        )
+        missing_fields = [s for s in hdfs_samples if not s.get("event_id") or not s.get("trace_id") or not s.get("run_id")]
+        if not missing_fields:
+            missing_fields = self._query(
+                "SELECT event_id, trace_id, run_id, agent_id FROM agentscope_source.agent_events_source WHERE event_id = '' OR trace_id = '' OR run_id = '' OR agent_id = '' LIMIT 5",
+                ()
+            )
         
         issues = []
         

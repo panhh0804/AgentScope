@@ -97,3 +97,12 @@ CREATE TABLE IF NOT EXISTS ai_reports (
   KEY idx_report_date (report_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS quality_rules_metadata (
+  rule_id VARCHAR(64) NOT NULL,
+  rule_name VARCHAR(128) NOT NULL,
+  rule_sql VARCHAR(512) NOT NULL,
+  is_active TINYINT NOT NULL DEFAULT 1,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (rule_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

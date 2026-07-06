@@ -32,3 +32,13 @@ ON DUPLICATE KEY UPDATE
   total_tokens = VALUES(total_tokens),
   estimated_cost_usd = VALUES(estimated_cost_usd);
 
+INSERT INTO quality_rules_metadata (rule_id, rule_name, rule_sql, is_active) VALUES
+  ('required_fields', '关键字段非空校验', 'event_id IS NOT NULL AND event_id <> \'\' AND trace_id IS NOT NULL AND trace_id <> \'\' AND run_id IS NOT NULL AND run_id <> \'\'', 1),
+  ('allowed_event_types', '事件类型合规校验', 'event_type IN (\'agent_start\', \'agent_complete\', \'agent_failed\', \'llm_request\', \'llm_response\', \'tool_call\', \'tool_result\', \'retry\', \'alert\')', 1),
+  ('non_negative_latency', '时延非负校验', 'latency_ms >= 0', 1),
+  ('non_negative_tokens', 'Token数非负校验', 'total_tokens >= 0', 1)
+ON DUPLICATE KEY UPDATE
+  rule_name = VALUES(rule_name),
+  rule_sql = VALUES(rule_sql),
+  is_active = VALUES(is_active);
+

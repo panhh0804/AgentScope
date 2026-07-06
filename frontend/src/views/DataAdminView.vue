@@ -12,7 +12,18 @@
         </div>
       </header>
 
-      <a-tabs v-model:active-key="activeTab" class="admin-tabs">
+      <!-- Unified States overlay/container -->
+      <div v-if="loading" class="state-wrapper">
+        <LoadingState message="正在加载数据治理与任务治理指标..." />
+      </div>
+      <div v-else-if="error" class="state-wrapper">
+        <ErrorState :reason="error" @retry="loadAll" />
+      </div>
+      <div v-else-if="isEmpty" class="state-wrapper">
+        <EmptyState />
+      </div>
+
+      <a-tabs v-else v-model:active-key="activeTab" class="admin-tabs">
         <a-tab-pane key="overview" title="数据总览">
           <section class="screen-metrics admin-metrics">
             <article v-for="metric in overviewMetrics" :key="metric.label" class="screen-metric">
@@ -677,6 +688,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
+import LoadingState from '../components/LoadingState.vue'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
+
+const loading = ref(true)
+const error = ref('')
+const isEmpty = ref(false)
 import {
   executeAdminJob,
   fetchAdminEvents,
@@ -1292,32 +1310,48 @@ function resizeCharts() {
 }
 
 async function loadAll() {
-  const [overviewData, trendData, pipelineData, datasetData, lineageData, qualityOverviewData, qualityIssueData, auditData] = await Promise.all([
-    fetchAdminOverview(),
-    fetchDataVolumeTrend(),
-    fetchPipelineStatus(),
-    fetchDatasets(),
-    fetchDataLineage(),
-    fetchQualityOverview(),
-    fetchQualityIssues(),
-    fetchAuditLogs()
-  ])
-  overview.value = overviewData
-  trend.value = trendData
-  pipeline.value = pipelineData
-  datasets.value = datasetData
-  lineage.value = lineageData
-  qualityOverview.value = qualityOverviewData
-  qualityIssues.value = qualityIssueData
-  auditLogs.value = auditData
-  
-  await Promise.all([loadLayerData(), loadJobs(), loadRules()])
-  await nextTick()
-  renderTrend()
-  renderFunnel()
-  renderLineage()
-  renderStorageChart()
-  renderPerfChart()
+  loading.value = true
+  error.value = ''
+  isEmpty.value = false
+  try {
+    const [overviewData, trendData, pipelineData, datasetData, lineageData, qualityOverviewData, qualityIssueData, auditData] = await Promise.all([
+      fetchAdminOverview(),
+      fetchDataVolumeTrend(),
+      fetchPipelineStatus(),
+      fetchDatasets(),
+      fetchDataLineage(),
+      fetchQualityOverview(),
+      fetchQualityIssues(),
+      fetchAuditLogs()
+    ])
+    
+    // Check empty dataset condition (strict mode check)
+    if (!overviewData || Object.keys(overviewData).length === 0 || !datasetData || datasetData.length === 0) {
+      isEmpty.value = true
+    }
+    
+    overview.value = overviewData || {}
+    trend.value = trendData || []
+    pipeline.value = pipelineData || { nodes: [], edges: [] }
+    datasets.value = datasetData || []
+    lineage.value = lineageData || { nodes: [], edges: [] }
+    qualityOverview.value = qualityOverviewData || { rule_count: 0, issue_count: 0, avg_pass_rate: 1.0, pending_count: 0 }
+    qualityIssues.value = qualityIssueData || []
+    auditLogs.value = auditData || []
+    
+    await Promise.all([loadLayerData(), loadJobs(), loadRules()])
+    await nextTick()
+    renderTrend()
+    renderFunnel()
+    renderLineage()
+    renderStorageChart()
+    renderPerfChart()
+  } catch (err) {
+    console.error('Failed to load admin data', err)
+    error.value = err.message || '网络连接或后端服务异常'
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(async () => {

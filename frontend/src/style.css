@@ -3219,6 +3219,17 @@ tr:nth-child(3) .rank-badge {
   color: #94a3b8;
 }
 
-
-
-
+/* ─── Unified Loading / Empty / Error state container ──────────────────── */
+.state-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 360px;
+  background: rgba(7, 19, 31, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(103, 232, 249, 0.12);
+  border-radius: 8px;
+  margin: 8px 0;
+}

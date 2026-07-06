@@ -16,8 +16,20 @@
 
       <!-- Tab Content Container -->
       <div class="overview-tab-container">
-        <!-- Tab 1: Realtime Board -->
-        <div v-if="activeSubTab === 'realtime'" class="tab-content-wrapper">
+        <!-- Unified States overlay/container -->
+        <div v-if="loading" class="state-wrapper">
+          <LoadingState message="正在加载实时与离线指标..." />
+        </div>
+        <div v-else-if="error" class="state-wrapper">
+          <ErrorState :reason="error" @retry="load" />
+        </div>
+        <div v-else-if="isEmpty" class="state-wrapper">
+          <EmptyState />
+        </div>
+
+        <template v-else>
+          <!-- Tab 1: Realtime Board -->
+          <div v-if="activeSubTab === 'realtime'" class="tab-content-wrapper">
 
       <!-- Compact realtime stats bar -->
       <div class="rt-stats-bar">
@@ -221,10 +233,10 @@
           </div>
         </article>
       </section>
-        </div>
-
-      </div>
-    </div>
+          </div><!-- /tab-content-wrapper -->
+        </template><!-- /v-else -->
+      </div><!-- /overview-tab-container -->
+    </div><!-- /screen-board -->
 
     <a-modal v-model:visible="alertOpen" title="告警详情" width="920px" :footer="false">
       <div class="screen-table-wrap modal-table-wrap">
@@ -261,10 +273,17 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
+import LoadingState from '../components/LoadingState.vue'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend, fetchReportDetail } from '../api/dashboard'
 import { fetchQualityOverview, fetchQualityIssues } from '../api/admin'
 import { barOption, graphOption, lineOption } from '../charts/options'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
+
+const loading = ref(true)
+const error = ref('')
+const isEmpty = ref(false)
 const router = useRouter()
 const realtimeOverview = ref({})
 const realtimeTrend = ref([])
@@ -627,45 +646,61 @@ function goBack() {
 }
 
 async function load() {
-  const [startDate, endDate] = [getDateValue(dateRange.value?.[0], '2026-06-01'), getDateValue(dateRange.value?.[1], getTodayString())]
-  const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData, dailyData, rankingData, relationData, historyAlertData, reportsData, qualityOverviewData, qualityIssuesData] = await Promise.all([
-    fetchOverview(),
-    fetchTrend(60),
-    fetchAgents(),
-    fetchRealtimeAlerts(),
-    fetchDailyMetrics(startDate, endDate),
-    fetchAgentRankings(endDate),
-    fetchRelationGraph(endDate),
-    fetchHistoryAlerts(endDate),
-    fetchReports(),
-    fetchQualityOverview().catch(() => ({ rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 })),
-    fetchQualityIssues().catch(() => [])
-  ])
-  realtimeOverview.value = realtimeOverviewData
-  realtimeTrend.value = realtimeTrendData
-  realtimeAgents.value = agentsData
-  realtimeAlerts.value = realtimeAlertData
-  dailyMetrics.value = dailyData
-  historyRankings.value = rankingData
-  relationGraph.value = relationData
-  historyAlerts.value = historyAlertData
-  qualityOverview.value = qualityOverviewData || { rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 }
-  qualityIssues.value = qualityIssuesData || []
-  
-  if (reportsData && reportsData.length > 0) {
-    try {
-      const detail = await fetchReportDetail(reportsData[0].report_id)
-      reports.value = [detail, ...reportsData.slice(1)]
-    } catch (err) {
-      console.error('Failed to load latest report detail', err)
-      reports.value = reportsData
+  loading.value = true
+  error.value = ''
+  isEmpty.value = false
+  try {
+    const [startDate, endDate] = [getDateValue(dateRange.value?.[0], '2026-06-01'), getDateValue(dateRange.value?.[1], getTodayString())]
+    const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData, dailyData, rankingData, relationData, historyAlertData, reportsData, qualityOverviewData, qualityIssuesData] = await Promise.all([
+      fetchOverview(),
+      fetchTrend(60),
+      fetchAgents(),
+      fetchRealtimeAlerts(),
+      fetchDailyMetrics(startDate, endDate),
+      fetchAgentRankings(endDate),
+      fetchRelationGraph(endDate),
+      fetchHistoryAlerts(endDate),
+      fetchReports(),
+      fetchQualityOverview().catch(() => ({ rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 })),
+      fetchQualityIssues().catch(() => [])
+    ])
+    
+    // Check empty dataset condition (strict mode check)
+    if (!realtimeOverviewData || Object.keys(realtimeOverviewData).length === 0 || !agentsData || agentsData.length === 0) {
+      isEmpty.value = true
     }
-  } else {
-    reports.value = []
-  }
+    
+    realtimeOverview.value = realtimeOverviewData || {}
+    realtimeTrend.value = realtimeTrendData || []
+    realtimeAgents.value = agentsData || []
+    realtimeAlerts.value = realtimeAlertData || []
+    dailyMetrics.value = dailyData || []
+    historyRankings.value = rankingData || []
+    relationGraph.value = relationData || { nodes: [], links: [] }
+    historyAlerts.value = historyAlertData || []
+    qualityOverview.value = qualityOverviewData || { rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 }
+    qualityIssues.value = qualityIssuesData || []
+    
+    if (reportsData && reportsData.length > 0) {
+      try {
+        const detail = await fetchReportDetail(reportsData[0].report_id)
+        reports.value = [detail, ...reportsData.slice(1)]
+      } catch (err) {
+        console.error('Failed to load latest report detail', err)
+        reports.value = reportsData
+      }
+    } else {
+      reports.value = []
+    }
 
-  await nextTick()
-  renderCharts()
+    await nextTick()
+    renderCharts()
+  } catch (err) {
+    console.error('Failed to load overview data', err)
+    error.value = err.message || '网络连接或后端服务异常'
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(async () => {

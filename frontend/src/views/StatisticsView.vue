@@ -11,7 +11,19 @@
         </div>
       </header>
 
-      <section class="screen-metrics statistics-metrics">
+      <!-- Unified States overlay/container -->
+      <div v-if="loading" class="state-wrapper">
+        <LoadingState message="正在加载数据统计与分析指标..." />
+      </div>
+      <div v-else-if="error" class="state-wrapper">
+        <ErrorState :reason="error" @retry="loadAll" />
+      </div>
+      <div v-else-if="isEmpty" class="state-wrapper">
+        <EmptyState />
+      </div>
+
+      <template v-else>
+        <section class="screen-metrics statistics-metrics">
         <article v-for="metric in summaryMetrics" :key="metric.label" class="screen-metric">
           <span>{{ metric.label }}</span>
           <strong>{{ metric.value }}</strong>
@@ -69,6 +81,7 @@
           <div ref="latencyChartRef" class="statistics-chart"></div>
         </article>
       </section>
+      </template>
     </div>
   </section>
 </template>
@@ -78,6 +91,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
 import ChartPanel from '../components/ChartPanel.vue'
+import LoadingState from '../components/LoadingState.vue'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 import { fetchDailyMetrics, fetchAgentRankings } from '../api/dashboard'
 import {
   fetchAnalyticsAgentStats,
@@ -86,7 +102,9 @@ import {
 } from '../api/statistics'
 import { barOption, lineOption } from '../charts/options'
 
-const loading = ref(false)
+const loading = ref(true)
+const error = ref('')
+const isEmpty = ref(false)
 const trend = ref([])
 const errors = ref([])
 const agentStats = ref([])
@@ -532,6 +550,8 @@ function resizeCharts() {
 
 async function loadAll() {
   loading.value = true
+  error.value = ''
+  isEmpty.value = false
   showLoading()
   try {
     const endDate = getTodayString()
@@ -542,15 +562,22 @@ async function loadAll() {
       fetchDailyMetrics('2026-06-01', endDate),
       fetchAgentRankings(endDate)
     ])
-    trend.value = trendData
-    errors.value = errorData
-    agentStats.value = agentData
+    
+    // Check if empty dataset (strict mode verification)
+    if (!trendData || trendData.length === 0 || !agentData || agentData.length === 0) {
+      isEmpty.value = true
+    }
+    
+    trend.value = trendData || []
+    errors.value = errorData || []
+    agentStats.value = agentData || []
     dailyMetrics.value = dailyData || []
     historyRankings.value = rankingData || []
     await nextTick()
     renderCharts()
   } catch (err) {
-    Message.error({ content: `数据统计加载失败: ${err.message || err}`, duration: 5000 })
+    console.error('Failed to load statistics', err)
+    error.value = err.message || '网络连接或后端服务异常'
   } finally {
     hideLoading()
     loading.value = false

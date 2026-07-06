@@ -26,78 +26,84 @@
       <p>正在生成报告，请稍候。</p>
     </section>
 
-    <section class="report-hero panel">
-      <div class="panel-header">
-        <h2>报告概览</h2>
-        <span v-if="report.create_time" class="muted">生成时间：{{ report.create_time }}</span>
-      </div>
+    <!-- Unified States -->
+    <div v-if="isLoadingReport" class="state-wrapper">
+      <LoadingState message="正在加载分析报告..." />
+    </div>
+    <div v-else-if="error" class="state-wrapper">
+      <ErrorState :reason="error" @retry="loadLatestReport" />
+    </div>
+    <div v-else-if="isEmpty" class="state-wrapper">
+      <EmptyState message="暂无分析报告，请在上方选择日期并点击「生成报告」。" />
+    </div>
 
-      <div class="report-meta-grid">
-        <article class="report-meta-card">
-          <span>报告主题</span>
-          <strong v-html="reportTitleHtml"></strong>
-          <p>{{ reportIntro }}</p>
-        </article>
-        <article class="report-meta-card">
-          <span>生成参数</span>
-          <strong>{{ reportDisplayType.toUpperCase() }}</strong>
-          <p>{{ reportDisplayDate }}</p>
-        </article>
-        <article class="report-meta-card">
-          <span>内容块</span>
-          <strong>{{ sections.length }}</strong>
-          <p>结构化渲染后的章节数</p>
-        </article>
-      </div>
-    </section>
-
-    <section v-if="sections.length" class="report-section-grid">
-      <article v-for="(section, sectionIndex) in sections" :key="`${section.title}-${sectionIndex}`" class="panel report-section-card">
+    <template v-else>
+      <section class="report-hero panel">
         <div class="panel-header">
-          <h2 v-html="section.titleHtml"></h2>
-          <span>{{ section.blocks.length }} 段</span>
+          <h2>报告概览</h2>
+          <span v-if="report.create_time" class="muted">生成时间：{{ report.create_time }}</span>
         </div>
 
-        <div class="report-blocks">
-          <template v-for="(block, blockIndex) in section.blocks" :key="`${sectionIndex}-${blockIndex}`">
-            <div v-if="block.type === 'paragraph'" class="report-block report-block--paragraph" v-html="block.html"></div>
-            <div v-else-if="block.type === 'hr'" class="report-block report-block--hr">
-              <hr style="border: 0; border-top: 1px dashed rgba(34, 211, 238, 0.25); margin: 15px 0;" />
-            </div>
-            <div v-else-if="block.type === 'list'" class="report-block report-block--list">
-              <ul>
-                <li v-for="(item, itemIndex) in block.items" :key="itemIndex" v-html="item"></li>
-              </ul>
-            </div>
-            <div v-else-if="block.type === 'code'" class="report-block report-block--code">
-              <span v-if="block.language" class="code-lang">{{ block.language }}</span>
-              <pre v-text="block.text"></pre>
-            </div>
-            <div v-else-if="block.type === 'table'" class="report-block report-block--table table-responsive">
-              <table class="data-table screen-native-table markdown-table">
-                <thead>
-                  <tr>
-                    <th v-for="(h, hIdx) in block.headers" :key="hIdx" v-html="h"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, rIdx) in block.rows" :key="rIdx">
-                    <td v-for="(cell, cIdx) in row" :key="cIdx" v-html="cell"></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </template>
+        <div class="report-meta-grid">
+          <article class="report-meta-card">
+            <span>报告主题</span>
+            <strong v-html="reportTitleHtml"></strong>
+            <p>{{ reportIntro }}</p>
+          </article>
+          <article class="report-meta-card">
+            <span>生成参数</span>
+            <strong>{{ reportDisplayType.toUpperCase() }}</strong>
+            <p>{{ reportDisplayDate }}</p>
+          </article>
+          <article class="report-meta-card">
+            <span>内容块</span>
+            <strong>{{ sections.length }}</strong>
+            <p>结构化渲染后的章节数</p>
+          </article>
         </div>
-      </article>
-    </section>
+      </section>
 
-    <section v-else class="panel report-empty">
-      <div class="panel-header">
-        <h2>报告内容</h2>
-      </div>
-      <p class="report-empty-text">暂无报告，点击“生成报告”后会以卡片化方式展示结构化内容。</p>
-    </section>
+      <section v-if="sections.length" class="report-section-grid">
+        <article v-for="(section, sectionIndex) in sections" :key="`${section.title}-${sectionIndex}`" class="panel report-section-card">
+          <div class="panel-header">
+            <h2 v-html="section.titleHtml"></h2>
+            <span>{{ section.blocks.length }} 段</span>
+          </div>
+
+          <div class="report-blocks">
+            <template v-for="(block, blockIndex) in section.blocks" :key="`${sectionIndex}-${blockIndex}`">
+              <div v-if="block.type === 'paragraph'" class="report-block report-block--paragraph" v-html="block.html"></div>
+              <div v-else-if="block.type === 'hr'" class="report-block report-block--hr">
+                <hr style="border: 0; border-top: 1px dashed rgba(34, 211, 238, 0.25); margin: 15px 0;" />
+              </div>
+              <div v-else-if="block.type === 'list'" class="report-block report-block--list">
+                <ul>
+                  <li v-for="(item, itemIndex) in block.items" :key="itemIndex" v-html="item"></li>
+                </ul>
+              </div>
+              <div v-else-if="block.type === 'code'" class="report-block report-block--code">
+                <span v-if="block.language" class="code-lang">{{ block.language }}</span>
+                <pre v-text="block.text"></pre>
+              </div>
+              <div v-else-if="block.type === 'table'" class="report-block report-block--table table-responsive">
+                <table class="data-table screen-native-table markdown-table">
+                  <thead>
+                    <tr>
+                      <th v-for="(h, hIdx) in block.headers" :key="hIdx" v-html="h"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, rIdx) in block.rows" :key="rIdx">
+                      <td v-for="(cell, cIdx) in row" :key="cIdx" v-html="cell"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+        </article>
+      </section>
+    </template>
   </div>
 </template>
 
@@ -106,6 +112,9 @@ import { computed, ref, onMounted } from 'vue'
 import { FilePlus2 } from '@lucide/vue'
 import { generateReport, fetchReports, fetchReportDetail } from '../api/dashboard'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
+import LoadingState from '../components/LoadingState.vue'
+import EmptyState from '../components/EmptyState.vue'
+import ErrorState from '../components/ErrorState.vue'
 
 const getTodayString = () => {
   const d = new Date()
@@ -119,10 +128,14 @@ const reportType = ref('daily')
 const report = ref({})
 const isGenerating = ref(false)
 const reportError = ref('')
-const isLoadingReport = ref(false)
+const isLoadingReport = ref(true)
+const error = ref('')
+const isEmpty = ref(false)
 
-onMounted(async () => {
+async function loadLatestReport() {
   isLoadingReport.value = true
+  error.value = ''
+  isEmpty.value = false
   try {
     const list = await fetchReports()
     if (list && list.length > 0) {
@@ -132,12 +145,22 @@ onMounted(async () => {
         date.value = detail.report_date
         reportType.value = detail.report_type || 'daily'
       }
+      if (!detail.content || detail.content.trim() === '') {
+        isEmpty.value = true
+      }
+    } else {
+      isEmpty.value = true
     }
   } catch (e) {
-    console.error('Failed to load latest report on mount', e)
+    console.error('Failed to load latest report', e)
+    error.value = e.message || '网络连接或后端服务异常'
   } finally {
     isLoadingReport.value = false
   }
+}
+
+onMounted(async () => {
+  await loadLatestReport()
 })
 
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))

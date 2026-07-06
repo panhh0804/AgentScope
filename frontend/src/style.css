@@ -2430,8 +2430,8 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "latency llm_telemetry"
-      "throughput agent_rank"
+      "latency agent_rank"
+      "throughput system_load"
       "stream relation"
       "bigdata diagnostics"
       "alerts alerts";
@@ -2514,11 +2514,11 @@ tr:nth-child(3) .rank-badge {
   min-height: 0;
   overflow: hidden;
   grid-template-areas:
-    "latency llm_telemetry throughput"
-    "stream agent_rank relation"
+    "latency agent_rank throughput"
+    "stream system_load relation"
     "bigdata diagnostics alerts";
   grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) minmax(280px, 1fr);
-  grid-template-rows: minmax(135px, 0.9fr) minmax(175px, 1.15fr) minmax(115px, 0.75fr);
+  grid-template-rows: minmax(175px, 1.15fr) minmax(135px, 0.9fr) minmax(115px, 0.75fr);
   gap: 10px;
 }
 
@@ -2612,8 +2612,8 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "latency llm_telemetry"
-      "throughput agent_rank"
+      "latency agent_rank"
+      "throughput system_load"
       "stream relation"
       "diagnostics bigdata"
       "alerts alerts";
@@ -2654,8 +2654,8 @@ tr:nth-child(3) .rank-badge {
 
 .screen-page--overview .overview-grid {
   grid-template-areas:
-    "latency llm_telemetry throughput"
-    "stream agent_rank relation"
+    "latency agent_rank throughput"
+    "stream system_load relation"
     "bigdata diagnostics alerts";
 }
 
@@ -3152,9 +3152,9 @@ tr:nth-child(3) .rank-badge {
   padding: 8px;
 }
 
-/* LLM Live Telemetry Grid styles */
-.overview-grid__llm_telemetry {
-  grid-area: llm_telemetry;
+/* System Live Load & Remediation Telemetry styles */
+.overview-grid__system_load {
+  grid-area: system_load;
 }
 
 .llm-telemetry-grid {

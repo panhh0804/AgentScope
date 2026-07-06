@@ -137,34 +137,36 @@
           </div>
 
         </article>
-        <!-- 9. LLM API Live Telemetry (The new separate box in Center Row 1) -->
-        <article class="screen-panel compact overview-grid__llm_telemetry">
+        <!-- 9. System Live Load & Remediation Telemetry (The new separate box in Center Row 2) -->
+        <article class="screen-panel compact overview-grid__system_load">
           <div class="screen-panel-head">
-            <h3>LLM 接口实时负载监控</h3>
-            <span>API Gateway Live</span>
+            <h3>系统负载与自愈监控</h3>
+            <span>Load & Remediation</span>
           </div>
           <div class="llm-telemetry-grid">
             <div class="tel-card">
-              <span class="tel-label">并发请求</span>
-              <strong class="tel-value text-cyan">{{ Math.round((realtimeOverview.running_tasks || 0) * 0.6) }}</strong>
-              <small class="tel-hint">Active Requests</small>
+              <span class="tel-label">活跃任务数</span>
+              <strong class="tel-value text-cyan">{{ realtimeOverview.running_tasks || 0 }}</strong>
+              <small class="tel-hint">Running Tasks</small>
             </div>
             <div class="tel-card">
-              <span class="tel-label">API 成功率</span>
-              <strong class="tel-value text-emerald">{{ percent(realtimeOverview.success_rate) }}</strong>
-              <small class="tel-hint">Success Rate</small>
-            </div>
-            <div class="tel-card">
-              <span class="tel-label">平均时延</span>
-              <strong class="tel-value text-blue">{{ Math.round(realtimeOverview.avg_latency_ms || 0) }}ms</strong>
-              <small class="tel-hint">Avg Response Time</small>
+              <span class="tel-label">事件吞吐率</span>
+              <strong class="tel-value text-blue">{{ realtimeOverview.events_per_minute || 0 }}/m</strong>
+              <small class="tel-hint">Events Throughput</small>
             </div>
             <div class="tel-card">
               <span class="tel-label">重试自愈数</span>
               <strong class="tel-value" :class="{ 'text-red': (realtimeOverview.retry_tasks || 0) > 0, 'text-gray': (realtimeOverview.retry_tasks || 0) === 0 }">
                 {{ realtimeOverview.retry_tasks || 0 }}
               </strong>
-              <small class="tel-hint">Task Auto-Recovery</small>
+              <small class="tel-hint">Self-healing Queue</small>
+            </div>
+            <div class="tel-card">
+              <span class="tel-label">未处理告警</span>
+              <strong class="tel-value" :class="{ 'text-red': realtimeAlerts.length > 0, 'text-gray': realtimeAlerts.length === 0 }">
+                {{ realtimeAlerts.length }}
+              </strong>
+              <small class="tel-hint">Open Alerts</small>
             </div>
           </div>
         </article>

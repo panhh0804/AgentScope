@@ -2174,3 +2174,100 @@ tr:nth-child(3) .rank-badge {
   box-shadow: 0 8px 24px rgba(34, 211, 238, 0.16), inset 0 0 16px rgba(34, 211, 238, 0.08);
   transform: translateY(-2px);
 }
+
+/* 100vh Non-scrollable Dashboard Rules */
+.screen-page--overview {
+  margin: 0;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden !important;
+}
+
+.screen-page--overview .screen-board {
+  height: 100vh !important;
+  min-height: 100vh !important;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+.screen-page--overview .overview-tab-container {
+  flex: 1;
+  overflow: hidden;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-page--overview .tab-content-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen-page--overview .tab-content-wrapper.scrollable {
+  overflow-y: auto;
+  gap: 16px;
+  padding-bottom: 20px;
+  display: block;
+}
+
+/* Scale down charts and containers on the realtime board to fit perfectly */
+.screen-page--overview .link-summary-grid {
+  margin-bottom: 10px;
+}
+
+.screen-page--overview .screen-metrics {
+  margin-bottom: 10px;
+}
+
+.screen-page--overview .overview-grid {
+  flex: 1;
+  overflow: hidden;
+}
+
+.screen-page--overview .overview-grid .screen-panel {
+  padding: 10px 14px;
+}
+
+.screen-page--overview .overview-grid .screen-panel.compact,
+.screen-page--overview .overview-grid .screen-panel.hero-panel {
+  min-height: 180px;
+  height: 100%;
+}
+
+.screen-page--overview .overview-grid .screen-chart {
+  height: 140px !important;
+}
+
+.screen-page--overview .overview-grid .screen-chart.large {
+  height: 155px !important;
+}
+
+.screen-page--overview .overview-grid .screen-chart.small {
+  height: 120px !important;
+}
+
+.screen-page--overview .overview-grid .terminal-log-container {
+  height: 135px !important;
+  margin-top: 6px;
+}
+
+.screen-page--overview .overview-grid__cost .screen-chart {
+  height: 95px !important;
+  margin-top: 8px !important;
+}
+
+.screen-page--overview .overview-grid .alert-ticker {
+  gap: 6px;
+}
+
+.screen-page--overview .overview-grid .ticker-item {
+  padding: 4px 6px;
+}
+

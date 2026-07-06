@@ -9,12 +9,18 @@
         <div class="screen-tools">
           <a-range-picker v-model="dateRange" value-format="YYYY-MM-DD" size="large" class="screen-date" />
           <a-button type="outline" size="large" @click="load">刷新</a-button>
-          <a-button type="outline" size="large" @click="scrollToAgents">Agent 监控</a-button>
-          <a-button type="outline" size="large" @click="scrollToHistory">历史图表</a-button>
+          <a-button :type="activeSubTab === 'realtime' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'realtime'">实时大盘</a-button>
+          <a-button :type="activeSubTab === 'agent' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'agent'">Agent 监控</a-button>
+          <a-button :type="activeSubTab === 'history' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'history'; nextTick(() => resizeCharts())">历史分析</a-button>
           <a-button type="outline" size="large" @click="goBack" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回后台</a-button>
           <a-button type="primary" size="large" @click="alertOpen = true">当前告警 {{ realtimeAlerts.length }} / 历史 {{ historyAlerts.length }}</a-button>
         </div>
       </header>
+
+      <!-- Tab Content Container -->
+      <div class="overview-tab-container">
+        <!-- Tab 1: Realtime Board -->
+        <div v-if="activeSubTab === 'realtime'" class="tab-content-wrapper">
 
       <section class="link-summary-grid">
         <article class="link-summary-card realtime">
@@ -162,8 +168,11 @@
           <div ref="costChart" class="screen-chart" style="height: 200px; margin-top: 14px;"></div>
         </article>
       </section>
+        </div>
 
-      <section ref="agentTableRef" class="screen-panel agent-monitor-panel">
+        <!-- Tab 2: Agent Monitor -->
+        <div v-if="activeSubTab === 'agent'" class="tab-content-wrapper single-panel-wrapper">
+          <section ref="agentTableRef" class="screen-panel agent-monitor-panel" style="margin-top: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; height: 100%;">
         <div class="screen-panel-head">
           <h3>Agent 监控与实时排行</h3>
           <span>{{ realtimeAgents.length }} agents</span>
@@ -201,8 +210,11 @@
           </table>
         </div>
       </section>
+        </div>
 
-      <section ref="historyChartsRef" class="screen-history">
+        <!-- Tab 3: History Board -->
+        <div v-if="activeSubTab === 'history'" class="tab-content-wrapper scrollable">
+          <section ref="historyChartsRef" class="screen-history" style="margin-top: 0;">
         <div class="screen-panel-head screen-history-head">
           <div>
             <p class="screen-kicker">历史分析汇总</p>
@@ -298,10 +310,12 @@
           </div>
           <a-space wrap>
             <a-button type="primary" @click="$router.push('/reports')">进入报告页</a-button>
-            <a-button @click="scrollToHistory">查看历史图表</a-button>
+            <a-button @click="activeSubTab = 'history'; nextTick(() => resizeCharts())">查看历史图表</a-button>
           </a-space>
         </article>
       </section>
+        </div>
+      </div>
     </div>
 
     <a-modal v-model:visible="alertOpen" title="告警详情" width="920px" :footer="false">
@@ -366,6 +380,7 @@ const getTodayString = () => {
 
 const dateRange = ref(['2026-06-01', getTodayString()])
 const alertOpen = ref(false)
+const activeSubTab = ref('realtime')
 const agentTableRef = ref(null)
 const historyChartsRef = ref(null)
 

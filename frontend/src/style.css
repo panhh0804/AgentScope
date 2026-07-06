@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  font-family: 'Outfit', 'Inter', "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   color: #dbe7f3;
   background:
     radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 35%),
@@ -2818,4 +2818,175 @@ tr:nth-child(3) .rank-badge {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   PREMIUM AESTHETICS OVERRIDES (Futuristic Glassmorphism & Cyberpunk Glows)
+   ========================================================================== */
+
+/* High-end Glassmorphic Panels & Metric Cards */
+.screen-panel,
+.screen-metric,
+.rt-stat-item,
+.link-summary-card,
+.cost-card {
+  border: 1px solid rgba(103, 232, 249, 0.16) !important;
+  background: rgba(9, 23, 42, 0.65) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.42), inset 0 0 16px rgba(34, 211, 238, 0.05) !important;
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 220ms cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 12px !important;
+}
+
+/* Hover Glowing Effects */
+.screen-panel:hover,
+.screen-metric:hover,
+.rt-stat-item:hover,
+.cost-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(34, 211, 238, 0.45) !important;
+  box-shadow: 0 16px 40px rgba(8, 145, 178, 0.28), inset 0 0 20px rgba(34, 211, 238, 0.08) !important;
+}
+
+/* Navigation Link Redesign */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgba(103, 232, 249, 0.12) !important;
+  border-radius: 20px !important;
+  color: #9bc7d9 !important;
+  text-decoration: none;
+  background: rgba(9, 24, 43, 0.45) !important;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  font-weight: 500;
+  box-shadow: none !important;
+}
+
+.nav-link:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(34, 211, 238, 0.4) !important;
+  background: rgba(13, 42, 64, 0.65) !important;
+  color: #22d3ee !important;
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.15) !important;
+}
+
+.nav-link.router-link-active {
+  border-color: rgba(34, 211, 238, 0.6) !important;
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.85), rgba(37, 99, 235, 0.85)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.28), inset 0 0 8px rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Interactive Navigation Link on Dashboard Back Button */
+.screen-tools .arco-btn-outline {
+  border: 1px solid rgba(103, 232, 249, 0.3) !important;
+  color: #9bc7d9 !important;
+  background: rgba(9, 24, 43, 0.35) !important;
+  border-radius: 8px !important;
+}
+
+.screen-tools .arco-btn-outline:hover {
+  border-color: rgba(34, 211, 238, 0.65) !important;
+  color: #22d3ee !important;
+  background: rgba(13, 42, 64, 0.5) !important;
+  box-shadow: 0 4px 14px rgba(34, 211, 238, 0.15) !important;
+}
+
+/* Premium Status Tags */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.tag.success,
+.tag.normal,
+.tag.active {
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.28) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.12) !important;
+}
+
+.tag.failed,
+.tag.critical,
+.tag.error {
+  background: rgba(239, 68, 68, 0.14) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.28) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.12) !important;
+}
+
+.tag.warning,
+.tag.check {
+  background: rgba(245, 158, 11, 0.14) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.28) !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.12) !important;
+}
+
+.tag.ods, .tag.dwd, .tag.dws {
+  background: rgba(6, 182, 212, 0.12) !important;
+  color: #67e8f9 !important;
+  border-color: rgba(6, 182, 212, 0.25) !important;
+}
+
+/* Cyberpunk-styled Arco Design Buttons */
+.arco-btn-primary {
+  background: linear-gradient(135deg, #0891b2, #2563eb) !important;
+  border: 1px solid rgba(34, 211, 238, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.22) !important;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 8px !important;
+}
+
+.arco-btn-primary:hover {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6) !important;
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Premium Table Rows */
+.data-table th {
+  background: rgba(12, 27, 42, 0.96) !important;
+  color: #67e8f9 !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid rgba(103, 232, 249, 0.2) !important;
+}
+
+.data-table tbody tr {
+  transition: background-color 150ms ease !important;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(34, 211, 238, 0.08) !important;
+}
+
+/* Warehouse Layer Flow Cards - Active state improvements */
+.layer-card {
+  border-radius: 12px !important;
+  background: rgba(14, 42, 68, 0.3) !important;
+  border: 1px solid rgba(103, 232, 249, 0.12) !important;
+}
+
+.layer-card.active {
+  border-color: rgba(34, 211, 238, 0.7) !important;
+  background: rgba(8, 38, 64, 0.65) !important;
+  box-shadow: 0 8px 32px rgba(34, 211, 238, 0.2), inset 0 0 16px rgba(34, 211, 238, 0.12) !important;
+  transform: translateY(-3px) !important;
+}
+
 

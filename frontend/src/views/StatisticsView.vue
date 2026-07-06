@@ -119,53 +119,123 @@ const summaryMetrics = computed(() => {
 
 const trendPeriodLabel = computed(() => `近 ${trend.value.length || 0} 天`)
 
-const historyRankingOption = computed(() => barOption(
-  'Agent 执行次数排行',
-  historyRankings.value.map((item) => item.agent_role),
-  historyRankings.value.map((item) => item.execution_count),
-  '执行次数'
-))
+const historyRankingOption = computed(() => {
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(2, 8, 16, 0.92)',
+      borderColor: 'rgba(103, 232, 249, 0.25)',
+      textStyle: { color: '#dbe7f3' }
+    },
+    grid: { top: 38, right: 18, bottom: 42, left: 48, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: historyRankings.value.map((item) => item.agent_role),
+      axisLabel: { color: '#9bc7d9', rotate: 18, fontSize: 11 },
+      axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.22)' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9bc7d9' },
+      axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.22)' } },
+      splitLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.08)' } }
+    },
+    series: [{
+      name: '执行次数',
+      type: 'bar',
+      barWidth: 16,
+      data: historyRankings.value.map((item) => item.execution_count),
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#22d3ee' },
+          { offset: 1, color: '#0891b2' }
+        ]),
+        borderRadius: [4, 4, 0, 0]
+      }
+    }]
+  }
+})
 
 const historyCostOption = computed(() => {
-  const option = historyLineOption('Token / 成本趋势', [
-    {
-      name: '每日 Token',
-      type: 'line',
-      smooth: true,
-      yAxisIndex: 0,
-      data: dailyMetrics.value.map((item) => item.total_tokens),
-      itemStyle: { color: '#06b6d4' },
-      lineStyle: { width: 3 },
-      areaStyle: { color: 'rgba(6, 182, 212, 0.08)' }
+  return {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(2, 8, 16, 0.92)',
+      borderColor: 'rgba(103, 232, 249, 0.25)',
+      textStyle: { color: '#dbe7f3' },
+      formatter: historyTooltipFormatter
     },
-    {
-      name: '每日成本 ($)',
-      type: 'line',
-      smooth: true,
-      yAxisIndex: 1,
-      data: dailyMetrics.value.map((item) => item.estimated_cost_usd),
-      itemStyle: { color: '#10b981' },
-      lineStyle: { width: 3 }
-    }
-  ])
-  option.yAxis = [
-    {
-      type: 'value',
-      name: 'Tokens',
-      axisLabel: {
-        color: '#9bc7d9',
-        formatter: (value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${Math.round(value / 1000)}k`
+    legend: {
+      top: 0,
+      right: 8,
+      textStyle: { color: '#9bc7d9' }
+    },
+    grid: { top: 38, right: 48, bottom: 32, left: 48, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: dailyMetrics.value.map((item) => formatShortDate(item.metric_date)),
+      boundaryGap: ['4%', '8%'],
+      axisLabel: { color: '#9bc7d9' },
+      axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.22)' } }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: 'Tokens',
+        nameTextStyle: { color: '#9bc7d9', fontSize: 10 },
+        axisLabel: {
+          color: '#9bc7d9',
+          formatter: (value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${Math.round(value / 1000)}k`
+        },
+        axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.22)' } },
+        splitLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.08)' } }
       },
-      splitLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.1)' } }
-    },
-    {
-      type: 'value',
-      name: '成本 ($)',
-      axisLabel: { color: '#9bc7d9', formatter: '${value}' },
-      splitLine: { show: false }
-    }
-  ]
-  return option
+      {
+        type: 'value',
+        name: '成本 ($)',
+        nameTextStyle: { color: '#9bc7d9', fontSize: 10 },
+        axisLabel: { color: '#9bc7d9', formatter: '${value}' },
+        axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.22)' } },
+        splitLine: { show: false }
+      }
+    ],
+    series: [
+      {
+        name: '每日 Token',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        yAxisIndex: 0,
+        data: dailyMetrics.value.map((item) => item.total_tokens),
+        itemStyle: { color: '#06b6d4' },
+        lineStyle: { width: 3 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(6, 182, 212, 0.16)' },
+            { offset: 1, color: 'rgba(6, 182, 212, 0.01)' }
+          ])
+        }
+      },
+      {
+        name: '每日成本 ($)',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        yAxisIndex: 1,
+        data: dailyMetrics.value.map((item) => item.estimated_cost_usd),
+        itemStyle: { color: '#10b981' },
+        lineStyle: { width: 3 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.12)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.01)' }
+          ])
+        }
+      }
+    ]
+  }
 })
 
 const errorTypeLabels = {
@@ -276,7 +346,13 @@ function renderTrend() {
         type: 'bar',
         barWidth: 14,
         data: trend.value.map((item) => Number(item.task_count || 0)),
-        itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] }
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#22d3ee' },
+            { offset: 1, color: '#0891b2' }
+          ]),
+          borderRadius: [4, 4, 0, 0]
+        }
       },
       {
         name: '成功率',
@@ -287,7 +363,12 @@ function renderTrend() {
         data: trend.value.map((item) => Number((Number(item.success_rate || 0) * 100).toFixed(2))),
         itemStyle: { color: '#4ade80' },
         lineStyle: { width: 3, color: '#4ade80' },
-        areaStyle: { color: 'rgba(74, 222, 128, 0.08)' }
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(74, 222, 128, 0.2)' },
+            { offset: 1, color: 'rgba(74, 222, 128, 0.01)' }
+          ])
+        }
       }
     ]
   }, true)
@@ -320,7 +401,14 @@ function renderToken() {
           shadowBlur: 12,
           shadowColor: 'rgba(34, 211, 238, 0.18)'
         },
-        color: ['#22d3ee', '#06b6d4', '#0891b2', '#38bdf8', '#4ade80', '#fbbf24'],
+        color: [
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#22d3ee' }, { offset: 1, color: '#0891b2' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#4ade80' }, { offset: 1, color: '#16a34a' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#fbbf24' }, { offset: 1, color: '#d97706' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f43f5e' }, { offset: 1, color: '#be123c' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#a855f7' }, { offset: 1, color: '#7e22ce' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#3b82f6' }, { offset: 1, color: '#1d4ed8' }])
+        ],
         data: agentStats.value.map((item) => ({
           name: item.agent_role || item.agent_id,
           value: Number(item.total_tokens || 0),
@@ -359,7 +447,13 @@ function renderErrors() {
         name: '错误次数',
         type: 'bar',
         data: sorted.map((item) => Number(item.total_count || 0)),
-        itemStyle: { color: '#22d3ee', borderRadius: [0, 4, 4, 0] },
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#be123c' },
+            { offset: 1, color: '#fb7185' }
+          ]),
+          borderRadius: [0, 4, 4, 0]
+        },
         label: { show: true, position: 'right', color: '#dbe7f3' }
       }
     ]
@@ -382,7 +476,12 @@ function renderLatency() {
         data: agentStats.value.map((item) => Number(item.avg_latency_ms || 0)),
         itemStyle: { color: '#22d3ee' },
         lineStyle: { width: 3 },
-        areaStyle: { color: 'rgba(34, 211, 238, 0.08)' }
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(34, 211, 238, 0.2)' },
+            { offset: 1, color: 'rgba(34, 211, 238, 0.01)' }
+          ])
+        }
       },
       {
         name: 'P95 时延',
@@ -391,7 +490,12 @@ function renderLatency() {
         data: agentStats.value.map((item) => Number(item.p95_latency_ms || 0)),
         itemStyle: { color: '#fbbf24' },
         lineStyle: { width: 3 },
-        areaStyle: { color: 'rgba(251, 191, 36, 0.08)' }
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(251, 191, 36, 0.2)' },
+            { offset: 1, color: 'rgba(251, 191, 36, 0.01)' }
+          ])
+        }
       }
     ]
   }, true)

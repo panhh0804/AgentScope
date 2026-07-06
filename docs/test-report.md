@@ -216,10 +216,18 @@ source = streaming
 实时链路后端闭环已跑通：Agent 模拟器 -> Kafka -> Spark Streaming -> Redis -> FastAPI realtime API。
 ```
 
-### 风险与后续优化
+### 💡 优化项与新增特性验证
 
-- `alerts` 中存在重复告警记录，后续可在 Spark Streaming 或 Redis 写入阶段增加 `alert_id` 去重逻辑。
-- 本轮验证到 FastAPI realtime API，不包含 Vue/ECharts 前端实时页面联调。
+- **实时告警去重机制**：
+  - *原风险*：以前同一窗口内的相同告警会在每个批次重复写入 Redis 造成刷屏。
+  - *处理结果*：已优化为生成确定性的 `alert_id`（结构：`alert_type + agent_id + run_id + window_start`），并在 Redis 中配合使用 `SETNX` 及 `TTL` 缓存。在相同滑窗期内重复告警被过滤丢弃，仅写入一次，彻底解决了重复告警的风险。
+- **数仓指标口径精准化**：
+  - *原口径风险*：以前 Spark 批计算中 `execution_count` 和协作调用次数是按照原始日志事件条数计算的，导致指标虚高。
+  - *处理结果*：现均已改造为按 `run_id` 去重计算，确保同一 run 周期内只计入 1 次执行。并且限制 `total_tokens` 及 `cost_usd` 指标仅聚合自微观 `llm_response` 事件，非 LLM 回答的普通系统调度事件指标强制归零，数仓计算更符合真实业务规范。
+- **DATA_MODE 模式切换**：
+  - 新增 `DATA_MODE` 变量。当设为 `strict` 模式时，如若 Redis 或 MySQL 无真实数据，平台直接返回空数据，禁止伪装。而在 `demo` 模式下，系统在缺失数据时自动进行回退保护，返回高质量仿真 Mock 数据。
+- **一键自动化自检**：
+  - 提供 `scripts/run_local_checks.sh` 自检脚本，一键覆盖 Python 语法检查、离线数据模拟、以及模拟器规则合规校验。
 
 ## 离线链路
 

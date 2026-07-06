@@ -29,55 +29,36 @@
       </div>
 
       <section class="screen-layout overview-grid">
-        <div class="overview-grid__stream stream-agent-stack">
-          <article class="screen-panel terminal-log-panel stream-stack-panel">
-            <div class="screen-panel-head">
-              <h3>实时数据流</h3>
-              <span class="pulse-badge">LIVE STREAMING</span>
-            </div>
-            <div ref="terminalRef" class="terminal-log-container stream-cards-container">
-              <TransitionGroup name="list" tag="div">
-                <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
-                  <div :class="['event-icon-wrapper', log.level]">
-                    <component :is="getEventIcon(log.agent, log.level)" :size="14" />
-                  </div>
-                  <div class="event-card-body">
-                    <div class="event-card-meta">
-                      <span class="event-agent-tag">{{ log.agent }}</span>
-                      <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
-                      <span class="event-time-stamp">{{ log.time }}</span>
-                    </div>
-                    <p class="event-message-text">{{ log.message }}</p>
-                  </div>
-                  <div v-if="log.metric" class="event-card-metric">
-                    <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
-                    <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
-                  </div>
+        <!-- 1. Real-time Event Stream (Takes full height of stream area) -->
+        <article class="screen-panel terminal-log-panel overview-grid__stream">
+          <div class="screen-panel-head">
+            <h3>实时数据流</h3>
+            <span class="pulse-badge">LIVE STREAMING</span>
+          </div>
+          <div ref="terminalRef" class="terminal-log-container stream-cards-container">
+            <TransitionGroup name="list" tag="div">
+              <div v-for="log in realtimeLogs" :key="log.id" class="stream-event-card">
+                <div :class="['event-icon-wrapper', log.level]">
+                  <component :is="getEventIcon(log.agent, log.level)" :size="14" />
                 </div>
-              </TransitionGroup>
-            </div>
-          </article>
-
-          <article class="screen-panel agent-rank-panel stream-stack-panel">
-            <div class="screen-panel-head">
-              <h3>Agent 监控与实时排行</h3>
-              <span>{{ realtimeAgents.length }} agents</span>
-            </div>
-            <div class="agent-rank-compact">
-              <div v-for="(agent, index) in sortedAgents" :key="agent.agent_id" class="agent-rank-row">
-                <span class="rank-badge">#{{ index + 1 }}</span>
-                <div class="agent-rank-main">
-                  <strong>{{ agent.agent_id }}</strong>
-                  <small>{{ agent.current_task }}</small>
+                <div class="event-card-body">
+                  <div class="event-card-meta">
+                    <span class="event-agent-tag">{{ log.agent }}</span>
+                    <span :class="['event-level-badge', log.level]">{{ log.level.toUpperCase() }}</span>
+                    <span class="event-time-stamp">{{ log.time }}</span>
+                  </div>
+                  <p class="event-message-text">{{ log.message }}</p>
                 </div>
-                <span :class="['tag', agent.status]">{{ agent.status }}</span>
-                <b>{{ percent(agent.success_rate) }}</b>
-                <small>{{ Math.round(agent.avg_latency_ms || 0) }} ms</small>
+                <div v-if="log.metric" class="event-card-metric">
+                  <span v-if="log.metric.latency">{{ log.metric.latency }}ms</span>
+                  <span v-if="log.metric.tokens">{{ log.metric.tokens }} tk</span>
+                </div>
               </div>
-            </div>
-          </article>
-        </div>
+            </TransitionGroup>
+          </div>
+        </article>
 
+        <!-- 2. Throughput Chart -->
         <article class="screen-panel hero-panel overview-grid__throughput">
           <div class="screen-panel-head">
             <h3>实时吞吐 / 失败趋势</h3>
@@ -86,8 +67,7 @@
           <div ref="throughputChart" class="screen-chart large"></div>
         </article>
 
-
-
+        <!-- 3. Realtime Alerts Ticker -->
         <article class="screen-panel compact overview-grid__alerts">
           <div class="screen-panel-head">
             <h3>实时告警</h3>
@@ -102,6 +82,7 @@
           </div>
         </article>
 
+        <!-- 4. Latency Trend Chart -->
         <article class="screen-panel hero-panel overview-grid__latency">
           <div class="screen-panel-head">
             <h3>平均时延趋势</h3>
@@ -110,6 +91,7 @@
           <div ref="latencyChart" class="screen-chart large"></div>
         </article>
 
+        <!-- 5. Agent Communication Topology -->
         <article class="screen-panel overview-grid__relation">
           <div class="screen-panel-head">
             <h3>协作关系图</h3>
@@ -118,6 +100,27 @@
           <div ref="relationChart" class="screen-chart" style="height: 260px;"></div>
         </article>
 
+        <!-- 6. Agent live rankings (Dedicated Flat Card) -->
+        <article class="screen-panel agent-rank-panel overview-grid__agent_rank">
+          <div class="screen-panel-head">
+            <h3>Agent 监控与实时排行</h3>
+            <span>{{ realtimeAgents.length }} agents</span>
+          </div>
+          <div class="agent-rank-compact">
+            <div v-for="(agent, index) in sortedAgents" :key="agent.agent_id" class="agent-rank-row">
+              <span class="rank-badge">#{{ index + 1 }}</span>
+              <div class="agent-rank-main">
+                <strong>{{ agent.agent_id }}</strong>
+                <small>{{ agent.current_task }}</small>
+              </div>
+              <span :class="['tag', agent.status]">{{ agent.status }}</span>
+              <b>{{ percent(agent.success_rate) }}</b>
+              <small>{{ Math.round(agent.avg_latency_ms || 0) }} ms</small>
+            </div>
+          </div>
+        </article>
+
+        <!-- 7. Communication bottlenecks diagnostics -->
         <article class="screen-panel overview-grid__diagnostics">
           <div class="screen-panel-head">
             <h3>Agent 协作及拥堵诊断</h3>
@@ -148,6 +151,7 @@
           </div>
         </article>
 
+        <!-- 8. Pipeline Ingress monitor -->
         <article class="screen-panel overview-grid__bigdata">
           <div class="screen-panel-head">
             <h3>大数据链路监控</h3>
@@ -163,26 +167,6 @@
               <b>{{ item.metric }}</b>
             </div>
           </div>
-        </article>
-
-        <article class="screen-panel overview-grid__cost">
-          <div class="screen-panel-head">
-            <h3>LLM 资源与成本监控</h3>
-            <span>real-time & history</span>
-          </div>
-          <div class="cost-summary-cards">
-            <div class="cost-card token">
-              <span>实时 (5m) Token 消耗</span>
-              <strong>{{ formatNumber(realtimeOverview.token_total_5m) }}</strong>
-              <small>tokens</small>
-            </div>
-            <div class="cost-card price">
-              <span>实时 (5m) 估算成本</span>
-              <strong>${{ Number(realtimeOverview.estimated_cost_5m || 0).toFixed(4) }}</strong>
-              <small>USD</small>
-            </div>
-          </div>
-          <div ref="costChart" class="screen-chart" style="height: 200px; margin-top: 14px;"></div>
         </article>
       </section>
         </div>
@@ -259,7 +243,6 @@ const historyChartsRef = ref(null)
 const throughputChart = ref(null)
 const latencyChart = ref(null)
 const relationChart = ref(null)
-const costChart = ref(null)
 
 const realtimeLogs = ref([])
 const terminalRef = ref(null)
@@ -335,7 +318,6 @@ let pollTimer
 let throughputInstance
 let latencyInstance
 let relationInstance
-let costInstance
 
 const dailySummary = computed(() => {
   const rows = dailyMetrics.value
@@ -377,12 +359,14 @@ const metrics = computed(() => [
 
 // Compact horizontal stats bar — realtime only
 const realtimeMetrics = computed(() => [
-  { label: '运行任务', value: realtimeOverview.value.running_tasks ?? '-', hint: '实时任务数' },
+  { label: '运行任务', value: realtimeOverview.value.running_tasks ?? '-', hint: '运行任务数' },
   { label: '活跃 Agent', value: realtimeOverview.value.active_agents ?? '-', hint: '在线角色' },
-  { label: '事件吞吐', value: `${realtimeOverview.value.events_per_minute ?? '-'} /min`, hint: '实时输入速率' },
+  { label: '事件吞吐', value: `${realtimeOverview.value.events_per_minute ?? '-'} /min`, hint: '实时输入' },
   { label: '实时成功率', value: percent(realtimeOverview.value.success_rate), hint: `错误率 ${percent(realtimeOverview.value.error_rate)}` },
-  { label: '平均时延', value: `${Math.round(realtimeOverview.value.avg_latency_ms || 0)} ms`, hint: '实时窗口' },
-  { label: '告警数', value: realtimeAlerts.value.length, hint: 'active alerts' },
+  { label: '平均时延', value: `${Math.round(realtimeOverview.value.avg_latency_ms || 0)} ms`, hint: '时延窗口' },
+  { label: '5m Token 消耗', value: formatNumber(realtimeOverview.value.token_total_5m), hint: '近 5 分钟' },
+  { label: '5m 估算成本', value: `$${Number(realtimeOverview.value.estimated_cost_5m || 0).toFixed(4)}`, hint: '近 5 分钟' },
+  { label: '告警数', value: realtimeAlerts.value.length, hint: '未处理告警' }
 ])
 
 const historyTaskOption = computed(() => historyLineOption('每日任务量', [
@@ -536,11 +520,9 @@ function renderRealtimeCharts() {
 
 function renderCharts() {
   renderRealtimeCharts()
-  if (!relationChart.value || !costChart.value) return
+  if (!relationChart.value) return
   relationInstance ||= echarts.init(relationChart.value)
-  costInstance ||= echarts.init(costChart.value)
 
-  const xDaily = dailyMetrics.value.map((item) => formatShortDate(item.metric_date))
   const relationOption = graphOption(relationGraph.value)
   const relationSeries = relationOption.series?.[0]
   if (relationSeries) {
@@ -561,68 +543,12 @@ function renderCharts() {
     }))
   }
   relationInstance.setOption(relationOption, true)
-
-  costInstance.setOption({
-    backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis', formatter: historyTooltipFormatter },
-    legend: { top: 0, textStyle: { color: '#bdefff' } },
-    grid: { top: 38, right: 54, bottom: 28, left: 48 },
-    xAxis: { type: 'category', data: xDaily, boundaryGap: ['4%', '8%'], ...baseAxis() },
-    yAxis: [
-      {
-        type: 'value',
-        name: 'Tokens',
-        position: 'left',
-        ...baseAxis(),
-        axisLabel: {
-          formatter: (val) => val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : `${val/1000}k`,
-          color: '#9bc7d9'
-        }
-      },
-      {
-        type: 'value',
-        name: '成本 (USD)',
-        position: 'right',
-        ...baseAxis(),
-        splitLine: { show: false },
-        axisLabel: {
-          formatter: '${value}',
-          color: '#9bc7d9'
-        }
-      }
-    ],
-    series: [
-      {
-        name: '每日 Token',
-        type: 'line',
-        smooth: true,
-        symbol: 'none',
-        showSymbol: false,
-        yAxisIndex: 0,
-        data: dailyMetrics.value.map((item) => item.total_tokens),
-        itemStyle: { color: '#06b6d4' },
-        lineStyle: { width: 3 }
-      },
-      {
-        name: '每日成本 ($)',
-        type: 'line',
-        smooth: true,
-        symbol: 'none',
-        showSymbol: false,
-        yAxisIndex: 1,
-        data: dailyMetrics.value.map((item) => item.estimated_cost_usd),
-        itemStyle: { color: '#10b981' },
-        lineStyle: { width: 3 }
-      }
-    ]
-  }, true)
 }
 
 function resizeCharts() {
   throughputInstance?.resize()
   latencyInstance?.resize()
   relationInstance?.resize()
-  costInstance?.resize()
 }
 
 function scrollToHistory() {
@@ -729,6 +655,5 @@ onBeforeUnmount(() => {
   throughputInstance?.dispose()
   latencyInstance?.dispose()
   relationInstance?.dispose()
-  costInstance?.dispose()
 })
 </script>

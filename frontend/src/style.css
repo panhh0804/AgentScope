@@ -2432,8 +2432,9 @@ tr:nth-child(3) .rank-badge {
     grid-template-areas:
       "stream stream"
       "throughput latency"
-      "relation cost"
-      "alerts diagnostics";
+      "relation agent_rank"
+      "alerts diagnostics"
+      "bigdata bigdata";
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2453,9 +2454,10 @@ tr:nth-child(3) .rank-badge {
       "throughput"
       "latency"
       "relation"
-      "cost"
+      "agent_rank"
       "alerts"
-      "diagnostics";
+      "diagnostics"
+      "bigdata";
     grid-template-columns: 1fr;
   }
 
@@ -2513,10 +2515,10 @@ tr:nth-child(3) .rank-badge {
   overflow: hidden;
   grid-template-areas:
     "stream throughput latency"
-    "stream relation cost"
-    "alerts diagnostics diagnostics";
-  grid-template-columns: minmax(330px, 1.12fr) minmax(280px, 1fr) minmax(280px, 1fr);
-  grid-template-rows: minmax(145px, 0.9fr) minmax(185px, 1.15fr) minmax(118px, 0.72fr);
+    "stream relation agent_rank"
+    "alerts diagnostics bigdata";
+  grid-template-columns: minmax(330px, 1.15fr) minmax(280px, 1fr) minmax(280px, 1fr);
+  grid-template-rows: minmax(135px, 0.9fr) minmax(175px, 1.15fr) minmax(115px, 0.75fr);
   gap: 10px;
 }
 
@@ -2612,7 +2614,7 @@ tr:nth-child(3) .rank-badge {
     grid-template-areas:
       "stream throughput"
       "stream latency"
-      "relation cost"
+      "relation agent_rank"
       "diagnostics bigdata"
       "alerts alerts";
     grid-template-columns: minmax(330px, 1.15fr) minmax(300px, 1fr);
@@ -2653,8 +2655,14 @@ tr:nth-child(3) .rank-badge {
 .screen-page--overview .overview-grid {
   grid-template-areas:
     "stream throughput latency"
-    "stream relation cost"
+    "stream relation agent_rank"
     "alerts diagnostics bigdata";
+}
+
+.overview-grid__agent_rank {
+  grid-area: agent_rank;
+  display: flex;
+  flex-direction: column;
 }
 
 .screen-page--overview .stream-stack-panel {

@@ -151,7 +151,7 @@
             </article>
             <article class="screen-panel">
               <div class="screen-panel-head">
-                <h3>简化数据血缘</h3>
+                <h3>数据血缘</h3>
                 <span>Source to Analytics</span>
               </div>
               <div ref="lineageChartRef" class="screen-chart" style="height: 280px; margin-top: 10px;"></div>
@@ -1087,7 +1087,7 @@ function renderLineage() {
     target: e.to,
     value: e.label,
     label: { 
-      show: false, 
+      show: true, 
       formatter: e.label, 
       fontSize: 10, 
       color: '#9bc7d9',

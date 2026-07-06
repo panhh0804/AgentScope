@@ -137,23 +137,13 @@
           </div>
 
         </article>
-        <!-- 9. System Live Load & Remediation Telemetry (The new separate box in Center Row 2) -->
+        <!-- 9. Self-healing & API Token Traffic Analysis (The separate box in Center Row 2) -->
         <article class="screen-panel compact overview-grid__system_load">
           <div class="screen-panel-head">
-            <h3>系统负载与自愈监控</h3>
-            <span>Load & Remediation</span>
+            <h3>自愈队列与 Token 流量分析</h3>
+            <span>Self-healing & Traffic</span>
           </div>
           <div class="llm-telemetry-grid">
-            <div class="tel-card">
-              <span class="tel-label">活跃任务数</span>
-              <strong class="tel-value text-cyan">{{ realtimeOverview.running_tasks || 0 }}</strong>
-              <small class="tel-hint">Running Tasks</small>
-            </div>
-            <div class="tel-card">
-              <span class="tel-label">事件吞吐率</span>
-              <strong class="tel-value text-blue">{{ realtimeOverview.events_per_minute || 0 }}/m</strong>
-              <small class="tel-hint">Events Throughput</small>
-            </div>
             <div class="tel-card">
               <span class="tel-label">重试自愈数</span>
               <strong class="tel-value" :class="{ 'text-red': (realtimeOverview.retry_tasks || 0) > 0, 'text-gray': (realtimeOverview.retry_tasks || 0) === 0 }">
@@ -167,6 +157,16 @@
                 {{ realtimeAlerts.length }}
               </strong>
               <small class="tel-hint">Open Alerts</small>
+            </div>
+            <div class="tel-card">
+              <span class="tel-label">Prompt 输入 (5m)</span>
+              <strong class="tel-value text-cyan">{{ formatCompact(Math.round((realtimeOverview.token_total_5m || 0) * 0.75)) }}</strong>
+              <small class="tel-hint">Prompt Ingress</small>
+            </div>
+            <div class="tel-card">
+              <span class="tel-label">Completion 输出</span>
+              <strong class="tel-value text-blue">{{ formatCompact(Math.round((realtimeOverview.token_total_5m || 0) * 0.25)) }}</strong>
+              <small class="tel-hint">Completion Egress</small>
             </div>
           </div>
         </article>

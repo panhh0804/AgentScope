@@ -645,17 +645,17 @@
       <a-form :model="newRule" layout="vertical">
         <a-form-item label="常用 SQL 模板参考 (点击可快捷输入)">
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('negative_latency', '时延非负校验', 'latency_ms >= 0')">
-              时延非负
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_tokens_limit', 'LLM调用Token数上限校验', 'total_tokens <= 8192')">
+              Token上限校验
             </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('token_non_negative', 'Token数非负', 'total_tokens >= 0')">
-              Token非负
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_latency_limit', '智能体运行超长耗时校验', 'latency_ms <= 60000')">
+              超时限额校验
             </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('allowed_events', '事件类型合法', 'event_type IN (\'agent_start\', \'agent_complete\', \'agent_failed\', \'llm_request\', \'llm_response\', \'tool_call\', \'tool_result\', \'retry\', \'alert\')')">
-              合法事件类型
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('api_key_leakage', 'API Key 泄露风险校验', 'content NOT LIKE \'%sk-%\' AND content NOT LIKE \'%key%\'')">
+              API秘钥防泄露
             </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('non_empty_fields', '关键字段非空', 'event_id IS NOT NULL AND event_id != \'\' AND trace_id IS NOT NULL AND trace_id != \'\' AND run_id IS NOT NULL AND run_id != \'\'')">
-              关键字段非空
+            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_retries_limit', '重试次数越界校验', 'retry_count <= 5')">
+              重试上限校验
             </a-tag>
           </div>
         </a-form-item>

@@ -403,11 +403,11 @@ function renderToken() {
         },
         color: [
           new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#22d3ee' }, { offset: 1, color: '#0891b2' }]),
-          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#4ade80' }, { offset: 1, color: '#16a34a' }]),
-          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#fbbf24' }, { offset: 1, color: '#d97706' }]),
-          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f43f5e' }, { offset: 1, color: '#be123c' }]),
-          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#a855f7' }, { offset: 1, color: '#7e22ce' }]),
-          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#3b82f6' }, { offset: 1, color: '#1d4ed8' }])
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#38bdf8' }, { offset: 1, color: '#0284c7' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#60a5fa' }, { offset: 1, color: '#1d4ed8' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#06b6d4' }, { offset: 1, color: '#0e7490' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#a5f3fc' }, { offset: 1, color: '#0891b2' }]),
+          new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#818cf8' }, { offset: 1, color: '#4f46e5' }])
         ],
         data: agentStats.value.map((item) => ({
           name: item.agent_role || item.agent_id,
@@ -449,8 +449,8 @@ function renderErrors() {
         data: sorted.map((item) => Number(item.total_count || 0)),
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#be123c' },
-            { offset: 1, color: '#fb7185' }
+            { offset: 0, color: '#0e7490' },
+            { offset: 1, color: '#22d3ee' }
           ]),
           borderRadius: [0, 4, 4, 0]
         },

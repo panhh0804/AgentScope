@@ -2430,11 +2430,11 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "throughput stream"
       "latency stream"
-      "relation agent_rank"
-      "alerts diagnostics"
-      "bigdata bigdata";
+      "throughput stream"
+      "agent_rank relation"
+      "bigdata diagnostics"
+      "alerts alerts";
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2514,9 +2514,9 @@ tr:nth-child(3) .rank-badge {
   min-height: 0;
   overflow: hidden;
   grid-template-areas:
-    "throughput stream latency"
-    "relation stream agent_rank"
-    "alerts diagnostics bigdata";
+    "latency stream throughput"
+    "agent_rank stream relation"
+    "bigdata diagnostics alerts";
   grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) minmax(280px, 1fr);
   grid-template-rows: minmax(135px, 0.9fr) minmax(175px, 1.15fr) minmax(115px, 0.75fr);
   gap: 10px;
@@ -2612,10 +2612,10 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "throughput stream"
       "latency stream"
-      "relation agent_rank"
-      "diagnostics bigdata"
+      "throughput stream"
+      "agent_rank relation"
+      "bigdata diagnostics"
       "alerts alerts";
     grid-template-columns: minmax(300px, 1fr) minmax(330px, 1.15fr);
     grid-template-rows: minmax(115px, 0.72fr) minmax(115px, 0.72fr) minmax(145px, 0.94fr) minmax(105px, 0.66fr) minmax(90px, 0.52fr);
@@ -2654,9 +2654,9 @@ tr:nth-child(3) .rank-badge {
 
 .screen-page--overview .overview-grid {
   grid-template-areas:
-    "throughput stream latency"
-    "relation stream agent_rank"
-    "alerts diagnostics bigdata";
+    "latency stream throughput"
+    "agent_rank stream relation"
+    "bigdata diagnostics alerts";
 }
 
 .overview-grid__agent_rank {

@@ -114,8 +114,25 @@
                 <small>{{ agent.current_task }}</small>
               </div>
               <span :class="['tag', agent.status]">{{ agent.status }}</span>
-              <b>{{ percent(agent.success_rate) }}</b>
-              <small>{{ Math.round(agent.avg_latency_ms || 0) }} ms</small>
+              
+              <div class="agent-rank-metrics">
+                <div class="metric-mini">
+                  <span class="m-val">{{ percent(agent.success_rate) }}</span>
+                  <span class="m-lbl">成功率</span>
+                </div>
+                <div class="metric-mini">
+                  <span class="m-val">{{ Math.round(agent.avg_latency_ms || 0) }}ms</span>
+                  <span class="m-lbl">时延</span>
+                </div>
+                <div class="metric-mini">
+                  <span class="m-val">{{ formatCompact(agent.token_total) }}</span>
+                  <span class="m-lbl">Tokens</span>
+                </div>
+                <div class="metric-mini" :class="{ 'has-retries': agent.retry_count > 0 }">
+                  <span class="m-val">{{ agent.retry_count }}</span>
+                  <span class="m-lbl">重试</span>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -442,6 +459,10 @@ function percent(value) {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString()
+}
+
+function formatCompact(value) {
+  return Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0))
 }
 
 function getDateValue(value, fallback) {

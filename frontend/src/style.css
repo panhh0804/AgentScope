@@ -2430,8 +2430,8 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "stream stream"
-      "throughput latency"
+      "throughput stream"
+      "latency stream"
       "relation agent_rank"
       "alerts diagnostics"
       "bigdata bigdata";
@@ -2514,10 +2514,10 @@ tr:nth-child(3) .rank-badge {
   min-height: 0;
   overflow: hidden;
   grid-template-areas:
-    "stream throughput latency"
-    "stream relation agent_rank"
+    "throughput stream latency"
+    "relation stream agent_rank"
     "alerts diagnostics bigdata";
-  grid-template-columns: minmax(330px, 1.15fr) minmax(280px, 1fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) minmax(280px, 1fr);
   grid-template-rows: minmax(135px, 0.9fr) minmax(175px, 1.15fr) minmax(115px, 0.75fr);
   gap: 10px;
 }
@@ -2612,12 +2612,12 @@ tr:nth-child(3) .rank-badge {
 @media (max-width: 1240px) {
   .screen-page--overview .overview-grid {
     grid-template-areas:
-      "stream throughput"
-      "stream latency"
+      "throughput stream"
+      "latency stream"
       "relation agent_rank"
       "diagnostics bigdata"
       "alerts alerts";
-    grid-template-columns: minmax(330px, 1.15fr) minmax(300px, 1fr);
+    grid-template-columns: minmax(300px, 1fr) minmax(330px, 1.15fr);
     grid-template-rows: minmax(115px, 0.72fr) minmax(115px, 0.72fr) minmax(145px, 0.94fr) minmax(105px, 0.66fr) minmax(90px, 0.52fr);
   }
 }
@@ -2654,8 +2654,8 @@ tr:nth-child(3) .rank-badge {
 
 .screen-page--overview .overview-grid {
   grid-template-areas:
-    "stream throughput latency"
-    "stream relation agent_rank"
+    "throughput stream latency"
+    "relation stream agent_rank"
     "alerts diagnostics bigdata";
 }
 
@@ -2686,14 +2686,46 @@ tr:nth-child(3) .rank-badge {
 
 .agent-rank-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 34px minmax(0, 1.2fr) 60px minmax(0, 2.8fr);
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 7px 8px;
+  min-height: 38px;
+  padding: 6px 8px;
   border: 1px solid rgba(103, 232, 249, 0.12);
   border-radius: 6px;
   background: rgba(15, 34, 54, 0.45);
+}
+
+.agent-rank-metrics {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.metric-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 32px;
+}
+
+.metric-mini .m-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.1;
+}
+
+.metric-mini .m-lbl {
+  font-size: 8px;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.metric-mini.has-retries .m-val {
+  color: #f87171;
+  text-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
 }
 
 .agent-rank-main {

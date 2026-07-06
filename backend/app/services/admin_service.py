@@ -25,27 +25,94 @@ class AdminService:
         self.repo = MySQLAnalyticsRepository()
         self._job_runs = self._seed_job_runs()
         self._audit_logs = self._seed_audit_logs()
+        
+        # Async memory caches populated by daemon thread
+        self._hdfs_storage_cache = {
+            "used_bytes": 93679616,
+            "limit_bytes": 83784761344,
+        }
+        self._parquet_ratio_cache = 0.4656
+        
+        import threading
+        threading.Thread(target=self._background_updater, daemon=True).start()
+
+    def _background_updater(self):
+        import time
+        import subprocess
+        while True:
+            # 1. Update HDFS storage stats
+            try:
+                cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
+                proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, _ = proc.communicate(timeout=6)
+                if stdout:
+                    lines = stdout.decode("utf-8").strip().split("\n")
+                    if len(lines) >= 2:
+                        parts = lines[1].split()
+                        if len(parts) >= 3:
+                            self._hdfs_storage_cache = {
+                                "limit_bytes": int(parts[1]),
+                                "used_bytes": int(parts[2])
+                            }
+            except Exception:
+                pass
+
+            # 2. Update Parquet ratio stats
+            try:
+                cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -du -s /agentscope/raw /agentscope/clean 2>/dev/null"
+                proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, _ = proc.communicate(timeout=6)
+                if stdout:
+                    lines = stdout.decode("utf-8").strip().split("\n")
+                    raw_bytes = 0
+                    clean_bytes = 0
+                    for line in lines:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            bytes_sz = int(parts[0])
+                            path = parts[1]
+                            if "raw" in path:
+                                raw_bytes = bytes_sz
+                            elif "clean" in path:
+                                clean_bytes = bytes_sz
+                    if raw_bytes > 0:
+                        self._parquet_ratio_cache = round(1.0 - (clean_bytes / raw_bytes), 4)
+            except Exception:
+                pass
+
+            time.sleep(30)
 
     def _get_hdfs_storage_stats(self) -> Dict[str, Any]:
-        res = {
-            "used_bytes": 1331589120,
-            "limit_bytes": 10737418240,
+        return self._hdfs_storage_cache
+
+    def _get_parquet_compression_ratio(self) -> float:
+        return self._parquet_ratio_cache
+
+    def _get_compute_perf(self) -> List[Dict[str, Any]]:
+        job_names = {
+            "datax_import": "DataX 业务同步",
+            "spark_clean": "Spark 格式清洗",
+            "daily_metric": "Spark 每日指标聚合",
+            "relation_analysis": "Spark 节点关系分析",
+            "error_analysis": "Spark 错误分布聚合",
         }
-        try:
-            cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
-            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, _ = proc.communicate(timeout=4)
-            if stdout:
-                lines = stdout.decode("utf-8").strip().split("\n")
-                if len(lines) >= 2:
-                    parts = lines[1].split()
-                    if len(parts) >= 3:
-                        res["limit_bytes"] = int(parts[1])
-                        res["used_bytes"] = int(parts[2])
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to fetch real HDFS storage stats: {e}")
-        return res
+        perf = []
+        for job_code, display_name in job_names.items():
+            runs = [r for r in self._job_runs if r.get("job_code") == job_code and r.get("status") == "success"]
+            if runs:
+                duration = runs[0].get("duration_seconds")
+                if duration is not None:
+                    perf.append({"job_name": display_name, "duration": duration})
+                    continue
+            default_durations = {
+                "datax_import": 8,
+                "spark_clean": 22,
+                "daily_metric": 12,
+                "relation_analysis": 18,
+                "error_analysis": 45
+            }
+            perf.append({"job_name": display_name, "duration": default_durations[job_code]})
+        return perf
 
     def data_overview(self) -> Dict[str, Any]:
         today_date = date.today()
@@ -108,6 +175,7 @@ class AdminService:
             "metric_partition_count": metric_partition_cnt,
             "metric_latest_biz_date": metric_latest,
             "raw_to_clean_valid_rate": 0.965,
+            "parquet_saving_rate": self._get_parquet_compression_ratio(),
             "today_task_success_rate": success_rate,
             "recent_failed_task": recent_failed,
             "quality_issue_pending_count": pending_issues,
@@ -124,13 +192,7 @@ class AdminService:
                 {"name": "Metric", "count": int(clean_cnt * 0.012) if clean_cnt > 0 else 0, "processor": None},
             ],
             "hdfs_storage": self._get_hdfs_storage_stats(),
-            "compute_perf": [
-                {"job_name": "DataX 业务同步", "duration": 8},
-                {"job_name": "Spark 格式清洗", "duration": 22},
-                {"job_name": "Spark 每日指标聚合", "duration": 12},
-                {"job_name": "Spark 节点关系分析", "duration": 18},
-                {"job_name": "Spark 错误分布聚合", "duration": 45},
-            ],
+            "compute_perf": self._get_compute_perf(),
         }
 
     def data_volume_trend(self) -> List[Dict[str, Any]]:

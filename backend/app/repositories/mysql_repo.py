@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class MySQLAnalyticsRepository:
+    _issues_cache = {}
+    _issues_cache_ttl = 15
+
     def __init__(self) -> None:
         self._enabled = os.getenv("MYSQL_ANALYTICS_ENABLED", "0") == "1"
 
@@ -216,23 +219,51 @@ class MySQLAnalyticsRepository:
         )
 
     def get_quality_issues(self, metric_date: date) -> List[Dict]:
-        import subprocess
-        import json
+        import time
+        import threading
+        now = time.time()
+        cache_key = metric_date.isoformat()
+        if cache_key in self._issues_cache:
+            val, expire = self._issues_cache[cache_key]
+            if now < expire:
+                return val
 
-        # Attempt to read dirty samples from HDFS first (real-time sample fallback)
-        hdfs_samples = []
-        try:
-            dt_str = metric_date.isoformat()
-            cmd = f"/usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -cat /agentscope/dirty/agent_events/dt={dt_str}/*.json 2>/dev/null | head -n 10"
-            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, _ = proc.communicate(timeout=4)
-            if stdout:
-                for line in stdout.decode("utf-8").split("\n"):
-                    if line.strip():
-                        hdfs_samples.append(json.loads(line.strip()))
-        except Exception as e:
-            logging.warning(f"Failed to fetch HDFS dirty samples: {e}")
+        if not hasattr(self, "_fetching_keys"):
+            self._fetching_keys = set()
 
+        if cache_key not in self._fetching_keys:
+            self._fetching_keys.add(cache_key)
+            
+            def fetch_hdfs_job():
+                hdfs_samples = []
+                try:
+                    import subprocess
+                    import json
+                    dt_str = metric_date.isoformat()
+                    cmd = f"export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -cat /agentscope/dirty/agent_events/dt={dt_str}/*.json 2>/dev/null | head -n 10"
+                    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    stdout, _ = proc.communicate(timeout=6)
+                    if stdout:
+                        for line in stdout.decode("utf-8").split("\n"):
+                            if line.strip():
+                                hdfs_samples.append(json.loads(line.strip()))
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Failed to fetch HDFS dirty samples: {e}")
+                
+                self._update_issues_cache(metric_date, hdfs_samples)
+                self._fetching_keys.discard(cache_key)
+
+            threading.Thread(target=fetch_hdfs_job, daemon=True).start()
+
+        return self._build_issues_list(metric_date, [])
+
+    def _update_issues_cache(self, metric_date: date, hdfs_samples: List[Dict]):
+        import time
+        issues = self._build_issues_list(metric_date, hdfs_samples)
+        self._issues_cache[metric_date.isoformat()] = (issues, time.time() + self._issues_cache_ttl)
+
+    def _build_issues_list(self, metric_date: date, hdfs_samples: List[Dict]) -> List[Dict]:
         # 1. Query real DB for negative latency
         neg_latency = [s for s in hdfs_samples if s.get("latency_ms", 0) < 0]
         if not neg_latency:
@@ -300,7 +331,6 @@ class MySQLAnalyticsRepository:
             })
             
         if not issues:
-            # Fallback to simulated quality metrics if live DB is clean
             issues = [
                 {
                     "rule_code": "required_fields",

@@ -130,3 +130,35 @@ def quality_issues():
 @router.get("/audit-logs")
 def audit_logs():
     return ok(service.audit_logs())
+
+
+class QualityRuleCreate(BaseModel):
+    rule_id: str
+    rule_name: str
+    rule_sql: str
+    is_active: int = 1
+
+
+class QualityRuleUpdate(BaseModel):
+    is_active: int
+
+
+@router.get("/quality/rules")
+def quality_rules():
+    return ok(service.get_quality_rules())
+
+
+@router.post("/quality/rules")
+def create_quality_rule(rule: QualityRuleCreate):
+    res = service.create_quality_rule(rule.rule_id, rule.rule_name, rule.rule_sql, rule.is_active)
+    if not res:
+        raise HTTPException(status_code=400, detail="Failed to create quality rule")
+    return ok({"message": "Rule created successfully"})
+
+
+@router.put("/quality/rules/{rule_id}")
+def update_quality_rule(rule_id: str, rule: QualityRuleUpdate):
+    res = service.update_quality_rule(rule_id, rule.is_active)
+    if not res:
+        raise HTTPException(status_code=400, detail="Failed to update quality rule")
+    return ok({"message": "Rule updated successfully"})

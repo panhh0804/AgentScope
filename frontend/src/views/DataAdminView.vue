@@ -351,6 +351,47 @@
               </div>
             </div>
           </section>
+
+          <!-- 数据质量规则配置 (Data Quality Rules Configuration) -->
+          <section class="screen-panel" style="margin-top: 16px;">
+            <div class="screen-panel-head">
+              <h3>元数据驱动 —— 数据质量检测规则配置</h3>
+              <a-button type="primary" size="small" @click="openRuleModal">新增校验规则</a-button>
+            </div>
+            <div class="screen-table-wrap">
+              <table class="data-table screen-native-table admin-table">
+                <thead>
+                  <tr>
+                    <th>规则代码 (rule_id)</th>
+                    <th>规则名称 (rule_name)</th>
+                    <th>SQL 校验表达式 (rule_sql)</th>
+                    <th>启用状态 (is_active)</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="rule in qualityRules" :key="rule.rule_id">
+                    <td><code>{{ rule.rule_id }}</code></td>
+                    <td>{{ rule.rule_name }}</td>
+                    <td><code class="sql-code" style="color: #67e8f9; background: rgba(103, 232, 249, 0.08); padding: 2px 6px; border-radius: 4px;">{{ rule.rule_sql }}</code></td>
+                    <td>
+                      <span :class="['tag', rule.is_active ? 'success' : 'failed']">
+                        {{ rule.is_active ? '已启用' : '已禁用' }}
+                      </span>
+                    </td>
+                    <td>
+                      <a-button size="mini" :type="rule.is_active ? 'outline' : 'primary'" @click="toggleRule(rule)">
+                        {{ rule.is_active ? '禁用' : '启用' }}
+                      </a-button>
+                    </td>
+                  </tr>
+                  <tr v-if="!qualityRules.length">
+                    <td colspan="5" class="empty-cell">暂无配置规则</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </a-tab-pane>
 
         <a-tab-pane key="jobs" title="数据任务管理">
@@ -564,6 +605,21 @@
     <a-modal v-model:visible="jsonModalOpen" title="JSON 详情" width="760px" :footer="false">
       <pre class="json-pre">{{ jsonPreview }}</pre>
     </a-modal>
+
+    <!-- 新增规则 Modal -->
+    <a-modal v-model:visible="ruleModalVisible" title="新增数据质量检测规则" @ok="handleCreateRule" width="600px">
+      <a-form :model="newRule" layout="vertical">
+        <a-form-item label="规则代码 (rule_id)">
+          <a-input v-model="newRule.rule_id" placeholder="例如: non_negative_latency" />
+        </a-form-item>
+        <a-form-item label="规则名称 (rule_name)">
+          <a-input v-model="newRule.rule_name" placeholder="例如: 时延非负校验" />
+        </a-form-item>
+        <a-form-item label="SQL 校验表达式 (rule_sql)">
+          <a-textarea v-model="newRule.rule_sql" placeholder="例如: latency_ms >= 0 (Spark SQL 语法)" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </section>
 </template>
 
@@ -588,6 +644,9 @@ import {
   fetchPipelineStatus,
   fetchQualityIssues,
   fetchQualityOverview,
+  fetchQualityRules,
+  createQualityRule,
+  updateQualityRule,
   retryAdminJobRun
 } from '../api/admin'
 import { lineOption } from '../charts/options'
@@ -635,6 +694,14 @@ const jobRuns = ref([])
 const qualityOverview = ref({})
 const qualityIssues = ref([])
 const auditLogs = ref([])
+const qualityRules = ref([])
+const ruleModalVisible = ref(false)
+const newRule = ref({
+  rule_id: '',
+  rule_name: '',
+  rule_sql: '',
+  is_active: 1
+})
 const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
 const agentOptions = ['planner_agent', 'search_agent', 'analysis_agent', 'writer_agent', 'reviewer_agent']
 const eventTypeOptions = ['task_start', 'tool_call', 'llm_call', 'handoff', 'task_finish', 'agent_start', 'agent_complete', 'llm_response']
@@ -816,6 +883,45 @@ const warehouseDataPanelRef = ref(null)
 function selectLayer(layer) {
   selectedLayer.value = layer
   loadLayerData()
+}
+
+async function loadRules() {
+  try {
+    qualityRules.value = await fetchQualityRules()
+  } catch (e) {
+    console.error('Failed to load quality rules', e)
+  }
+}
+
+function openRuleModal() {
+  newRule.value = { rule_id: '', rule_name: '', rule_sql: '', is_active: 1 }
+  ruleModalVisible.value = true
+}
+
+async function handleCreateRule() {
+  if (!newRule.value.rule_id || !newRule.value.rule_name || !newRule.value.rule_sql) {
+    Message.error('请填写完整信息')
+    return
+  }
+  try {
+    await createQualityRule(newRule.value)
+    Message.success('质量规则添加成功')
+    ruleModalVisible.value = false
+    await loadRules()
+  } catch (e) {
+    Message.error(e.response?.data?.detail || '添加规则失败')
+  }
+}
+
+async function toggleRule(rule) {
+  try {
+    const newStatus = rule.is_active ? 0 : 1
+    await updateQualityRule(rule.rule_id, { is_active: newStatus })
+    Message.success(`${rule.rule_name}已${newStatus ? '启用' : '禁用'}`)
+    await loadRules()
+  } catch (e) {
+    Message.error('修改规则状态失败')
+  }
 }
 
 async function loadJobs() {
@@ -1131,7 +1237,7 @@ async function loadAll() {
   qualityOverview.value = qualityOverviewData
   qualityIssues.value = qualityIssueData
   auditLogs.value = auditData
-  await Promise.all([loadLayerData(), loadJobs()])
+  await Promise.all([loadLayerData(), loadJobs(), loadRules()])
   await nextTick()
   renderTrend()
   renderFunnel()

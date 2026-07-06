@@ -15,3 +15,9 @@ export async function postData(path, payload = {}, config = {}) {
   return response.data.data
 }
 
+export async function putData(path, payload = {}, config = {}) {
+  const response = await api.put(path, payload, config)
+  return response.data.data
+}
+
+

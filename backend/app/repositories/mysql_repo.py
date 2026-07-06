@@ -425,3 +425,17 @@ class MySQLAnalyticsRepository:
             curr += timedelta(days=1)
         return trend
 
+    def get_quality_rules(self) -> List[Dict[str, Any]]:
+        sql = "SELECT rule_id, rule_name, rule_sql, is_active, create_time FROM agentscope_analytics.quality_rules_metadata ORDER BY create_time DESC"
+        res = self._query(sql, ())
+        return res or []
+
+    def create_quality_rule(self, rule_id: str, rule_name: str, rule_sql: str, is_active: int) -> bool:
+        sql = "INSERT INTO agentscope_analytics.quality_rules_metadata (rule_id, rule_name, rule_sql, is_active) VALUES (%s, %s, %s, %s)"
+        return self._execute(sql, (rule_id, rule_name, rule_sql, is_active))
+
+    def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
+        sql = "UPDATE agentscope_analytics.quality_rules_metadata SET is_active = %s WHERE rule_id = %s"
+        return self._execute(sql, (is_active, rule_id))
+
+

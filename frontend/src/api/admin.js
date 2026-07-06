@@ -1,4 +1,4 @@
-import { getData, postData } from './client'
+import { getData, postData, putData } from './client'
 
 const REPORT_TIMEOUT_MS = Number(import.meta.env.VITE_REPORT_TIMEOUT || 180000)
 
@@ -24,3 +24,7 @@ export const fetchAdminJobLogs = (runId) => getData(`/admin/job-runs/${runId}/lo
 export const fetchQualityOverview = () => getData('/admin/quality/overview')
 export const fetchQualityIssues = () => getData('/admin/quality/issues')
 export const fetchAuditLogs = () => getData('/admin/audit-logs')
+export const fetchQualityRules = () => getData('/admin/quality/rules')
+export const createQualityRule = (rule) => postData('/admin/quality/rules', rule)
+export const updateQualityRule = (ruleId, payload) => putData(`/admin/quality/rules/${ruleId}`, payload)
+

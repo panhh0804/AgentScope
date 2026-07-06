@@ -598,3 +598,13 @@ class AdminService:
             return date.fromisoformat(str(value)[:10].replace("/", "-"))
         except ValueError:
             return None
+
+    def get_quality_rules(self) -> List[Dict[str, Any]]:
+        return self.repo.get_quality_rules()
+
+    def create_quality_rule(self, rule_id: str, rule_name: str, rule_sql: str, is_active: int) -> bool:
+        return self.repo.create_quality_rule(rule_id, rule_name, rule_sql, is_active)
+
+    def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
+        return self.repo.update_quality_rule(rule_id, is_active)
+

@@ -554,7 +554,20 @@
             <div class="screen-table-wrap">
               <table class="data-table screen-native-table admin-table">
                 <thead>
-                  <tr><th>run_id</th><th>job_code</th><th>biz_date</th><th>状态</th><th>输入</th><th>输出</th><th>异常</th><th>开始</th><th>结束</th><th>耗时</th><th>日志</th><th>操作</th></tr>
+                  <tr>
+                    <th style="min-width: 110px;">run_id</th>
+                    <th style="min-width: 110px;">job_code</th>
+                    <th style="min-width: 95px;">biz_date</th>
+                    <th style="min-width: 75px;">状态</th>
+                    <th style="min-width: 75px;">输入</th>
+                    <th style="min-width: 75px;">输出</th>
+                    <th style="min-width: 65px;">异常</th>
+                    <th style="min-width: 155px;">开始</th>
+                    <th style="min-width: 155px;">结束</th>
+                    <th style="min-width: 65px;">耗时</th>
+                    <th style="min-width: 65px;">日志</th>
+                    <th style="min-width: 70px;">操作</th>
+                  </tr>
                 </thead>
                 <tbody>
                   <tr v-for="run in jobRuns" :key="run.run_id">
@@ -584,7 +597,14 @@
             <div class="screen-table-wrap">
               <table class="data-table screen-native-table">
                 <thead>
-                  <tr><th>operator</th><th>operation_type</th><th>resource_type</th><th>resource_id</th><th>operation_result</th><th>created_at</th></tr>
+                  <tr>
+                    <th style="min-width: 90px;">operator</th>
+                    <th style="min-width: 120px;">operation_type</th>
+                    <th style="min-width: 110px;">resource_type</th>
+                    <th style="min-width: 120px;">resource_id</th>
+                    <th style="min-width: 80px;">operation_result</th>
+                    <th style="min-width: 155px;">created_at</th>
+                  </tr>
                 </thead>
                 <tbody>
                   <tr v-for="log in auditLogs" :key="log.audit_id">

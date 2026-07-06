@@ -66,13 +66,7 @@
           <div ref="throughputChart" class="screen-chart large"></div>
         </article>
 
-        <article class="screen-panel compact overview-grid__daily">
-          <div class="screen-panel-head">
-            <h3>离线每日指标</h3>
-            <span>history trend</span>
-          </div>
-          <div ref="dailyChart" class="screen-chart small"></div>
-        </article>
+
 
         <article class="screen-panel compact overview-grid__alerts">
           <div class="screen-panel-head">
@@ -268,7 +262,6 @@ const historyChartsRef = ref(null)
 
 const throughputChart = ref(null)
 const latencyChart = ref(null)
-const dailyChart = ref(null)
 const relationChart = ref(null)
 const costChart = ref(null)
 
@@ -345,7 +338,6 @@ let pollTimer
 
 let throughputInstance
 let latencyInstance
-let dailyInstance
 let relationInstance
 let costInstance
 
@@ -517,66 +509,11 @@ function renderRealtimeCharts() {
 
 function renderCharts() {
   renderRealtimeCharts()
-  if (!dailyChart.value || !relationChart.value || !costChart.value) return
-  dailyInstance ||= echarts.init(dailyChart.value)
+  if (!relationChart.value || !costChart.value) return
   relationInstance ||= echarts.init(relationChart.value)
   costInstance ||= echarts.init(costChart.value)
 
   const xDaily = dailyMetrics.value.map((item) => formatShortDate(item.metric_date))
-  dailyInstance.setOption({
-    backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis', formatter: historyTooltipFormatter },
-    legend: { top: 0, textStyle: { color: '#bdefff' } },
-    grid: { top: 42, right: 54, bottom: 28, left: 50 },
-    xAxis: { type: 'category', data: xDaily, boundaryGap: ['4%', '8%'], ...baseAxis() },
-    yAxis: [
-      {
-        type: 'value',
-        name: '任务量',
-        position: 'left',
-        ...baseAxis()
-      },
-      {
-        type: 'value',
-        name: '成功率',
-        position: 'right',
-        min: 0,
-        max: 100,
-        ...baseAxis(),
-        splitLine: { show: false },
-        axisLabel: {
-          formatter: '{value}%',
-          color: '#9bc7d9'
-        }
-      }
-    ],
-    series: [
-      {
-        name: '任务量',
-        type: 'line',
-        smooth: true,
-        symbol: 'none',
-        showSymbol: false,
-        yAxisIndex: 0,
-        data: dailyMetrics.value.map((item) => item.task_count),
-        areaStyle: { color: 'rgba(34, 211, 238, 0.08)' },
-        itemStyle: { color: '#22d3ee' },
-        lineStyle: { width: 3 }
-      },
-      {
-        name: '成功率 %',
-        type: 'line',
-        smooth: true,
-        symbol: 'none',
-        showSymbol: false,
-        yAxisIndex: 1,
-        data: dailyMetrics.value.map((item) => Math.round(Number(item.success_rate) * 100)),
-        itemStyle: { color: '#4ade80' },
-        lineStyle: { width: 3 }
-      }
-    ]
-  }, true)
-
   const relationOption = graphOption(relationGraph.value)
   const relationSeries = relationOption.series?.[0]
   if (relationSeries) {
@@ -657,7 +594,6 @@ function renderCharts() {
 function resizeCharts() {
   throughputInstance?.resize()
   latencyInstance?.resize()
-  dailyInstance?.resize()
   relationInstance?.resize()
   costInstance?.resize()
 }
@@ -765,7 +701,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
   throughputInstance?.dispose()
   latencyInstance?.dispose()
-  dailyInstance?.dispose()
   relationInstance?.dispose()
   costInstance?.dispose()
 })

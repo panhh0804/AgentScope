@@ -559,9 +559,9 @@ h2 {
 
 .overview-grid {
   grid-template-areas:
-    "throughput latency daily"
-    "stream stream alerts"
-    "cost diagnostics relation";
+    "throughput latency alerts"
+    "stream stream diagnostics"
+    "cost cost relation";
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
 }

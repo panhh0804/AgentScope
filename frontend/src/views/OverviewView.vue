@@ -769,7 +769,7 @@ function goBack() {
   if (window.opener || window.history.length <= 1) {
     window.close()
   } else {
-    router.push('/data-admin')
+    router.push('/data-overview')
   }
 }
 

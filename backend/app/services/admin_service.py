@@ -32,7 +32,7 @@ class AdminService:
             "limit_bytes": 10737418240,
         }
         try:
-            cmd = "/usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
+            cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
             proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, _ = proc.communicate(timeout=4)
             if stdout:

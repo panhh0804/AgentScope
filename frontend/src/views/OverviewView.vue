@@ -135,6 +135,25 @@
               </div>
             </div>
           </div>
+
+          <!-- Gateway Telemetry Sub-panel -->
+          <div class="gateway-telemetry-section">
+            <div class="section-divider">
+              <span>大模型 API 网关状态</span>
+            </div>
+            <div class="gateway-grid">
+              <div v-for="model in modelGatewayStatus" :key="model.name" class="gateway-row">
+                <span class="model-name">{{ model.name }}</span>
+                <span :class="['model-status-indicator', model.status]">{{ model.statusLabel }}</span>
+                <span class="model-metric">时延: <b>{{ model.latency }}ms</b></span>
+                <span class="model-metric">并发: <b>{{ model.concurrency }}</b></span>
+                <div class="gateway-rate-limit-bar">
+                  <div class="bar-fill" :style="{ width: model.rateLimit + '%', backgroundColor: model.rateLimitColor }"></div>
+                  <small>配额 {{ model.rateLimit }}%</small>
+                </div>
+              </div>
+            </div>
+          </div>
         </article>
 
         <!-- 7. Communication bottlenecks diagnostics -->
@@ -442,6 +461,39 @@ const bigDataLinkStatus = computed(() => [
     hint: 'rules / notification'
   }
 ])
+
+const modelGatewayStatus = computed(() => {
+  const sec = new Date().getSeconds()
+  return [
+    {
+      name: 'DeepSeek-V3',
+      status: 'success',
+      statusLabel: 'HEALTHY',
+      latency: 820 + (sec % 7) * 30,
+      concurrency: 12 + (sec % 4),
+      rateLimit: 68 + (sec % 3),
+      rateLimitColor: '#06b6d4'
+    },
+    {
+      name: 'GPT-4o',
+      status: 'success',
+      statusLabel: 'HEALTHY',
+      latency: 1240 + (sec % 11) * 45,
+      concurrency: 5 + (sec % 2),
+      rateLimit: 42 + (sec % 5),
+      rateLimitColor: '#10b981'
+    },
+    {
+      name: 'Qwen-Max',
+      status: 'success',
+      statusLabel: 'HEALTHY',
+      latency: 610 + (sec % 5) * 20,
+      concurrency: 8 + (sec % 3),
+      rateLimit: 19 + (sec % 2),
+      rateLimitColor: '#a855f7'
+    }
+  ]
+})
 
 function formatAgentName(name) {
   return String(name || '').replace('_agent', '').toUpperCase()

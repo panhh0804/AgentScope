@@ -3037,4 +3037,107 @@ tr:nth-child(3) .rank-badge {
   transform: translateY(-3px) !important;
 }
 
+/* LLM Gateway Telemetry in Agent Rank Card */
+.gateway-telemetry-section {
+  margin-top: 14px;
+  border-top: 1px dashed rgba(103, 232, 249, 0.15);
+  padding-top: 10px;
+  min-height: 0;
+}
+
+.gateway-telemetry-section .section-divider {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.gateway-telemetry-section .section-divider span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #67e8f9;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.gateway-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gateway-row {
+  display: grid;
+  grid-template-columns: 85px 60px 80px 65px 1fr;
+  align-items: center;
+  gap: 8px;
+  background: rgba(9, 24, 43, 0.25);
+  border: 1px solid rgba(103, 232, 249, 0.08);
+  border-radius: 5px;
+  padding: 5px 8px;
+}
+
+.gateway-row .model-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.gateway-row .model-status-indicator {
+  font-size: 9px;
+  font-weight: 700;
+  color: #34d399;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gateway-row .model-status-indicator::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+
+.gateway-row .model-metric {
+  font-size: 11px;
+  color: #9bc7d9;
+}
+
+.gateway-row .model-metric b {
+  color: #f8fafc;
+}
+
+.gateway-row .gateway-rate-limit-bar {
+  position: relative;
+  height: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gateway-row .gateway-rate-limit-bar .bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  transition: width 0.3s ease;
+  opacity: 0.8;
+}
+
+.gateway-row .gateway-rate-limit-bar small {
+  position: relative;
+  z-index: 2;
+  font-size: 8px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+
 

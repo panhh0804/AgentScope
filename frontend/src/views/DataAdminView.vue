@@ -86,6 +86,37 @@
               </div>
               <div ref="perfChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
             </article>
+            <!-- 离线历史运行与性能分析 (4个图表) -->
+            <div style="grid-column: span 2; margin-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+              <article class="screen-panel">
+                <div class="screen-panel-head">
+                  <h3>每日离线任务运行量</h3>
+                  <span>task count trend</span>
+                </div>
+                <ChartPanel :option="historyTaskOption" style="height: 240px; margin-top: 10px;" />
+              </article>
+              <article class="screen-panel">
+                <div class="screen-panel-head">
+                  <h3>每日离线清洗成功率</h3>
+                  <span>success rate trend</span>
+                </div>
+                <ChartPanel :option="historySuccessOption" style="height: 240px; margin-top: 10px;" />
+              </article>
+              <article class="screen-panel">
+                <div class="screen-panel-head">
+                  <h3>离线计算时延趋势 (平均 / P95)</h3>
+                  <span>latency ms</span>
+                </div>
+                <ChartPanel :option="historyLatencyOption" style="height: 240px; margin-top: 10px;" />
+              </article>
+              <article class="screen-panel">
+                <div class="screen-panel-head">
+                  <h3>智能体离线调用排行 (Top Roles)</h3>
+                  <span>agent execution rank</span>
+                </div>
+                <ChartPanel :option="historyRankingOption" style="height: 240px; margin-top: 10px;" />
+              </article>
+            </div>
 
             <!-- 数据质量检测与合规明细表格（横跨整行） -->
             <article class="screen-panel" style="grid-column: span 2; margin-top: 16px;">
@@ -170,11 +201,11 @@
               <table class="data-table screen-native-table admin-table">
                 <thead>
                   <tr>
-                    <th style="min-width: 120px;">规则代码 (rule_id)</th>
-                    <th style="min-width: 120px;">规则名称 (rule_name)</th>
-                    <th style="min-width: 320px;">SQL 校验表达式 (rule_sql)</th>
-                    <th style="min-width: 90px;">启用状态 (is_active)</th>
-                    <th style="min-width: 80px;">操作</th>
+                    <th style="width: 130px;">规则代码 (rule_id)</th>
+                    <th style="width: 150px;">规则名称 (rule_name)</th>
+                    <th style="width: 320px;">SQL 校验表达式 (rule_sql)</th>
+                    <th style="width: 100px;">启用状态 (is_active)</th>
+                    <th style="width: 80px;">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -568,18 +599,18 @@
               <table class="data-table screen-native-table admin-table">
                 <thead>
                   <tr>
-                    <th style="min-width: 110px;">run_id</th>
-                    <th style="min-width: 110px;">job_code</th>
-                    <th style="min-width: 95px;">biz_date</th>
-                    <th style="min-width: 75px;">状态</th>
-                    <th style="min-width: 75px;">输入</th>
-                    <th style="min-width: 75px;">输出</th>
-                    <th style="min-width: 65px;">异常</th>
-                    <th style="min-width: 155px;">开始</th>
-                    <th style="min-width: 155px;">结束</th>
-                    <th style="min-width: 65px;">耗时</th>
-                    <th style="min-width: 65px;">日志</th>
-                    <th style="min-width: 70px;">操作</th>
+                    <th style="width: 140px;">run_id</th>
+                    <th style="width: 120px;">job_code</th>
+                    <th style="width: 95px;">biz_date</th>
+                    <th style="width: 75px;">状态</th>
+                    <th style="width: 75px;">输入</th>
+                    <th style="width: 75px;">输出</th>
+                    <th style="width: 65px;">异常</th>
+                    <th style="width: 160px;">开始</th>
+                    <th style="width: 160px;">结束</th>
+                    <th style="width: 65px;">耗时</th>
+                    <th style="width: 65px;">日志</th>
+                    <th style="width: 70px;">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -611,12 +642,12 @@
               <table class="data-table screen-native-table">
                 <thead>
                   <tr>
-                    <th style="min-width: 90px;">operator</th>
-                    <th style="min-width: 120px;">operation_type</th>
-                    <th style="min-width: 110px;">resource_type</th>
-                    <th style="min-width: 120px;">resource_id</th>
-                    <th style="min-width: 80px;">operation_result</th>
-                    <th style="min-width: 155px;">created_at</th>
+                    <th style="width: 110px;">operator</th>
+                    <th style="width: 135px;">operation_type</th>
+                    <th style="width: 120px;">resource_type</th>
+                    <th style="width: 135px;">resource_id</th>
+                    <th style="width: 90px;">operation_result</th>
+                    <th style="width: 160px;">created_at</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -699,7 +730,9 @@ import {
   updateQualityRule,
   retryAdminJobRun
 } from '../api/admin'
-import { lineOption } from '../charts/options'
+import { lineOption, barOption } from '../charts/options'
+import ChartPanel from '../components/ChartPanel.vue'
+import { fetchDailyMetrics, fetchAgentRankings } from '../api/dashboard'
 const route = useRoute()
 const router = useRouter()
 const openScreen = () => {
@@ -728,6 +761,54 @@ watch(
   { immediate: true }
 )
 const bizDate = ref(todayString())
+
+const dailyMetrics = ref([])
+const historyRankings = ref([])
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    return `${parts[1]}-${parts[2]}`
+  }
+  return dateStr
+}
+
+function historyTooltipFormatter(params) {
+  if (!params || !params.length) return ''
+  const date = params[0].axisValueLabel
+  const rows = Array.isArray(params) ? params : [params]
+  const lines = rows.map((item) => `${item.marker}${item.seriesName}: ${item.value}`)
+  return [date, ...lines].join('<br/>')
+}
+
+function historyLineOption(title, series) {
+  const option = lineOption(title, dailyMetrics.value.map((item) => formatShortDate(item.metric_date)), series)
+  option.tooltip = { ...option.tooltip, trigger: 'axis', formatter: historyTooltipFormatter }
+  option.grid = { ...option.grid, right: 34, bottom: 32, containLabel: true }
+  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
+  return option
+}
+
+const historyTaskOption = computed(() => historyLineOption('每日任务量', [
+  { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
+]))
+
+const historySuccessOption = computed(() => historyLineOption('每日成功率', [
+  { name: '成功率', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => Number(item.success_rate) * 100), itemStyle: { color: '#10b981' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(16, 185, 129, 0.08)' } }
+]))
+
+const historyLatencyOption = computed(() => historyLineOption('平均 / P95 时延', [
+  { name: '平均时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.avg_latency_ms), itemStyle: { color: '#06b6d4' }, lineStyle: { width: 3 } },
+  { name: 'P95 时延', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.p95_latency_ms), itemStyle: { color: '#f97316' }, lineStyle: { width: 3 } }
+]))
+
+const historyRankingOption = computed(() => barOption(
+  'Agent 执行次数排行',
+  historyRankings.value.map((item) => item.agent_role),
+  historyRankings.value.map((item) => item.execution_count),
+  '执行次数'
+))
 const overview = ref({})
 const trend = ref([])
 const pipeline = ref({})
@@ -1292,7 +1373,7 @@ function resizeCharts() {
 }
 
 async function loadAll() {
-  const [overviewData, trendData, pipelineData, datasetData, lineageData, qualityOverviewData, qualityIssueData, auditData] = await Promise.all([
+  const [overviewData, trendData, pipelineData, datasetData, lineageData, qualityOverviewData, qualityIssueData, auditData, dailyData, rankingData] = await Promise.all([
     fetchAdminOverview(),
     fetchDataVolumeTrend(),
     fetchPipelineStatus(),
@@ -1300,7 +1381,9 @@ async function loadAll() {
     fetchDataLineage(),
     fetchQualityOverview(),
     fetchQualityIssues(),
-    fetchAuditLogs()
+    fetchAuditLogs(),
+    fetchDailyMetrics('2026-06-01', todayString()),
+    fetchAgentRankings('2026-06-01', todayString())
   ])
   overview.value = overviewData
   trend.value = trendData
@@ -1310,6 +1393,9 @@ async function loadAll() {
   qualityOverview.value = qualityOverviewData
   qualityIssues.value = qualityIssueData
   auditLogs.value = auditData
+  dailyMetrics.value = dailyData || []
+  historyRankings.value = rankingData || []
+  
   await Promise.all([loadLayerData(), loadJobs(), loadRules()])
   await nextTick()
   renderTrend()

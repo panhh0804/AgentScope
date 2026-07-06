@@ -2226,6 +2226,49 @@ tr:nth-child(3) .rank-badge {
   margin-bottom: 10px;
 }
 
+/* Compact realtime stats bar */
+.rt-stats-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.rt-stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 14px;
+  border: 1px solid rgba(103, 232, 249, 0.3);
+  background: linear-gradient(180deg, rgba(15, 48, 72, 0.88), rgba(6, 24, 39, 0.92));
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.rt-stat-label {
+  font-size: 11px;
+  color: #9bc7d9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.rt-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+  margin: 2px 0 1px;
+}
+
+.rt-stat-hint {
+  font-size: 10px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
 .screen-page--overview .overview-grid {
   flex: 1;
   overflow: hidden;

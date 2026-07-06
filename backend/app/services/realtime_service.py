@@ -39,10 +39,18 @@ class RealtimeService:
             return None
         return json.loads(value)
 
-    def overview(self) -> Dict:
-        return self._get_json("agentscope:realtime:overview") or mock_data.realtime_overview()
+    def _data_mode(self) -> str:
+        return os.getenv("DATA_MODE", "demo").lower()
 
-    def trend(self, minutes: int) -> List[Dict]:
+    def overview(self) -> Dict:
+        redis_data = self._get_json("agentscope:realtime:overview")
+        if redis_data:
+            return {"data": redis_data, "data_source": "redis", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": {}, "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
+        return {"data": mock_data.realtime_overview(), "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
+
+    def trend(self, minutes: int) -> Dict:
         client = self._client()
         if client:
             overview_raw = client.get("agentscope:realtime:overview")
@@ -70,12 +78,24 @@ class RealtimeService:
                     pass
             data = self._get_json("agentscope:realtime:trend")
             if data:
-                return data[-minutes:]
-        return mock_data.realtime_trend(minutes)
+                return {"data": data[-minutes:], "data_source": "redis", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
+        return {"data": mock_data.realtime_trend(minutes), "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
 
-    def agents(self) -> List[Dict]:
-        return self._get_json("agentscope:realtime:agents") or mock_data.realtime_agents()
+    def agents(self) -> Dict:
+        redis_data = self._get_json("agentscope:realtime:agents")
+        if redis_data:
+            return {"data": redis_data, "data_source": "redis", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
+        return {"data": mock_data.realtime_agents(), "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
 
-    def alerts(self) -> List[Dict]:
-        return self._get_json("agentscope:realtime:alerts") or mock_data.recent_alerts()
+    def alerts(self) -> Dict:
+        redis_data = self._get_json("agentscope:realtime:alerts")
+        if redis_data:
+            return {"data": redis_data, "data_source": "redis", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
+        return {"data": mock_data.recent_alerts(), "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
 

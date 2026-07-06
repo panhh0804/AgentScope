@@ -8,33 +8,65 @@ from app.repositories.mysql_repo import MySQLAnalyticsRepository
 from app.services import mock_data
 
 
+import os
+
 class StatisticsService:
     def __init__(self) -> None:
         self.repo = MySQLAnalyticsRepository()
 
-    def trend(self) -> List[Dict[str, Any]]:
+    def _data_mode(self) -> str:
+        return os.getenv("DATA_MODE", "demo").lower()
+
+    def trend(self) -> Dict[str, Any]:
         end = date.today()
         start = end - timedelta(days=29)
-        rows = self.repo.analytics_trend(start, end) or mock_data.daily_metrics(start, end)
-        return [self._normalize_row(row) for row in rows]
+        rows = self.repo.analytics_trend(start, end)
+        if rows:
+            data = [self._normalize_row(row) for row in rows]
+            return {"data": data, "data_source": "mysql", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "mysql", "fallback": False, "reason": "MySQL empty or unavailable"}
+        mock_rows = mock_data.daily_metrics(start, end)
+        data = [self._normalize_row(row) for row in mock_rows]
+        return {"data": data, "data_source": "mock", "fallback": True, "reason": "MySQL empty or unavailable"}
 
-    def errors(self, limit: int = 10) -> List[Dict[str, Any]]:
-        rows = self.repo.get_error_distribution(limit) or self._mock_errors()
-        total = sum(int(row.get("total_count") or row.get("error_count") or 0) for row in rows)
+    def errors(self, limit: int = 10) -> Dict[str, Any]:
+        rows = self.repo.get_error_distribution(limit)
+        if rows:
+            total = sum(int(row.get("total_count") or row.get("error_count") or 0) for row in rows)
+            normalized = []
+            for row in rows:
+                item = self._normalize_row(row)
+                count = int(item.get("total_count") or item.get("error_count") or 0)
+                item["total_count"] = count
+                item["percentage"] = float(item.get("percentage") or (count / total if total else 0))
+                normalized.append(item)
+            return {"data": normalized, "data_source": "mysql", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "mysql", "fallback": False, "reason": "MySQL empty or unavailable"}
+        mock_rows = self._mock_errors()
+        total = sum(int(row.get("total_count") or row.get("error_count") or 0) for row in mock_rows)
         normalized = []
-        for row in rows:
+        for row in mock_rows:
             item = self._normalize_row(row)
             count = int(item.get("total_count") or item.get("error_count") or 0)
             item["total_count"] = count
             item["percentage"] = float(item.get("percentage") or (count / total if total else 0))
             normalized.append(item)
-        return normalized
+        return {"data": normalized, "data_source": "mock", "fallback": True, "reason": "MySQL empty or unavailable"}
 
-    def agent_stats(self) -> List[Dict[str, Any]]:
+    def agent_stats(self) -> Dict[str, Any]:
         end = date.today()
         start = end - timedelta(days=29)
-        rows = self.repo.get_agent_stats(start, end) or mock_data.rankings(end)
-        return [self._normalize_row(row) for row in rows]
+        rows = self.repo.get_agent_stats(start, end)
+        if rows:
+            data = [self._normalize_row(row) for row in rows]
+            return {"data": data, "data_source": "mysql", "fallback": False, "reason": None}
+        if self._data_mode() == "strict":
+            return {"data": [], "data_source": "mysql", "fallback": False, "reason": "MySQL empty or unavailable"}
+        mock_rows = mock_data.rankings(end)
+        data = [self._normalize_row(row) for row in mock_rows]
+        return {"data": data, "data_source": "mock", "fallback": True, "reason": "MySQL empty or unavailable"}
 
     def _mock_errors(self) -> List[Dict[str, Any]]:
         rows = [

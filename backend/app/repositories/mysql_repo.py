@@ -240,7 +240,9 @@ class MySQLAnalyticsRepository:
                     import subprocess
                     import json
                     dt_str = metric_date.isoformat()
-                    cmd = f"export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -cat /agentscope/dirty/agent_events/dt={dt_str}/*.json 2>/dev/null | head -n 10"
+                    java_home = os.getenv("JAVA_HOME", "/usr/local/jdk1.8.0_171")
+                    hadoop_home = os.getenv("HADOOP_HOME", "/usr/local/hadoop-2.7.6")
+                    cmd = f"export JAVA_HOME={java_home} && {hadoop_home}/bin/hdfs dfs -fs hdfs://master:9000 -cat /agentscope/dirty/agent_events/dt={dt_str}/*.json 2>/dev/null | head -n 10"
                     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     stdout, _ = proc.communicate(timeout=6)
                     if stdout:
@@ -467,5 +469,96 @@ class MySQLAnalyticsRepository:
     def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
         sql = "UPDATE agentscope_analytics.quality_rules_metadata SET is_active = %s WHERE rule_id = %s"
         return self._execute(sql, (is_active, rule_id))
+
+    def ensure_admin_tables(self) -> None:
+        if not self._enabled:
+            return
+        self._execute("""
+            CREATE TABLE IF NOT EXISTS admin_job_runs (
+                run_id VARCHAR(64) PRIMARY KEY,
+                job_code VARCHAR(64) NOT NULL,
+                biz_date VARCHAR(32) NOT NULL,
+                status VARCHAR(32) NOT NULL,
+                input_count INT NOT NULL DEFAULT 0,
+                output_count INT NOT NULL DEFAULT 0,
+                error_count INT NOT NULL DEFAULT 0,
+                start_time VARCHAR(32) NOT NULL,
+                end_time VARCHAR(32) NULL,
+                duration_seconds INT NULL,
+                log_summary TEXT NULL,
+                demo TINYINT NOT NULL DEFAULT 0,
+                data_source VARCHAR(32) NOT NULL DEFAULT 'mysql'
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """, ())
+        self._execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                audit_id VARCHAR(64) PRIMARY KEY,
+                operator VARCHAR(64) NOT NULL,
+                operation_type VARCHAR(64) NOT NULL,
+                resource_type VARCHAR(64) NOT NULL,
+                resource_id VARCHAR(64) NOT NULL,
+                operation_result VARCHAR(32) NOT NULL,
+                created_at VARCHAR(32) NOT NULL,
+                demo TINYINT NOT NULL DEFAULT 0,
+                data_source VARCHAR(32) NOT NULL DEFAULT 'mysql'
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """, ())
+
+    def get_admin_job_runs(self) -> Optional[List[Dict]]:
+        return self._query("SELECT * FROM admin_job_runs ORDER BY start_time DESC", ())
+
+    def save_admin_job_run(self, run: Dict) -> bool:
+        sql = """
+            INSERT INTO admin_job_runs (
+                run_id, job_code, biz_date, status, input_count, output_count, error_count,
+                start_time, end_time, duration_seconds, log_summary, demo, data_source
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                end_time = VALUES(end_time),
+                duration_seconds = VALUES(duration_seconds),
+                log_summary = VALUES(log_summary),
+                input_count = VALUES(input_count),
+                output_count = VALUES(output_count),
+                error_count = VALUES(error_count)
+        """
+        params = (
+            run.get("run_id"),
+            run.get("job_code"),
+            run.get("biz_date"),
+            run.get("status"),
+            run.get("input_count") or 0,
+            run.get("output_count") or 0,
+            run.get("error_count") or 0,
+            str(run.get("start_time")),
+            str(run.get("end_time")) if run.get("end_time") else None,
+            run.get("duration_seconds"),
+            run.get("log_summary"),
+            1 if run.get("demo") or run.get("data_source") == "mock" else 0,
+            run.get("data_source", "mysql")
+        )
+        return self._execute(sql, params)
+
+    def get_admin_audit_logs(self) -> Optional[List[Dict]]:
+        return self._query("SELECT * FROM admin_audit_logs ORDER BY created_at DESC", ())
+
+    def save_admin_audit_log(self, log: Dict) -> bool:
+        sql = """
+            INSERT INTO admin_audit_logs (
+                audit_id, operator, operation_type, resource_type, resource_id, operation_result, created_at, demo, data_source
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        params = (
+            log.get("audit_id"),
+            log.get("operator"),
+            log.get("operation_type"),
+            log.get("resource_type"),
+            log.get("resource_id"),
+            log.get("operation_result"),
+            str(log.get("created_at")),
+            1 if log.get("demo") or log.get("data_source") == "mock" else 0,
+            log.get("data_source", "mysql")
+        )
+        return self._execute(sql, params)
 
 

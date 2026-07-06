@@ -384,6 +384,14 @@ class AdminService:
         return self._job_runs
 
     def execute_job(self, job_code: str, biz_date: date) -> Dict[str, Any]:
+        import os
+        ssh_user = os.getenv("SSH_USER", "root")
+        ssh_host = os.getenv("SSH_HOST", "master")
+        ssh_dest = f"{ssh_user}@{ssh_host}"
+        ssh_opts_str = os.getenv("SSH_OPTS", "-o StrictHostKeyChecking=no")
+        import shlex
+        ssh_opts = shlex.split(ssh_opts_str)
+        project_home = os.getenv("PROJECT_HOME", "/root/projects/agentscope")
         self._ensure_job(job_code)
         if biz_date > date.today():
             raise ValueError("业务日期不能晚于今天")
@@ -399,8 +407,8 @@ class AdminService:
         try:
             if job_code == "offline_generate":
                 # Execute simulator on master node via passwordless SSH to populate MySQL source db
-                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count 50"
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
+                exec_cmd = f"source /etc/profile && cd {project_home}/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count 50"
+                cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
                     status = "failed"
@@ -412,8 +420,8 @@ class AdminService:
             
             elif job_code == "datax_import":
                 # Execute DataX script on master node via passwordless SSH
-                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope && bash scripts/datax_import_agent_events.sh {biz_date.isoformat()}"
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
+                exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/datax_import_agent_events.sh {biz_date.isoformat()}"
+                cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
                     status = "failed"
@@ -424,8 +432,8 @@ class AdminService:
             
             elif job_code == "spark_clean":
                 # Execute Spark clean script on master node
-                exec_cmd = f"source /etc/profile && cd /root/projects/agentscope && bash scripts/run_clean_job.sh {biz_date.isoformat()}"
-                cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "root@master", exec_cmd]
+                exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/run_clean_job.sh {biz_date.isoformat()}"
+                cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
                     status = "failed"

@@ -269,8 +269,18 @@ class WorkflowGenerator:
         metadata: Optional[Dict[str, Any]] = None,
         token_overuse: bool = False,
     ) -> AgentEvent:
-        prompt_tokens, completion_tokens = self._tokens(overuse=token_overuse)
-        total_tokens = prompt_tokens + completion_tokens
+        if event_type == "llm_response":
+            prompt_tokens, completion_tokens = self._tokens(overuse=token_overuse)
+            total_tokens = prompt_tokens + completion_tokens
+            cost_usd = estimate_cost(prompt_tokens, completion_tokens)
+            model_name = self.sim_config.get("default_model", "gpt-4.1-mini")
+        else:
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            cost_usd = 0.0
+            model_name = None
+
         return AgentEvent(
             event_id=self.ids.new_id("evt"),
             trace_id=trace_id,
@@ -286,8 +296,8 @@ class WorkflowGenerator:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            cost_usd=estimate_cost(prompt_tokens, completion_tokens),
-            model_name=self.sim_config.get("default_model", "gpt-4.1-mini"),
+            cost_usd=cost_usd,
+            model_name=model_name,
             tool_name=tool_name,
             error_type=error_type,
             retry_count=retry_count,

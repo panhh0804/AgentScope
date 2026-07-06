@@ -71,6 +71,11 @@ def main() -> None:
     )
     require("event_id unique", len({event["event_id"] for event in mixed}) == len(mixed))
     require("total_tokens consistent", all(event["total_tokens"] == event["prompt_tokens"] + event["completion_tokens"] for event in mixed))
+    require("non-llm_response tokens and cost are zero", all(
+        (event["event_type"] == "llm_response") or 
+        (event["prompt_tokens"] == 0 and event["completion_tokens"] == 0 and event["total_tokens"] == 0 and float(event["cost_usd"]) == 0.0)
+        for event in mixed
+    ))
     require("timestamps increasing per trace", strictly_increasing_per_trace(mixed))
     require("complete runs", complete_runs(mixed))
 

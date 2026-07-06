@@ -105,6 +105,7 @@
                       <th>异常拦截行数</th>
                       <th>规则合规率</th>
                       <th>异常样本</th>
+                      <th>快捷治理</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -116,7 +117,8 @@
                       <td>{{ formatNumber(issue.total_count) }}</td>
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
-                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)">查看样本</a-button></td>
+                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
+                      <td><a-button type="primary" size="mini" :loading="recleaning[issue.biz_date]" @click="recleanData(issue.biz_date)">一键重洗</a-button></td>
                     </tr>
                   </tbody>
                 </table>
@@ -207,7 +209,10 @@
             </div>
             <div class="warehouse-layers-flow">
               <div :class="['layer-card', 'ods-card', { active: selectedLayer === 'ods' }]" @click="selectLayer('ods')">
-                <div class="layer-title">ODS 层</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="layer-title">ODS 层</div>
+                  <span class="tag success" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">正常</span>
+                </div>
                 <div class="layer-eng">Operational Data Store</div>
                 <p class="layer-desc">原始数据落地，保持数据原貌，接入格式各异的原始事件（JSON）。</p>
                 <div class="layer-mapping">
@@ -217,7 +222,12 @@
               </div>
               <div class="layer-arrow">➔</div>
               <div :class="['layer-card', 'dwd-card', { active: selectedLayer === 'dwd' }]" @click="selectLayer('dwd')">
-                <div class="layer-title">DWD 层</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="layer-title">DWD 层</div>
+                  <span :class="['tag', qualityOverview.issue_count > 0 ? 'failed' : 'success']" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">
+                    {{ qualityOverview.issue_count > 0 ? `检测出 ${qualityOverview.issue_count} 个异常` : '正常' }}
+                  </span>
+                </div>
                 <div class="layer-eng">Data Warehouse Detail</div>
                 <p class="layer-desc">数据清洗与标准化，过滤坏账去重，提供干净、无重复、字段统一的存储。</p>
                 <div class="layer-mapping">
@@ -227,7 +237,10 @@
               </div>
               <div class="layer-arrow">➔</div>
               <div :class="['layer-card', 'dws-card', { active: selectedLayer === 'dws' }]" @click="selectLayer('dws')">
-                <div class="layer-title">DWS 层</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="layer-title">DWS 层</div>
+                  <span class="tag success" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">数据已更新</span>
+                </div>
                 <div class="layer-eng">Data Warehouse Summary</div>
                 <p class="layer-desc">轻度汇总，按天/小时/Agent等多维主题聚合，提供下游可视化直接消费。</p>
                 <div class="layer-mapping">
@@ -716,6 +729,7 @@ const qualityOverview = ref({})
 const qualityIssues = ref([])
 const auditLogs = ref([])
 const qualityRules = ref([])
+const recleaning = ref({})
 const ruleModalVisible = ref(false)
 const newRule = ref({
   rule_id: '',
@@ -944,6 +958,22 @@ async function toggleRule(rule) {
     Message.error('修改规则状态失败')
   }
 }
+
+async function recleanData(dateVal) {
+  if (!dateVal) return
+  recleaning.value[dateVal] = true
+  Message.info({ content: `正在触发数据清洗自愈任务，业务日期: ${dateVal}...`, duration: 3000 })
+  try {
+    await executeAdminJob('spark_clean', dateVal)
+    Message.success({ content: `业务日期 ${dateVal} 的清洗自愈执行成功！`, duration: 4000 })
+    await loadAll()
+  } catch (e) {
+    Message.error({ content: `重洗自愈执行失败: ${e.message || '未知错误'}`, duration: 4000 })
+  } finally {
+    recleaning.value[dateVal] = false
+  }
+}
+
 
 async function loadJobs() {
   const [jobData, runData] = await Promise.all([fetchAdminJobs(), fetchAdminJobRuns()])

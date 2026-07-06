@@ -179,6 +179,92 @@ npm run dev -- --host 0.0.0.0 --port 5173
 
 ---
 
+## 🏗️ 分布式集群部署说明
+
+本项目采用典型的 Lambda 架构，在实际分布式生产环境中，建议按如下节点划分及顺序启动：
+
+### 1. 节点角色分配与拓扑
+
+| 主机名 | 核心组件分配 |
+| :--- | :--- |
+| **`master`** | Hadoop NameNode / YARN ResourceManager / Spark Master / FastAPI 后端 |
+| **`middleware`** | MySQL (业务与数仓) / Redis (缓存) / ZooKeeper / Kafka Broker |
+| **`slave1`, `slave2`** | HDFS DataNode / YARN NodeManager / Spark Worker |
+
+### 2. 基础集群与中间件启动顺序
+
+按照以下物理依赖顺序逐步启动集群服务：
+
+1. **分布式存储与资源计算调度（`master` 节点）**：
+   ```bash
+   start-dfs.sh
+   start-yarn.sh
+   /usr/local/spark/sbin/start-all.sh
+   ```
+2. **中间件与数据库服务（`middleware` 节点）**：
+   - 依次启动：`MySQL ➔ Redis ➔ ZooKeeper ➔ Kafka`。
+   - 检查 Kafka 探针端口（`9092`）及创建实时事件 Topic：
+     ```bash
+     /usr/local/kafka/bin/kafka-topics.sh --create --zookeeper middleware:2181 --replication-factor 1 --partitions 1 --topic agent-events
+     ```
+
+### 3. 后端服务与流计算作业提交
+
+1. **提交实时流计算作业（`master` 提交）**：
+   ```bash
+   /usr/local/spark/bin/spark-submit \
+     --class com.agentscope.streaming.AgentEventStreamingJob \
+     --master spark://master:7077 \
+     --deploy-mode client \
+     --driver-memory 512m --executor-memory 512m \
+     spark-streaming/target/agentscope-spark-streaming-0.1.0.jar \
+     --kafka-bootstrap middleware:9092 --topic agent-events --redis-host middleware --redis-port 6379
+   ```
+2. **守护进程运行 FastAPI 后端（`master` 节点）**：
+   ```bash
+   cd backend && source .venv/bin/activate
+   nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
+   ```
+
+### 4. 前端静态代理与 Nginx 反向代理配置
+
+生产环境下，前端 Vue 3 工程打包后通过 Nginx 进行反向代理与静态资源托管。
+
+1. **编译打包前端**：
+   ```bash
+   cd frontend && npm install && npm run build
+   # 打包生成的静态文件位于 dist/ 目录下
+   ```
+2. **配置 Nginx (`/etc/nginx/nginx.conf` 或 `deploy/nginx.conf`)**：
+   ```nginx
+   server {
+       listen 80;
+       server_name localhost;
+
+       # 托管前端打包静态文件
+       root /var/www/html/dist;
+       index index.html;
+
+       # 路由代理后端 FastAPI 接口
+       location /api/ {
+           proxy_pass http://127.0.0.1:8000/api/;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+
+       location /health {
+           proxy_pass http://127.0.0.1:8000/health;
+       }
+
+       location / {
+           try_files $uri $uri/ /index.html;
+       }
+   }
+   ```
+3. **加载配置**：`nginx -t && nginx -s reload`。
+
+---
+
 ## 📊 数据管道运维与测试
 
 ### 1. 产生模拟数据

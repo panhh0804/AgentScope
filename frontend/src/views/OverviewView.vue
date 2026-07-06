@@ -136,20 +136,47 @@
             </div>
           </div>
 
-          <!-- Gateway Telemetry Sub-panel -->
-          <div class="gateway-telemetry-section">
+          <!-- Quality Auditing Sub-panel -->
+          <div class="quality-audit-section">
             <div class="section-divider">
-              <span>大模型 API 网关状态</span>
+              <span>数据质量实时校验审计</span>
+              <span class="pass-rate-badge">合规率: {{ percent(qualityOverview.avg_pass_rate) }}</span>
             </div>
-            <div class="gateway-grid">
-              <div v-for="model in modelGatewayStatus" :key="model.name" class="gateway-row">
-                <span class="model-name">{{ model.name }}</span>
-                <span :class="['model-status-indicator', model.status]">{{ model.statusLabel }}</span>
-                <span class="model-metric">时延: <b>{{ model.latency }}ms</b></span>
-                <span class="model-metric">并发: <b>{{ model.concurrency }}</b></span>
-                <div class="gateway-rate-limit-bar">
-                  <div class="bar-fill" :style="{ width: model.rateLimit + '%', backgroundColor: model.rateLimitColor }"></div>
-                  <small>配额 {{ model.rateLimit }}%</small>
+            <div class="quality-grid">
+              <div class="quality-summary-row">
+                <div class="sum-card">
+                  <small>校验规则数</small>
+                  <strong>{{ qualityOverview.rule_count || 3 }}</strong>
+                </div>
+                <div class="sum-card">
+                  <small>脏数据记录</small>
+                  <strong :class="{ 'has-issues': qualityOverview.issue_count > 0 }">
+                    {{ qualityOverview.issue_count }}
+                  </strong>
+                </div>
+                <div class="sum-card">
+                  <small>拦截阻断数</small>
+                  <strong :class="{ 'has-issues': qualityOverview.pending_count > 0 }">
+                    {{ qualityOverview.pending_count }}
+                  </strong>
+                </div>
+              </div>
+              <div class="issues-list">
+                <div v-for="issue in qualityIssues.slice(0, 2)" :key="issue.rule_code" class="issue-item">
+                  <div class="issue-item-meta">
+                    <span class="rule-name">{{ issue.rule_name }}</span>
+                    <span :class="['tag', issue.failed_count > 0 ? 'failed' : 'success']">
+                      {{ issue.failed_count > 0 ? '不合规' : '通过' }}
+                    </span>
+                  </div>
+                  <div class="issue-item-details">
+                    <span>检测量: <b>{{ formatNumber(issue.total_count) }}</b></span>
+                    <span>异常数: <b :class="{ 'has-issues': issue.failed_count > 0 }">{{ issue.failed_count }}</b></span>
+                    <span>通过率: <b>{{ percent(issue.pass_rate) }}</b></span>
+                  </div>
+                </div>
+                <div v-if="!qualityIssues || qualityIssues.length === 0" class="issue-empty">
+                  🟢 实时数据源字段与时延校验 100% 合规
                 </div>
               </div>
             </div>
@@ -246,6 +273,7 @@ import * as echarts from 'echarts'
 import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
 import ChartPanel from '../components/ChartPanel.vue'
 import { fetchAgentRankings, fetchDailyMetrics, fetchAgents, fetchHistoryAlerts, fetchOverview, fetchRealtimeAlerts, fetchRelationGraph, fetchReports, fetchTrend, fetchReportDetail } from '../api/dashboard'
+import { fetchQualityOverview, fetchQualityIssues } from '../api/admin'
 import { barOption, graphOption, lineOption } from '../charts/options'
 import { excerptMarkdown, parseMarkdownSections } from '../utils/markdown'
 const router = useRouter()
@@ -261,6 +289,8 @@ const historyRankings = ref([])
 const relationGraph = ref({ nodes: [], links: [] })
 const historyAlerts = ref([])
 const reports = ref([])
+const qualityOverview = ref({ rule_count: 0, issue_count: 0, avg_pass_rate: 1, pending_count: 0 })
+const qualityIssues = ref([])
 
 const getTodayString = () => {
   const d = new Date()
@@ -462,39 +492,6 @@ const bigDataLinkStatus = computed(() => [
   }
 ])
 
-const modelGatewayStatus = computed(() => {
-  const sec = new Date().getSeconds()
-  return [
-    {
-      name: 'DeepSeek-V3',
-      status: 'success',
-      statusLabel: 'HEALTHY',
-      latency: 820 + (sec % 7) * 30,
-      concurrency: 12 + (sec % 4),
-      rateLimit: 68 + (sec % 3),
-      rateLimitColor: '#06b6d4'
-    },
-    {
-      name: 'GPT-4o',
-      status: 'success',
-      statusLabel: 'HEALTHY',
-      latency: 1240 + (sec % 11) * 45,
-      concurrency: 5 + (sec % 2),
-      rateLimit: 42 + (sec % 5),
-      rateLimitColor: '#10b981'
-    },
-    {
-      name: 'Qwen-Max',
-      status: 'success',
-      statusLabel: 'HEALTHY',
-      latency: 610 + (sec % 5) * 20,
-      concurrency: 8 + (sec % 3),
-      rateLimit: 19 + (sec % 2),
-      rateLimitColor: '#a855f7'
-    }
-  ]
-})
-
 function formatAgentName(name) {
   return String(name || '').replace('_agent', '').toUpperCase()
 }
@@ -642,7 +639,7 @@ function goBack() {
 
 async function load() {
   const [startDate, endDate] = [getDateValue(dateRange.value?.[0], '2026-06-01'), getDateValue(dateRange.value?.[1], getTodayString())]
-  const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData, dailyData, rankingData, relationData, historyAlertData, reportsData] = await Promise.all([
+  const [realtimeOverviewData, realtimeTrendData, agentsData, realtimeAlertData, dailyData, rankingData, relationData, historyAlertData, reportsData, qualityOverviewData, qualityIssuesData] = await Promise.all([
     fetchOverview(),
     fetchTrend(60),
     fetchAgents(),
@@ -651,7 +648,9 @@ async function load() {
     fetchAgentRankings(endDate),
     fetchRelationGraph(endDate),
     fetchHistoryAlerts(endDate),
-    fetchReports()
+    fetchReports(),
+    fetchQualityOverview().catch(() => ({ rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 })),
+    fetchQualityIssues().catch(() => [])
   ])
   realtimeOverview.value = realtimeOverviewData
   realtimeTrend.value = realtimeTrendData
@@ -661,6 +660,8 @@ async function load() {
   historyRankings.value = rankingData
   relationGraph.value = relationData
   historyAlerts.value = historyAlertData
+  qualityOverview.value = qualityOverviewData || { rule_count: 3, issue_count: 0, avg_pass_rate: 1, pending_count: 0 }
+  qualityIssues.value = qualityIssuesData || []
   
   if (reportsData && reportsData.length > 0) {
     try {

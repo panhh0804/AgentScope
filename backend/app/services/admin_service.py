@@ -26,6 +26,27 @@ class AdminService:
         self._job_runs = self._seed_job_runs()
         self._audit_logs = self._seed_audit_logs()
 
+    def _get_hdfs_storage_stats(self) -> Dict[str, Any]:
+        res = {
+            "used_bytes": 1331589120,
+            "limit_bytes": 10737418240,
+        }
+        try:
+            cmd = "/usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
+            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, _ = proc.communicate(timeout=4)
+            if stdout:
+                lines = stdout.decode("utf-8").strip().split("\n")
+                if len(lines) >= 2:
+                    parts = lines[1].split()
+                    if len(parts) >= 3:
+                        res["limit_bytes"] = int(parts[1])
+                        res["used_bytes"] = int(parts[2])
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to fetch real HDFS storage stats: {e}")
+        return res
+
     def data_overview(self) -> Dict[str, Any]:
         today_date = date.today()
         today_str = today_date.isoformat()
@@ -102,10 +123,7 @@ class AdminService:
                 {"name": "Clean", "count": clean_cnt, "processor": "Spark Analysis"},
                 {"name": "Metric", "count": int(clean_cnt * 0.012) if clean_cnt > 0 else 0, "processor": None},
             ],
-            "hdfs_storage": {
-                "used_bytes": 1331589120,
-                "limit_bytes": 10737418240,
-            },
+            "hdfs_storage": self._get_hdfs_storage_stats(),
             "compute_perf": [
                 {"job_name": "DataX 业务同步", "duration": 8},
                 {"job_name": "Spark 格式清洗", "duration": 22},

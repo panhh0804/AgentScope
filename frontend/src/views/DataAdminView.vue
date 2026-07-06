@@ -73,7 +73,7 @@
             <article class="screen-panel">
               <div class="screen-panel-head">
                 <h3>HDFS 存储资产配额</h3>
-                <span>Parquet 压缩节省 78.4%</span>
+                <span>Parquet 压缩节省 {{ percent(overview.parquet_saving_rate || 0.784) }}</span>
               </div>
               <div ref="storageChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
             </article>
@@ -158,8 +158,49 @@
             </article>
           </section>
 
+          <!-- 数据质量规则配置 (Data Quality Rules Configuration) -->
+          <section class="screen-panel" style="margin-top: 16px; margin-bottom: 16px;">
+            <div class="screen-panel-head">
+              <h3>数据质量检测规则配置</h3>
+              <a-button type="primary" size="small" @click="openRuleModal">新增校验规则</a-button>
+            </div>
+            <div class="screen-table-wrap">
+              <table class="data-table screen-native-table admin-table">
+                <thead>
+                  <tr>
+                    <th>规则代码 (rule_id)</th>
+                    <th>规则名称 (rule_name)</th>
+                    <th>SQL 校验表达式 (rule_sql)</th>
+                    <th>启用状态 (is_active)</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="rule in qualityRules" :key="rule.rule_id">
+                    <td><code>{{ rule.rule_id }}</code></td>
+                    <td>{{ rule.rule_name }}</td>
+                    <td><code class="sql-code" style="color: #67e8f9; background: rgba(103, 232, 249, 0.08); padding: 2px 6px; border-radius: 4px;">{{ rule.rule_sql }}</code></td>
+                    <td>
+                      <span :class="['tag', rule.is_active ? 'success' : 'failed']">
+                        {{ rule.is_active ? '已启用' : '已禁用' }}
+                      </span>
+                    </td>
+                    <td>
+                      <a-button size="mini" :type="rule.is_active ? 'outline' : 'primary'" @click="toggleRule(rule)">
+                        {{ rule.is_active ? '禁用' : '启用' }}
+                      </a-button>
+                    </td>
+                  </tr>
+                  <tr v-if="!qualityRules.length">
+                    <td colspan="5" class="empty-cell">暂无配置规则</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <!-- Three-Layer Data Warehouse Responsibility Section with Integrated Data Viewer -->
-          <section class="screen-panel warehouse-layers-panel" style="margin-top: 12px;">
+          <section class="screen-panel warehouse-layers-panel" style="margin-top: 16px;">
             <div class="screen-panel-head">
               <h3>数仓分层职责架构与数据查看</h3>
               <span>ODS ➔ DWD ➔ DWS (点击对应层级卡片可直接查看/筛选物理数据)</span>
@@ -352,46 +393,6 @@
             </div>
           </section>
 
-          <!-- 数据质量规则配置 (Data Quality Rules Configuration) -->
-          <section class="screen-panel" style="margin-top: 16px;">
-            <div class="screen-panel-head">
-              <h3>元数据驱动 —— 数据质量检测规则配置</h3>
-              <a-button type="primary" size="small" @click="openRuleModal">新增校验规则</a-button>
-            </div>
-            <div class="screen-table-wrap">
-              <table class="data-table screen-native-table admin-table">
-                <thead>
-                  <tr>
-                    <th>规则代码 (rule_id)</th>
-                    <th>规则名称 (rule_name)</th>
-                    <th>SQL 校验表达式 (rule_sql)</th>
-                    <th>启用状态 (is_active)</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="rule in qualityRules" :key="rule.rule_id">
-                    <td><code>{{ rule.rule_id }}</code></td>
-                    <td>{{ rule.rule_name }}</td>
-                    <td><code class="sql-code" style="color: #67e8f9; background: rgba(103, 232, 249, 0.08); padding: 2px 6px; border-radius: 4px;">{{ rule.rule_sql }}</code></td>
-                    <td>
-                      <span :class="['tag', rule.is_active ? 'success' : 'failed']">
-                        {{ rule.is_active ? '已启用' : '已禁用' }}
-                      </span>
-                    </td>
-                    <td>
-                      <a-button size="mini" :type="rule.is_active ? 'outline' : 'primary'" @click="toggleRule(rule)">
-                        {{ rule.is_active ? '禁用' : '启用' }}
-                      </a-button>
-                    </td>
-                  </tr>
-                  <tr v-if="!qualityRules.length">
-                    <td colspan="5" class="empty-cell">暂无配置规则</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
         </a-tab-pane>
 
         <a-tab-pane key="jobs" title="数据任务管理">

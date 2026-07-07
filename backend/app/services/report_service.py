@@ -12,8 +12,6 @@ from uuid import uuid4
 from app.services.metric_service import MetricService
 from app.repositories.mysql_repo import MySQLAnalyticsRepository
 
-from decimal import Decimal
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,10 +32,10 @@ class ReportService:
         self._prompt_path = Path(__file__).resolve().parents[1] / "report" / "prompt.md"
 
     def generate(self, report_date: date, report_type: str, model_name: Optional[str]) -> Dict:
-        daily = self.metrics.daily_metrics(report_date, report_date)
-        rankings = self.metrics.agent_rankings(report_date)
-        alerts = self.metrics.history_alerts(report_date)
-        relation = self.metrics.agent_relations(report_date)
+        daily = self._as_list(self.metrics.daily_metrics(report_date, report_date))
+        rankings = self._as_list(self.metrics.agent_rankings(report_date))
+        alerts = self._as_list(self.metrics.history_alerts(report_date))
+        relation = self._as_dict(self.metrics.agent_relations(report_date))
         report_id = f"report_{uuid4().hex[:12]}"
         model = model_name or self._env("OPENAI_MODEL_NAME", "SILICONFLOW_MODEL_NAME") or "rule-template"
         content = self._render_markdown(report_date, report_type, daily, rankings, alerts, relation)
@@ -184,6 +182,25 @@ class ReportService:
             return value
         return os.getenv(fallback)
 
+    @staticmethod
+    def _as_list(value) -> List[Dict]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            data = value.get("data")
+            if isinstance(data, list):
+                return data
+        return []
+
+    @staticmethod
+    def _as_dict(value) -> Dict:
+        if isinstance(value, dict):
+            data = value.get("data")
+            if isinstance(data, dict):
+                return data
+            return value
+        return {}
+
     def _build_prompt(
         self,
         report_date: date,
@@ -207,13 +224,20 @@ class ReportService:
         )
 
     def _render_markdown(self, report_date: date, report_type: str, daily: List[Dict], rankings: List[Dict], alerts: List[Dict], relation: Dict) -> str:
-        summary = daily[0] if daily else {}
-        worst_agent = max(rankings, key=lambda item: item.get("avg_latency_ms", 0)) if rankings else {}
-        best_agent = max(rankings, key=lambda item: item.get("success_rate", 0)) if rankings else {}
-        edge_count = len(relation.get("links", []))
+        daily = self._as_list(daily)
+        rankings = self._as_list(rankings)
+        alerts = self._as_list(alerts)
+        relation = self._as_dict(relation)
+
+        summary = daily[0] if isinstance(daily, list) and daily else {}
+        worst_agent = max(rankings, key=lambda item: item.get("avg_latency_ms", 0)) if isinstance(rankings, list) and rankings else {}
+        best_agent = max(rankings, key=lambda item: item.get("success_rate", 0)) if isinstance(rankings, list) and rankings else {}
+        edge_count = len(relation.get("links", [])) if isinstance(relation, dict) else 0
+        no_daily_notice = "" if summary else "\n> 暂无当日离线指标，以下报告基于当前可用的 Agent 排名、告警和关系数据生成。\n"
         return f"""# AgentScope {report_type} report - {report_date.isoformat()}
 
 ## 总体结论
+{no_daily_notice}
 
 当日任务量为 {summary.get("task_count", 0)}，成功率为 {summary.get("success_rate", 0)}，平均时延为 {summary.get("avg_latency_ms", 0)} ms，P95 时延为 {summary.get("p95_latency_ms", 0)} ms。
 

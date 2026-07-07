@@ -112,7 +112,7 @@ spark-streaming/target/agentscope-spark-streaming-0.1.0.jar
 ```bash
 /usr/local/spark/bin/spark-submit \
   --class com.agentscope.streaming.AgentEventStreamingJob \
-  --master spark://master:7077 \
+  --master yarn \
   --deploy-mode client \
   --driver-memory 512m \
   --executor-memory 512m \

@@ -9,7 +9,10 @@ fi
 BIZ_DATE="$1"
 SPARK_HOME="${SPARK_HOME:-/usr/local/spark}"
 APP_JAR="${APP_JAR:-spark-batch/target/agentscope-spark-batch-0.1.0.jar}"
-MASTER_URL="${SPARK_MASTER_URL:-spark://master:7077}"
+MASTER_URL="${SPARK_MASTER_URL:-yarn}"
+DEPLOY_MODE="${SPARK_DEPLOY_MODE:-client}"
+export HADOOP_CONF_DIR="${HADOOP_CONF_DIR:-/usr/local/hadoop-2.7.6/etc/hadoop}"
+export YARN_CONF_DIR="${YARN_CONF_DIR:-${HADOOP_CONF_DIR}}"
 HDFS_CLEAN_BASE="${HDFS_CLEAN_BASE:-/agentscope/clean/agent_events}"
 HDFS_METRIC_BASE="${HDFS_METRIC_BASE:-/agentscope/metric}"
 MYSQL_HOST="${MYSQL_HOST:-middleware}"
@@ -31,7 +34,7 @@ for job in DailyMetricJob AgentRankingJob ErrorAnalysisJob RelationGraphJob Hist
   "${SPARK_HOME}/bin/spark-submit" \
     --class "com.agentscope.batch.${job}" \
     --master "${MASTER_URL}" \
+    --deploy-mode "${DEPLOY_MODE}" \
     "${APP_JAR}" \
     "${COMMON_ARGS[@]}"
 done
-

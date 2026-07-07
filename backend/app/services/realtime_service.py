@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import time
+import urllib.error
+import urllib.request
 from typing import Any, Dict, List, Optional
 
 from app.services import mock_data
@@ -10,6 +14,8 @@ from app.services import mock_data
 class RealtimeService:
     def __init__(self) -> None:
         self._redis = None
+        self._middleware_cache: Optional[List[Dict[str, Any]]] = None
+        self._middleware_cache_at = 0.0
 
     def _client(self):
         if self._redis is not None:
@@ -42,214 +48,302 @@ class RealtimeService:
     def _data_mode(self) -> str:
         return os.getenv("DATA_MODE", "demo").lower()
 
+    def _middleware_host(self) -> str:
+        return os.getenv("MIDDLEWARE_HOST", "middleware")
+
+    def _hadoop_host(self) -> str:
+        return os.getenv("HADOOP_HOST", os.getenv("YARN_HOST", "master"))
+
+    def _tcp_probe(self, host: str, port: int, timeout: float = 0.35) -> Dict[str, Any]:
+        start = time.perf_counter()
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                latency_ms = round((time.perf_counter() - start) * 1000, 1)
+                return {"ok": True, "latency_ms": latency_ms, "reason": None}
+        except OSError as exc:
+            return {"ok": False, "latency_ms": None, "reason": str(exc)}
+
+    def _http_json(self, url: str, timeout: float = 0.5) -> Optional[Dict[str, Any]]:
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as response:
+                if response.status >= 400:
+                    return None
+                return json.loads(response.read().decode("utf-8"))
+        except (OSError, ValueError, urllib.error.URLError):
+            return None
+
+    def _service_row(
+        self,
+        name: str,
+        host: str,
+        port: int,
+        ok: bool,
+        metric: str,
+        hint: str,
+        status_label: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "name": name,
+            "status": "normal" if ok else "warning",
+            "statusLabel": status_label or ("RUNNING" if ok else "DOWN"),
+            "metric": metric,
+            "host": host,
+            "port": port,
+            "hint": hint,
+        }
+
+    def _mysql_stats(self) -> Dict[str, Any]:
+        host = os.getenv("MYSQL_HOST", self._middleware_host())
+        port = int(os.getenv("MYSQL_PORT", "3306"))
+        probe = self._tcp_probe(host, port)
+        if not probe["ok"]:
+            return self._service_row("MySQL 关系数据库", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
+        connections = None
+        uptime = None
+        questions = None
+        try:
+            import pymysql
+
+            conn = pymysql.connect(
+                host=host,
+                port=port,
+                user=os.getenv("MYSQL_USER", "agentscope"),
+                password=os.getenv("MYSQL_PASSWORD", "agentscope_pass"),
+                database=os.getenv("MYSQL_ANALYTICS_DB", "agentscope_analytics"),
+                connect_timeout=0.5,
+                read_timeout=0.5,
+                write_timeout=0.5,
+            )
+            with conn.cursor() as cur:
+                cur.execute("SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Uptime', 'Questions')")
+                rows = dict(cur.fetchall())
+            conn.close()
+            connections = int(rows.get("Threads_connected") or 0)
+            uptime = int(rows.get("Uptime") or 0)
+            questions = int(rows.get("Questions") or 0)
+        except Exception as exc:
+            return self._service_row(
+                "MySQL 关系数据库",
+                host,
+                port,
+                False,
+                "AUTH/QUERY FAIL",
+                f"port open, query failed: {exc}",
+                "CHECK",
+            )
+
+        qps = round(questions / uptime, 1) if uptime else 0
+        return self._service_row(
+            "MySQL 关系数据库",
+            host,
+            port,
+            True,
+            f"{connections} conns / {qps} QPS",
+            f"latency {probe['latency_ms']} ms",
+        )
+
+    def _redis_stats(self) -> Dict[str, Any]:
+        host = os.getenv("REDIS_HOST", self._middleware_host())
+        port = int(os.getenv("REDIS_PORT", "6379"))
+        probe = self._tcp_probe(host, port)
+        if not probe["ok"]:
+            return self._service_row("Redis 缓存/实时指标", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
+        try:
+            client = self._client()
+            if not client or isinstance(client, bool):
+                raise RuntimeError("redis client unavailable")
+            info = client.info()
+            memory = info.get("used_memory_human", "-")
+            ops = info.get("instantaneous_ops_per_sec", 0)
+            clients = info.get("connected_clients", 0)
+        except Exception as exc:
+            return self._service_row(
+                "Redis 缓存/实时指标",
+                host,
+                port,
+                False,
+                "PING FAIL",
+                f"port open, info failed: {exc}",
+                "CHECK",
+            )
+
+        return self._service_row(
+            "Redis 缓存/实时指标",
+            host,
+            port,
+            True,
+            f"{memory} / {ops} ops/s",
+            f"{clients} clients, {probe['latency_ms']} ms",
+        )
+
+    def _kafka_stats(self) -> Dict[str, Any]:
+        bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", f"{self._middleware_host()}:9092").split(",")[0].strip()
+        host, _, port_text = bootstrap.partition(":")
+        port = int(port_text or "9092")
+        probe = self._tcp_probe(host, port)
+        if not probe["ok"]:
+            return self._service_row("Kafka 消息队列", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
+        overview = self._get_json("agentscope:realtime:overview") or {}
+        events_per_minute = overview.get("events_per_minute", 0) if isinstance(overview, dict) else 0
+        try:
+            msg_rate = round(float(events_per_minute) / 60, 2)
+        except (TypeError, ValueError):
+            msg_rate = 0
+        metric = f"{msg_rate} msg/s observed" if msg_rate else "port open"
+        return self._service_row(
+            "Kafka 消息队列",
+            host,
+            port,
+            True,
+            metric,
+            f"broker tcp {probe['latency_ms']} ms",
+        )
+
+    def _yarn_stats(self) -> Dict[str, Any]:
+        host = os.getenv("YARN_HOST", self._hadoop_host())
+        port = int(os.getenv("YARN_PORT", "8088"))
+        probe = self._tcp_probe(host, port)
+        if not probe["ok"]:
+            return self._service_row("YARN 资源调度", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
+        metrics = self._http_json(f"http://{host}:{port}/ws/v1/cluster/metrics")
+        if not metrics:
+            return self._service_row(
+                "YARN 资源调度",
+                host,
+                port,
+                True,
+                "web open",
+                f"REST unavailable, tcp {probe['latency_ms']} ms",
+                "CHECK",
+            )
+        cluster = metrics.get("clusterMetrics", {})
+        running_apps = cluster.get("appsRunning", 0)
+        allocated = cluster.get("allocatedMB", 0)
+        available = cluster.get("availableMB", 0)
+        return self._service_row(
+            "YARN 资源调度",
+            host,
+            port,
+            True,
+            f"{running_apps} apps / {allocated}MB used",
+            f"{available}MB available",
+        )
+
+    def _hdfs_stats(self) -> Dict[str, Any]:
+        host = os.getenv("HDFS_NAMENODE_HOST", self._hadoop_host())
+        port = int(os.getenv("HDFS_NAMENODE_WEB_PORT", "50070"))
+        probe = self._tcp_probe(host, port)
+        if not probe["ok"]:
+            return self._service_row("HDFS NameNode", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
+        jmx = self._http_json(
+            f"http://{host}:{port}/jmx?qry=Hadoop:service=NameNode,name=FSNamesystemState"
+        )
+        if jmx and jmx.get("beans"):
+            bean = jmx["beans"][0]
+            live_nodes = bean.get("NumLiveDataNodes", 0)
+            dead_nodes = bean.get("NumDeadDataNodes", 0)
+            files = bean.get("FilesTotal", 0)
+            ok = int(dead_nodes or 0) == 0 and int(live_nodes or 0) > 0
+            return self._service_row(
+                "HDFS NameNode",
+                host,
+                port,
+                ok,
+                f"{live_nodes} live / {dead_nodes} dead",
+                f"{files} files",
+                "RUNNING" if ok else "DEGRADED",
+            )
+
+        return self._service_row(
+            "HDFS NameNode",
+            host,
+            port,
+            True,
+            "web open",
+            f"JMX unavailable, tcp {probe['latency_ms']} ms",
+            "CHECK",
+        )
+
+    def _spark_stats(self) -> Dict[str, Any]:
+        host = os.getenv("SPARK_MASTER_HOST", self._hadoop_host())
+        port = int(os.getenv("SPARK_MASTER_WEB_PORT", "8080"))
+        probe = self._tcp_probe(host, port)
+        if probe["ok"]:
+            return self._service_row(
+                "Spark 计算服务",
+                host,
+                port,
+                True,
+                "master web open",
+                f"tcp {probe['latency_ms']} ms",
+            )
+
+        yarn_host = os.getenv("YARN_HOST", self._hadoop_host())
+        yarn_port = int(os.getenv("YARN_PORT", "8088"))
+        apps = self._http_json(f"http://{yarn_host}:{yarn_port}/ws/v1/cluster/apps?states=RUNNING")
+        if apps is not None:
+            running = apps.get("apps", {}).get("app") or []
+            spark_apps = [app for app in running if "spark" in str(app.get("applicationType", "")).lower()]
+            return self._service_row(
+                "Spark 计算服务",
+                yarn_host,
+                yarn_port,
+                True,
+                f"{len(spark_apps)} running apps",
+                "checked by YARN REST",
+            )
+
+        return self._service_row("Spark 计算服务", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+
     def get_middleware_stats(self) -> List[Dict[str, Any]]:
-        import socket
-        import time
-        import random
-        from datetime import datetime
+        now = time.monotonic()
+        if self._middleware_cache and now - self._middleware_cache_at < 5:
+            return self._middleware_cache
 
-        data_mode = self._data_mode()
-        sec = datetime.now().second
-
-        # Get hosts & ports from config or fallback
-        mysql_host = os.getenv("MYSQL_HOST", "middleware")
-        mysql_port = int(os.getenv("MYSQL_PORT", "3306"))
-        
-        redis_host = os.getenv("REDIS_HOST", "middleware")
-        redis_port = int(os.getenv("REDIS_PORT", "6379"))
-        
-        kafka_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "middleware:9092")
-        kafka_host = "middleware"
-        kafka_port = 9092
-        if "," in kafka_servers:
-            kafka_servers = kafka_servers.split(",")[0]
-        if ":" in kafka_servers:
-            parts = kafka_servers.split(":")
-            kafka_host = parts[0]
-            try:
-                kafka_port = int(parts[1])
-            except ValueError:
-                pass
-        else:
-            kafka_host = kafka_servers
-
-        hadoop_host = os.getenv("SSH_HOST", "master")
-
-        def tcp_ping(host: str, port: int, timeout: float = 0.15) -> float:
-            start = time.time()
-            try:
-                s = socket.create_connection((host, port), timeout=timeout)
-                s.close()
-                return (time.time() - start) * 1000
-            except Exception:
-                return -1
-
-        # Probe ports
-        mysql_latency = tcp_ping(mysql_host, mysql_port)
-        redis_latency = tcp_ping(redis_host, redis_port)
-        kafka_latency = tcp_ping(kafka_host, kafka_port)
-        hadoop_latency = tcp_ping(hadoop_host, 8088)
-        if hadoop_latency < 0:
-            hadoop_latency = tcp_ping(hadoop_host, 9000)
-
-        # MySQL Metrics
-        mysql_ok = mysql_latency >= 0
-        mysql_metric = ""
-        mysql_connections = 0
-        mysql_qps = 0
-        if mysql_ok:
-            try:
-                import pymysql
-                conn = pymysql.connect(
-                    host=mysql_host,
-                    port=mysql_port,
-                    user=os.getenv("MYSQL_USER", "agentscope"),
-                    password=os.getenv("MYSQL_PASSWORD", "agentscope_pass"),
-                    database=os.getenv("MYSQL_ANALYTICS_DB", "agentscope_analytics"),
-                    connect_timeout=0.15
-                )
-                with conn.cursor() as cur:
-                    cur.execute("show status like 'Threads_connected'")
-                    row = cur.fetchone()
-                    if row:
-                        mysql_connections = int(row[1])
-                    cur.execute("show status like 'Questions'")
-                    row = cur.fetchone()
-                    if row:
-                        mysql_qps = int(row[1]) % 20 + 2
-                conn.close()
-            except Exception:
-                pass
-            if mysql_connections == 0:
-                mysql_connections = 5 + sec % 3
-            if mysql_qps == 0:
-                mysql_qps = 12 + sec % 5
-            mysql_metric = f"{mysql_connections} conns / {mysql_qps} QPS"
-        else:
-            if data_mode == "strict":
-                mysql_metric = "DOWN"
-            else:
-                mysql_ok = True
-                mysql_latency = 1.2 + random.uniform(-0.2, 0.2)
-                mysql_connections = 8 + (sec % 3)
-                mysql_qps = 15 + (sec % 4)
-                mysql_metric = f"{mysql_connections} conns / {mysql_qps} QPS"
-
-        # Redis Metrics
-        redis_ok = redis_latency >= 0
-        redis_metric = ""
-        redis_mem = "0 B"
-        redis_ops = 0
-        if redis_ok:
-            try:
-                client = self._client()
-                if client and not isinstance(client, bool):
-                    info = client.info()
-                    redis_mem = info.get("used_memory_human", "2.1M")
-                    redis_ops = info.get("instantaneous_ops_per_sec", 15)
-            except Exception:
-                pass
-            if redis_mem == "0 B":
-                redis_mem = "2.35M"
-            if redis_ops == 0:
-                redis_ops = 12 + (sec % 8)
-            redis_metric = f"{redis_mem} / {redis_ops} ops"
-        else:
-            if data_mode == "strict":
-                redis_metric = "DOWN"
-            else:
-                redis_ok = True
-                redis_latency = 0.35 + random.uniform(-0.05, 0.05)
-                redis_mem = f"{2.3 + (sec % 5) * 0.02:.2f}M"
-                redis_ops = 145 + (sec % 15)
-                redis_metric = f"{redis_mem} / {redis_ops} ops"
-
-        # Kafka Metrics
-        kafka_ok = kafka_latency >= 0
-        kafka_metric = ""
-        if kafka_ok:
-            overview_obj = self._get_json("agentscope:realtime:overview")
-            events = (overview_obj or {}).get("events_per_minute", 0) if isinstance(overview_obj, dict) else 0
-            if not events:
-                events = 120 + sec % 20
-            qps = round(events / 60.0, 1)
-            kafka_metric = f"{qps} msg/s"
-        else:
-            if data_mode == "strict":
-                kafka_metric = "DOWN"
-            else:
-                kafka_ok = True
-                kafka_latency = 2.4 + random.uniform(-0.3, 0.3)
-                qps = round((120 + sec % 20) / 60.0, 1)
-                kafka_metric = f"{qps} msg/s"
-
-        # Hadoop Metrics
-        hadoop_ok = hadoop_latency >= 0
-        hadoop_metric = ""
-        if hadoop_ok:
-            hadoop_metric = f"3 containers / 12% storage"
-        else:
-            if data_mode == "strict":
-                hadoop_metric = "DOWN"
-            else:
-                hadoop_ok = True
-                hadoop_latency = 3.6 + random.uniform(-0.5, 0.5)
-                hadoop_metric = f"3 containers / 12.4% storage"
-
-        return [
-            {
-                "name": "MySQL 关系数据库",
-                "status": "normal" if mysql_ok else "warning",
-                "statusLabel": "RUNNING" if mysql_ok else "DOWN",
-                "metric": mysql_metric,
-                "host": mysql_host,
-                "port": mysql_port,
-                "hint": f"latency: {mysql_latency:.1f}ms" if mysql_latency >= 0 else "connect timeout"
-            },
-            {
-                "name": "Redis 缓存/去重",
-                "status": "normal" if redis_ok else "warning",
-                "statusLabel": "RUNNING" if redis_ok else "DOWN",
-                "metric": redis_metric,
-                "host": redis_host,
-                "port": redis_port,
-                "hint": f"latency: {redis_latency:.1f}ms" if redis_latency >= 0 else "connect timeout"
-            },
-            {
-                "name": "Kafka 消息队列",
-                "status": "normal" if kafka_ok else "warning",
-                "statusLabel": "RUNNING" if kafka_ok else "DOWN",
-                "metric": kafka_metric,
-                "host": kafka_host,
-                "port": kafka_port,
-                "hint": f"latency: {kafka_latency:.1f}ms" if kafka_latency >= 0 else "connect timeout"
-            },
-            {
-                "name": "Hadoop YARN/HDFS",
-                "status": "normal" if hadoop_ok else "warning",
-                "statusLabel": "RUNNING" if hadoop_ok else "DOWN",
-                "metric": hadoop_metric,
-                "host": hadoop_host,
-                "port": 8088,
-                "hint": f"latency: {hadoop_latency:.1f}ms" if hadoop_latency >= 0 else "connect timeout"
-            }
+        checks = [
+            self._mysql_stats,
+            self._redis_stats,
+            self._kafka_stats,
+            self._yarn_stats,
+            self._hdfs_stats,
+            self._spark_stats,
         ]
+        rows: List[Dict[str, Any]] = []
+        for check in checks:
+            try:
+                rows.append(check())
+            except Exception as exc:
+                rows.append(
+                    self._service_row(
+                        check.__name__.replace("_", " ").strip(),
+                        "-",
+                        0,
+                        False,
+                        "CHECK FAIL",
+                        str(exc),
+                        "ERROR",
+                    )
+                )
+        self._middleware_cache = rows
+        self._middleware_cache_at = now
+        return rows
 
     def overview(self) -> Dict:
         redis_data = self._get_json("agentscope:realtime:overview")
         middleware_stats = self.get_middleware_stats()
-        
         if redis_data and isinstance(redis_data, dict):
             redis_data["middleware"] = middleware_stats
             return {"data": redis_data, "data_source": "redis", "fallback": False, "reason": None}
-            
         if self._data_mode() == "strict":
             return {"data": {"middleware": middleware_stats}, "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
-            
-        mock_overview = mock_data.realtime_overview()
-        mock_overview["middleware"] = middleware_stats
-        return {"data": mock_overview, "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
-
+        overview = mock_data.realtime_overview()
+        overview["middleware"] = middleware_stats
+        return {"data": overview, "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
 
     def trend(self, minutes: int) -> Dict:
         client = self._client()
@@ -299,4 +393,3 @@ class RealtimeService:
         if self._data_mode() == "strict":
             return {"data": [], "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
         return {"data": mock_data.recent_alerts(), "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
-

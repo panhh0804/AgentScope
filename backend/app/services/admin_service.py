@@ -459,9 +459,12 @@ class AdminService:
                 # Formulate the spark-submit command on master
                 spark_cmd = (
                     f"source /etc/profile && cd /root/projects/agentscope && "
+                    f"export HADOOP_CONF_DIR=${{HADOOP_CONF_DIR:-/usr/local/hadoop-2.7.6/etc/hadoop}} && "
+                    f"export YARN_CONF_DIR=${{YARN_CONF_DIR:-$HADOOP_CONF_DIR}} && "
                     f"/usr/local/spark/bin/spark-submit "
                     f"--class com.agentscope.batch.{job_class} "
-                    f"--master spark://master:7077 "
+                    f"--master ${{SPARK_MASTER_URL:-yarn}} "
+                    f"--deploy-mode ${{SPARK_DEPLOY_MODE:-client}} "
                     f"/root/projects/agentscope/spark-batch/target/agentscope-spark-batch-0.1.0.jar "
                     f"--input /agentscope/clean/agent_events/dt={biz_date.isoformat()} "
                     f"--metric-base /agentscope/metric "
@@ -695,4 +698,3 @@ class AdminService:
 
     def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
         return self.repo.update_quality_rule(rule_id, is_active)
-

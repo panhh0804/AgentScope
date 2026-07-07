@@ -215,17 +215,17 @@
           </div>
         </article>
 
-        <!-- 8. Middleware Ops Monitor -->
+        <!-- 8. Middleware operations monitor -->
         <article class="screen-panel overview-grid__bigdata">
           <div class="screen-panel-head">
             <h3>核心中间件运维监控</h3>
-            <span>middleware monitor</span>
+            <span>middleware ops</span>
           </div>
           <div class="bigdata-link-monitor">
             <div v-for="item in middlewareStatus" :key="item.name" class="bigdata-link-row">
               <div>
                 <strong>{{ item.name }}</strong>
-                <small>{{ item.host }}:{{ item.port }} <span style="opacity: 0.7;">({{ item.hint }})</span></small>
+                <small>{{ item.host }}:{{ item.port }} / {{ item.hint }}</small>
               </div>
               <span :class="['link-status-badge', item.status]">{{ item.statusLabel }}</span>
               <b>{{ item.metric }}</b>
@@ -470,46 +470,47 @@ const sortedRelations = computed(() => {
 })
 
 const middlewareStatus = computed(() => {
-  return realtimeOverview.value?.middleware || [
+  const rows = realtimeOverview.value?.middleware
+  if (Array.isArray(rows) && rows.length > 0) return rows
+  return [
     {
       name: 'MySQL 关系数据库',
       status: 'warning',
       statusLabel: 'WAIT',
-      metric: '- conns / - QPS',
+      metric: '-',
       host: 'middleware',
       port: 3306,
-      hint: 'no connection data'
+      hint: 'waiting for backend probe'
     },
     {
-      name: 'Redis 缓存/去重',
+      name: 'Redis 缓存/实时指标',
       status: 'warning',
       statusLabel: 'WAIT',
-      metric: '- MB / - ops',
+      metric: '-',
       host: 'middleware',
       port: 6379,
-      hint: 'no connection data'
+      hint: 'waiting for backend probe'
     },
     {
       name: 'Kafka 消息队列',
       status: 'warning',
       statusLabel: 'WAIT',
-      metric: '- msg/s',
+      metric: '-',
       host: 'middleware',
       port: 9092,
-      hint: 'no connection data'
+      hint: 'waiting for backend probe'
     },
     {
-      name: 'Hadoop YARN/HDFS',
+      name: 'YARN / HDFS / Spark',
       status: 'warning',
       statusLabel: 'WAIT',
-      metric: '- containers / -% storage',
+      metric: '-',
       host: 'master',
       port: 8088,
-      hint: 'no connection data'
+      hint: 'waiting for backend probe'
     }
   ]
 })
-
 
 function formatAgentName(name) {
   return String(name || '').replace('_agent', '').toUpperCase()
@@ -704,13 +705,16 @@ async function load() {
       reports.value = []
     }
 
+    loading.value = false
     await nextTick()
     renderCharts()
   } catch (err) {
     console.error('Failed to load overview data', err)
     error.value = err.message || '网络连接或后端服务异常'
   } finally {
-    loading.value = false
+    if (loading.value) {
+      loading.value = false
+    }
   }
 }
 

@@ -815,6 +815,27 @@ const defaultComputePerf = [
   { job_name: 'Spark 错误分布聚合', duration: 45 }
 ]
 
+const defaultLineage = {
+  nodes: [
+    { id: 'mysql_source', name: 'MySQL Source' },
+    { id: 'hdfs_raw', name: 'HDFS Raw' },
+    { id: 'hdfs_clean', name: 'HDFS Clean' },
+    { id: 'daily_metric', name: 'Daily Metric' },
+    { id: 'mysql_analytics', name: 'MySQL Analytics' }
+  ],
+  edges: [
+    { from: 'mysql_source', to: 'hdfs_raw', label: 'DataX' },
+    { from: 'hdfs_raw', to: 'hdfs_clean', label: 'Spark Clean' },
+    { from: 'hdfs_clean', to: 'daily_metric', label: 'Spark Analysis' },
+    { from: 'daily_metric', to: 'mysql_analytics', label: 'Write Back' }
+  ]
+}
+
+const defaultHdfsStorage = {
+  used_bytes: 1331589120,
+  limit_bytes: 10737418240
+}
+
 const overviewMetrics = computed(() => [
   { label: 'MySQL Source 总量', value: formatNumber(overview.value.source_total_count), hint: `今日新增 ${formatNumber(overview.value.today_new_count)}` },
   { label: 'HDFS Raw 分区', value: overview.value.raw_partition_count ?? '-', hint: latestHint(overview.value.raw_latest_biz_date) },
@@ -1093,212 +1114,253 @@ async function retryRun(runId) {
 }
 
 function renderFunnel() {
-  if (!funnelChartRef.value) return
-  funnelChart ||= echarts.init(funnelChartRef.value)
-  
-  const rawFunnel = overview.value.funnel || []
-  // Use a beautifully-proportioned visual scale to prevent the 120 count from collapsing the funnel shape
-  const visualScales = [100, 80, 60, 40]
-  const funnelData = rawFunnel.map((item, idx) => ({
-    name: item.name,
-    value: visualScales[idx] || 30,
-    realValue: item.count
-  }))
-  
-  funnelChart.setOption({
-    backgroundColor: 'transparent',
-    tooltip: {
-      trigger: 'item',
-      formatter: (params) => {
-        const valStr = Number(params.data.realValue || 0).toLocaleString()
-        return `${params.marker}${params.name} : <b>${valStr}</b> 条`
-      }
-    },
-    grid: { top: 10, bottom: 10 },
-    series: [
-      {
-        name: '数据生命周期漏斗',
-        type: 'funnel',
-        left: '20%',
-        width: '60%',
-        top: 20,
-        bottom: 10,
-        min: 0,
-        max: 100,
-        minSize: '30%',
-        maxSize: '100%',
-        sort: 'descending',
-        gap: 6,
-        label: {
-          show: true,
-          position: 'inside',
-          formatter: (params) => {
-            const valStr = Number(params.data.realValue || 0).toLocaleString()
-            return `${params.name}: ${valStr} 条`
+  try {
+    if (!funnelChartRef.value) return
+    funnelChart ||= echarts.init(funnelChartRef.value)
+
+    const rawFunnel = Array.isArray(overview.value.funnel) && overview.value.funnel.length
+      ? overview.value.funnel
+      : [
+          { name: 'Source', count: overview.value.source_total_count || 0 },
+          { name: 'Raw', count: overview.value.raw_count || overview.value.source_total_count || 0 },
+          { name: 'Clean', count: overview.value.clean_count || 0 },
+          { name: 'Metric', count: overview.value.metric_count || overview.value.metric_partition_count || 0 }
+        ]
+    const visualScales = [100, 80, 60, 40]
+    const funnelData = rawFunnel.map((item, idx) => ({
+      name: item.name,
+      value: visualScales[idx] || 30,
+      realValue: item.count
+    }))
+
+    funnelChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        formatter: (params) => {
+          const valStr = Number(params.data.realValue || 0).toLocaleString()
+          return `${params.marker}${params.name} : <b>${valStr}</b> 条`
+        }
+      },
+      grid: { top: 10, bottom: 10 },
+      series: [
+        {
+          name: '数据生命周期漏斗',
+          type: 'funnel',
+          left: '20%',
+          width: '60%',
+          top: 20,
+          bottom: 10,
+          min: 0,
+          max: 100,
+          minSize: '30%',
+          maxSize: '100%',
+          sort: 'descending',
+          gap: 6,
+          label: {
+            show: true,
+            position: 'inside',
+            formatter: (params) => {
+              const valStr = Number(params.data.realValue || 0).toLocaleString()
+              return `${params.name}: ${valStr} 条`
+            },
+            color: '#ffffff',
+            fontWeight: 'bold',
+            fontSize: 12
           },
-          color: '#ffffff',
-          fontWeight: 'bold',
-          fontSize: 12
-        },
-        labelLine: {
-          show: false
-        },
-        itemStyle: {
-          borderColor: 'rgba(103, 232, 249, 0.3)',
-          borderWidth: 1.5,
-          shadowBlur: 12,
-          shadowColor: 'rgba(34, 211, 238, 0.25)',
-          borderRadius: 4
-        },
-        color: ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'],
-        data: funnelData
-      }
-    ]
-  }, true)
+          labelLine: { show: false },
+          itemStyle: {
+            borderColor: 'rgba(103, 232, 249, 0.3)',
+            borderWidth: 1.5,
+            shadowBlur: 12,
+            shadowColor: 'rgba(34, 211, 238, 0.25)',
+            borderRadius: 4
+          },
+          color: ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'],
+          data: funnelData
+        }
+      ]
+    }, true)
+    funnelChart.resize()
+  } catch (err) {
+    console.error('Failed to render funnel chart', err)
+  }
 }
 
 function renderLineage() {
-  if (!lineageChartRef.value) return
-  lineageChart ||= echarts.init(lineageChartRef.value)
-  
-  const nodes = (lineage.value.nodes || []).map(n => ({
-    id: n.id,
-    name: n.name,
-    value: n.name,
-    symbolSize: 22,
-    itemStyle: { 
-      color: n.id.includes('mysql') ? '#3b82f6' : '#22d3ee',
-      shadowBlur: 10,
-      shadowColor: 'rgba(34, 211, 238, 0.4)'
-    }
-  }))
-  
-  const links = (lineage.value.edges || []).map(e => ({
-    source: e.from,
-    target: e.to,
-    value: e.label,
-    label: { 
-      show: true, 
-      formatter: e.label, 
-      fontSize: 10, 
-      color: '#9bc7d9',
-      backgroundColor: 'rgba(8, 22, 34, 0.75)',
-      padding: [2, 4],
-      borderRadius: 2
-    },
-    lineStyle: { 
-      color: 'rgba(103, 232, 249, 0.35)', 
-      curveness: 0.15,
-      width: 1.5
-    }
-  }))
-  
-  lineageChart.setOption({
-    backgroundColor: 'transparent',
-    tooltip: { 
-      trigger: 'item',
-      formatter: (params) => {
-        if (params.dataType === 'node') {
-          return `数据层: <b>${params.name}</b>`
-        } else {
+  try {
+    if (!lineageChartRef.value) return
+    lineageChart ||= echarts.init(lineageChartRef.value)
+
+    const sourceLineage = Array.isArray(lineage.value.nodes) && lineage.value.nodes.length
+      ? lineage.value
+      : defaultLineage
+    const nodes = (sourceLineage.nodes || []).map(n => ({
+      id: n.id,
+      name: n.name,
+      value: n.name,
+      symbolSize: 22,
+      itemStyle: {
+        color: String(n.id || '').includes('mysql') ? '#3b82f6' : '#22d3ee',
+        shadowBlur: 10,
+        shadowColor: 'rgba(34, 211, 238, 0.4)'
+      }
+    }))
+
+    const links = (sourceLineage.edges || []).map(e => ({
+      source: e.from,
+      target: e.to,
+      value: e.label,
+      label: { show: false },
+      lineStyle: {
+        color: 'rgba(103, 232, 249, 0.55)',
+        curveness: 0.16,
+        width: 1.8
+      }
+    }))
+
+    lineageChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        formatter: (params) => {
+          if (params.dataType === 'node') {
+            return `数据层: <b>${params.name}</b>`
+          }
           return `血缘流动: <b>${params.data.source} ➔ ${params.data.target}</b>${params.data.value ? ` (${params.data.value})` : ''}`
         }
-      }
-    },
-    series: [
-      {
-        type: 'graph',
-        layout: 'force',
-        top: 24,
-        right: 28,
-        bottom: 30,
-        left: 28,
-        force: {
-          repulsion: 280,
-          edgeLength: [150, 210],
-          gravity: 0.04
-        },
-        roam: true,
-        draggable: true,
-        symbol: 'circle',
-        edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: [4, 8],
-        label: {
-          show: true,
-          position: 'bottom',
-          color: '#bdefff',
-          fontSize: 10,
-          fontWeight: 'bold'
-        },
-        data: nodes,
-        links: links
-      }
-    ]
-  }, true)
+      },
+      series: [
+        {
+          type: 'graph',
+          layout: 'force',
+          top: 24,
+          right: 28,
+          bottom: 30,
+          left: 28,
+          force: {
+            repulsion: 360,
+            edgeLength: [170, 240],
+            gravity: 0.035
+          },
+          roam: true,
+          draggable: true,
+          symbol: 'circle',
+          edgeSymbol: ['none', 'arrow'],
+          edgeSymbolSize: [4, 9],
+          label: {
+            show: true,
+            position: 'bottom',
+            color: '#bdefff',
+            fontSize: 10,
+            fontWeight: 'bold'
+          },
+          data: nodes,
+          links: links
+        }
+      ]
+    }, true)
+    lineageChart.resize()
+  } catch (err) {
+    console.error('Failed to render lineage chart', err)
+  }
 }
 
 function renderTrend() {
-  if (!trendChartRef.value) return
-  trendChart ||= echarts.init(trendChartRef.value)
-  const option = lineOption('Raw / Clean 数据量趋势', trend.value.map((item) => formatTrendDate(item.biz_date)), [
-    { name: 'Raw', type: 'line', smooth: true, data: trend.value.map((item) => item.raw_count), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
-    { name: 'Clean', type: 'line', smooth: true, data: trend.value.map((item) => item.clean_count), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
-  ])
-  option.grid = { ...option.grid, right: 34, bottom: 30, containLabel: true }
-  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
-  trendChart.setOption(option, true)
+  try {
+    if (!trendChartRef.value) return
+    trendChart ||= echarts.init(trendChartRef.value)
+    const sourceTrend = Array.isArray(trend.value) && trend.value.length ? trend.value : getDefaultTrend()
+    const option = lineOption('Raw / Clean 数据量趋势', sourceTrend.map((item) => formatTrendDate(item.biz_date)), [
+      { name: 'Raw', type: 'line', smooth: true, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
+      { name: 'Clean', type: 'line', smooth: true, data: sourceTrend.map((item) => Number(item.clean_count || 0)), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
+    ])
+    option.grid = { ...option.grid, right: 42, bottom: 30, containLabel: true }
+    option.xAxis = { ...option.xAxis, boundaryGap: true }
+    trendChart.setOption(option, true)
+    trendChart.resize()
+  } catch (err) {
+    console.error('Failed to render trend chart', err)
+  }
 }
 
 function renderStorageChart() {
-  if (!storageChartRef.value) return
-  storageChart ||= echarts.init(storageChartRef.value)
-  const hdfs = overview.value.hdfs_storage || { used_bytes: 1331589120, limit_bytes: 10737418240 }
-  const percentVal = ((hdfs.used_bytes / hdfs.limit_bytes) * 100).toFixed(1)
-  storageChart.setOption({
-    series: [{
-      type: 'gauge',
-      startAngle: 90,
-      endAngle: -270,
-      pointer: { show: false },
-      progress: { show: true, roundCap: true, itemStyle: { color: '#22d3ee' } },
-      axisLine: { lineStyle: { width: 10, color: [['1', 'rgba(34, 211, 238, 0.1)']] } },
-      splitLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { show: false },
-      data: [{ value: percentVal, name: '已用空间' }],
-      detail: { fontSize: 18, color: '#f8fafc', formatter: '{value}%', offsetCenter: [0, 0] }
-    }]
-  })
+  try {
+    if (!storageChartRef.value) return
+    storageChart ||= echarts.init(storageChartRef.value)
+    const hdfs = overview.value.hdfs_storage || defaultHdfsStorage
+    const usedBytes = Number(hdfs.used_bytes || 0)
+    const limitBytes = Number(hdfs.limit_bytes || defaultHdfsStorage.limit_bytes || 1)
+    const percentVal = limitBytes > 0 ? ((usedBytes / limitBytes) * 100).toFixed(1) : 0
+    storageChart.setOption({
+      series: [{
+        type: 'gauge',
+        startAngle: 90,
+        endAngle: -270,
+        pointer: { show: false },
+        progress: { show: true, roundCap: true, itemStyle: { color: '#22d3ee' } },
+        axisLine: { lineStyle: { width: 10, color: [['1', 'rgba(34, 211, 238, 0.1)']] } },
+        splitLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { show: false },
+        data: [{ value: percentVal, name: '已用空间' }],
+        detail: { fontSize: 18, color: '#f8fafc', formatter: '{value}%', offsetCenter: [0, 0] }
+      }]
+    }, true)
+    storageChart.resize()
+  } catch (err) {
+    console.error('Failed to render storage chart', err)
+  }
 }
 
 function renderPerfChart() {
-  if (!perfChartRef.value) return
-  perfChart ||= echarts.init(perfChartRef.value)
-  const rawPerfData = Array.isArray(overview.value.compute_perf) && overview.value.compute_perf.length
-    ? overview.value.compute_perf
-    : defaultComputePerf
-  const perfData = rawPerfData.map((item) => ({
-    job_name: item.job_name || item.name || item.job_code || '-',
-    duration: Number(item.duration ?? item.duration_seconds ?? item.value ?? 0)
-  }))
-  perfChart.setOption({
-    grid: { left: '3%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
-    xAxis: { type: 'value', splitLine: { show: false }, axisLabel: { color: '#64748b' } },
-    yAxis: { type: 'category', data: perfData.map(item => item.job_name), axisLabel: { color: '#cbd5e1', fontSize: 11 } },
-    series: [{
-      name: '运行时长',
-      type: 'bar',
-      data: perfData.map(item => item.duration),
-      itemStyle: {
-        borderRadius: 4,
-        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-          { offset: 0, color: '#0891b2' },
-          { offset: 1, color: '#22d3ee' }
-        ])
-      },
-      label: { show: true, position: 'right', color: '#67e8f9' }
-    }]
-  })
+  try {
+    if (!perfChartRef.value) return
+    perfChart ||= echarts.init(perfChartRef.value)
+    const rawPerfData = Array.isArray(overview.value.compute_perf) && overview.value.compute_perf.length
+      ? overview.value.compute_perf
+      : defaultComputePerf
+    const perfData = rawPerfData.map((item) => ({
+      job_name: item.job_name || item.name || item.job_code || '-',
+      duration: Number(item.duration ?? item.duration_seconds ?? item.value ?? 0)
+    }))
+    perfChart.setOption({
+      grid: { left: '3%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
+      xAxis: { type: 'value', splitLine: { show: false }, axisLabel: { color: '#64748b' } },
+      yAxis: { type: 'category', data: perfData.map(item => item.job_name), axisLabel: { color: '#cbd5e1', fontSize: 11 } },
+      series: [{
+        name: '运行时长',
+        type: 'bar',
+        data: perfData.map(item => item.duration),
+        itemStyle: {
+          borderRadius: 4,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#0891b2' },
+            { offset: 1, color: '#22d3ee' }
+          ])
+        },
+        label: { show: true, position: 'right', color: '#67e8f9' }
+      }]
+    }, true)
+    perfChart.resize()
+  } catch (err) {
+    console.error('Failed to render performance chart', err)
+  }
+}
+
+function getDefaultTrend() {
+  const days = []
+  const now = new Date()
+  for (let index = 6; index >= 0; index -= 1) {
+    const day = new Date(now)
+    day.setDate(now.getDate() - index)
+    days.push({
+      biz_date: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`,
+      raw_count: 0,
+      clean_count: 0
+    })
+  }
+  return days
 }
 
 function resizeCharts() {
@@ -1307,6 +1369,26 @@ function resizeCharts() {
   lineageChart?.resize()
   storageChart?.resize()
   perfChart?.resize()
+}
+
+function renderAllVisibleCharts() {
+  if (activeTab.value === 'overview') {
+    renderTrend()
+    renderFunnel()
+    renderStorageChart()
+    renderPerfChart()
+  }
+  if (activeTab.value === 'assets') {
+    renderLineage()
+  }
+}
+
+async function scheduleVisibleChartRender() {
+  await nextTick()
+  setTimeout(() => {
+    renderAllVisibleCharts()
+    resizeCharts()
+  }, 100)
 }
 
 async function loadAll() {
@@ -1340,23 +1422,24 @@ async function loadAll() {
     auditLogs.value = auditData || []
     
     await Promise.all([loadLayerData(), loadJobs(), loadRules()])
-    await nextTick()
-    renderTrend()
-    renderFunnel()
-    renderLineage()
-    renderStorageChart()
-    renderPerfChart()
   } catch (err) {
     console.error('Failed to load admin data', err)
     error.value = err.message || '网络连接或后端服务异常'
   } finally {
     loading.value = false
+    if (!error.value && !isEmpty.value) {
+      scheduleVisibleChartRender()
+    }
   }
 }
 
 onMounted(async () => {
   await loadAll()
   window.addEventListener('resize', resizeCharts)
+})
+
+watch(activeTab, () => {
+  scheduleVisibleChartRender()
 })
 
 onBeforeUnmount(() => {

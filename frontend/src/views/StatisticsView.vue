@@ -390,6 +390,7 @@ function renderTrend() {
       }
     ]
   }, true)
+  trendChart.resize()
 }
 
 function renderToken() {
@@ -436,6 +437,7 @@ function renderToken() {
       }
     ]
   }, true)
+  tokenChart.resize()
 }
 
 function renderErrors() {
@@ -476,6 +478,7 @@ function renderErrors() {
       }
     ]
   }, true)
+  errorChart.resize()
 }
 
 function renderLatency() {
@@ -517,6 +520,7 @@ function renderLatency() {
       }
     ]
   }, true)
+  latencyChart.resize()
 }
 
 function showLoading() {
@@ -535,10 +539,26 @@ function hideLoading() {
 }
 
 function renderCharts() {
-  renderTrend()
-  renderToken()
-  renderErrors()
-  renderLatency()
+  try {
+    renderTrend()
+  } catch (err) {
+    console.error('Failed to render statistics trend chart', err)
+  }
+  try {
+    renderToken()
+  } catch (err) {
+    console.error('Failed to render statistics token chart', err)
+  }
+  try {
+    renderErrors()
+  } catch (err) {
+    console.error('Failed to render statistics error chart', err)
+  }
+  try {
+    renderLatency()
+  } catch (err) {
+    console.error('Failed to render statistics latency chart', err)
+  }
 }
 
 function resizeCharts() {
@@ -546,6 +566,14 @@ function resizeCharts() {
   tokenChart?.resize()
   errorChart?.resize()
   latencyChart?.resize()
+}
+
+async function scheduleChartRender() {
+  await nextTick()
+  setTimeout(() => {
+    renderCharts()
+    resizeCharts()
+  }, 100)
 }
 
 async function loadAll() {
@@ -573,14 +601,15 @@ async function loadAll() {
     agentStats.value = agentData || []
     dailyMetrics.value = dailyData || []
     historyRankings.value = rankingData || []
-    await nextTick()
-    renderCharts()
   } catch (err) {
     console.error('Failed to load statistics', err)
     error.value = err.message || '网络连接或后端服务异常'
   } finally {
     hideLoading()
     loading.value = false
+    if (!error.value && !isEmpty.value) {
+      scheduleChartRender()
+    }
   }
 }
 

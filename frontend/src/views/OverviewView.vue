@@ -215,17 +215,17 @@
           </div>
         </article>
 
-        <!-- 8. Pipeline Ingress monitor -->
+        <!-- 8. Middleware Ops Monitor -->
         <article class="screen-panel overview-grid__bigdata">
           <div class="screen-panel-head">
-            <h3>大数据链路监控</h3>
-            <span>pipeline monitor</span>
+            <h3>核心中间件运维监控</h3>
+            <span>middleware monitor</span>
           </div>
           <div class="bigdata-link-monitor">
-            <div v-for="item in bigDataLinkStatus" :key="item.name" class="bigdata-link-row">
+            <div v-for="item in middlewareStatus" :key="item.name" class="bigdata-link-row">
               <div>
                 <strong>{{ item.name }}</strong>
-                <small>{{ item.hint }}</small>
+                <small>{{ item.host }}:{{ item.port }} <span style="opacity: 0.7;">({{ item.hint }})</span></small>
               </div>
               <span :class="['link-status-badge', item.status]">{{ item.statusLabel }}</span>
               <b>{{ item.metric }}</b>
@@ -469,36 +469,47 @@ const sortedRelations = computed(() => {
   return [...(relationGraph.value.links || [])].sort((a, b) => b.avg_latency_ms - a.avg_latency_ms)
 })
 
-const bigDataLinkStatus = computed(() => [
-  {
-    name: '实时采集',
-    status: Number(realtimeOverview.value.events_per_minute || 0) > 0 ? 'normal' : 'warning',
-    statusLabel: Number(realtimeOverview.value.events_per_minute || 0) > 0 ? 'RUNNING' : 'IDLE',
-    metric: `${realtimeOverview.value.events_per_minute ?? '-'} /min`,
-    hint: 'Kafka / event ingress'
-  },
-  {
-    name: '流式计算',
-    status: Number(realtimeOverview.value.error_rate || 0) > 0.08 ? 'warning' : 'normal',
-    statusLabel: Number(realtimeOverview.value.error_rate || 0) > 0.08 ? 'CHECK' : 'OK',
-    metric: percent(1 - Number(realtimeOverview.value.error_rate || 0)),
-    hint: 'Spark Streaming window'
-  },
-  {
-    name: '离线指标',
-    status: dailyMetrics.value.length > 0 ? 'normal' : 'warning',
-    statusLabel: dailyMetrics.value.length > 0 ? 'READY' : 'WAIT',
-    metric: formatNumber(dailySummary.value.taskCount),
-    hint: 'DWS daily metrics'
-  },
-  {
-    name: '告警链路',
-    status: realtimeAlerts.value.length > 0 ? 'warning' : 'normal',
-    statusLabel: realtimeAlerts.value.length > 0 ? 'OPEN' : 'CLEAR',
-    metric: `${realtimeAlerts.value.length} open`,
-    hint: 'rules / notification'
-  }
-])
+const middlewareStatus = computed(() => {
+  return realtimeOverview.value?.middleware || [
+    {
+      name: 'MySQL 关系数据库',
+      status: 'warning',
+      statusLabel: 'WAIT',
+      metric: '- conns / - QPS',
+      host: 'middleware',
+      port: 3306,
+      hint: 'no connection data'
+    },
+    {
+      name: 'Redis 缓存/去重',
+      status: 'warning',
+      statusLabel: 'WAIT',
+      metric: '- MB / - ops',
+      host: 'middleware',
+      port: 6379,
+      hint: 'no connection data'
+    },
+    {
+      name: 'Kafka 消息队列',
+      status: 'warning',
+      statusLabel: 'WAIT',
+      metric: '- msg/s',
+      host: 'middleware',
+      port: 9092,
+      hint: 'no connection data'
+    },
+    {
+      name: 'Hadoop YARN/HDFS',
+      status: 'warning',
+      statusLabel: 'WAIT',
+      metric: '- containers / -% storage',
+      host: 'master',
+      port: 8088,
+      hint: 'no connection data'
+    }
+  ]
+})
+
 
 function formatAgentName(name) {
   return String(name || '').replace('_agent', '').toUpperCase()

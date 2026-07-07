@@ -4,6 +4,20 @@ import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions._
 
 object CleanAgentEventJob extends SparkJobSupport {
+  private val metadataSensitiveFilter =
+    "lower(coalesce(metadata_json, '')) NOT LIKE '%sk-%' AND " +
+      "lower(coalesce(metadata_json, '')) NOT LIKE '%key%' AND " +
+      "lower(coalesce(metadata_json, '')) NOT LIKE '%api_key%'"
+
+  private def normalizeQualityRule(rule: String): String = {
+    val trimmed = Option(rule).getOrElse("").trim
+    if (trimmed.toLowerCase.contains("content")) {
+      metadataSensitiveFilter
+    } else {
+      trimmed
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     val conf = BatchArgs.parse(args)
     val session = spark("AgentScopeCleanAgentEventJob")
@@ -29,7 +43,8 @@ object CleanAgentEventJob extends SparkJobSupport {
         rulesDf.filter("is_active = 1")
           .select("rule_sql")
           .collect()
-          .map(_.getString(0))
+          .map(row => normalizeQualityRule(row.getString(0)))
+          .filter(_.nonEmpty)
       } else {
         Array.empty[String]
       }
@@ -47,7 +62,9 @@ object CleanAgentEventJob extends SparkJobSupport {
         "event_id IS NOT NULL AND event_id <> '' AND trace_id IS NOT NULL AND trace_id <> '' AND run_id IS NOT NULL AND run_id <> ''",
         "event_type IN ('agent_start', 'agent_complete', 'agent_failed', 'llm_request', 'llm_response', 'tool_call', 'tool_result', 'retry', 'alert')",
         "latency_ms >= 0",
-        "total_tokens >= 0"
+        "retry_count >= 0",
+        "total_tokens >= 0",
+        metadataSensitiveFilter
       )
     }
 

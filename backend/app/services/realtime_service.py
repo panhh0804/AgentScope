@@ -270,12 +270,31 @@ class RealtimeService:
         )
 
     def _spark_stats(self) -> Dict[str, Any]:
+        spark_master = os.getenv("SPARK_MASTER", os.getenv("SPARK_MASTER_URL", "yarn"))
+        yarn_host = os.getenv("YARN_HOST", self._hadoop_host())
+        yarn_port = int(os.getenv("YARN_PORT", "8088"))
+
+        if spark_master == "yarn":
+            apps = self._http_json(f"http://{yarn_host}:{yarn_port}/ws/v1/cluster/apps?states=RUNNING")
+            if apps is not None:
+                running = apps.get("apps", {}).get("app") or []
+                spark_apps = [app for app in running if "spark" in str(app.get("applicationType", "")).lower()]
+                return self._service_row(
+                    "Spark on YARN",
+                    yarn_host,
+                    yarn_port,
+                    True,
+                    f"{len(spark_apps)} running apps",
+                    "checked by YARN REST",
+                )
+            return self._service_row("Spark on YARN", yarn_host, yarn_port, False, "DOWN", "YARN REST unavailable")
+
         host = os.getenv("SPARK_MASTER_HOST", self._hadoop_host())
         port = int(os.getenv("SPARK_MASTER_WEB_PORT", "8080"))
         probe = self._tcp_probe(host, port)
         if probe["ok"]:
             return self._service_row(
-                "Spark 计算服务",
+                "Spark Standalone",
                 host,
                 port,
                 True,
@@ -283,22 +302,7 @@ class RealtimeService:
                 f"tcp {probe['latency_ms']} ms",
             )
 
-        yarn_host = os.getenv("YARN_HOST", self._hadoop_host())
-        yarn_port = int(os.getenv("YARN_PORT", "8088"))
-        apps = self._http_json(f"http://{yarn_host}:{yarn_port}/ws/v1/cluster/apps?states=RUNNING")
-        if apps is not None:
-            running = apps.get("apps", {}).get("app") or []
-            spark_apps = [app for app in running if "spark" in str(app.get("applicationType", "")).lower()]
-            return self._service_row(
-                "Spark 计算服务",
-                yarn_host,
-                yarn_port,
-                True,
-                f"{len(spark_apps)} running apps",
-                "checked by YARN REST",
-            )
-
-        return self._service_row("Spark 计算服务", host, port, False, "DOWN", probe["reason"] or "connect timeout")
+        return self._service_row("Spark Standalone", host, port, False, "DOWN", probe["reason"] or "connect timeout")
 
     def get_middleware_stats(self) -> List[Dict[str, Any]]:
         now = time.monotonic()

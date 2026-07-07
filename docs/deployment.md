@@ -110,6 +110,11 @@ spark-streaming/target/agentscope-spark-streaming-0.1.0.jar
 启动作业：
 
 ```bash
+export SPARK_MASTER=yarn
+export SPARK_DEPLOY_MODE=client
+export HADOOP_CONF_DIR=/usr/local/hadoop-2.7.6/etc/hadoop
+export YARN_CONF_DIR=/usr/local/hadoop-2.7.6/etc/hadoop
+
 /usr/local/spark/bin/spark-submit \
   --class com.agentscope.streaming.AgentEventStreamingJob \
   --master yarn \
@@ -127,6 +132,12 @@ spark-streaming/target/agentscope-spark-streaming-0.1.0.jar
 
 ```bash
 scripts/start_streaming_job.sh
+```
+
+如需临时回退 Spark Standalone，可显式设置：
+
+```bash
+export SPARK_MASTER=spark://master:7077
 ```
 
 ### 6. master 启动 simulator

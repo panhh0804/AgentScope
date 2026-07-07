@@ -20,7 +20,7 @@
 #   KAFKA_BOOTSTRAP    Kafka 地址（默认 middleware:9092）
 #   KAFKA_TOPIC        Topic 名称（默认 agent-events）
 #   KAFKA_BIN          Kafka 工具目录（默认 /usr/local/kafka_2.11-2.1.0/bin）
-#   SPARK_UI_URL       Spark UI 地址（默认 http://master:8080）
+#   SPARK_UI_URL       YARN ResourceManager 地址（默认 http://master:8088）
 # ============================================================================
 set -euo pipefail
 
@@ -41,7 +41,7 @@ DRY_RUN=false
 KAFKA_BOOTSTRAP="${KAFKA_BOOTSTRAP:-middleware:9092}"
 KAFKA_TOPIC="${KAFKA_TOPIC:-agent-events}"
 KAFKA_BIN="${KAFKA_BIN:-/usr/local/kafka_2.11-2.1.0/bin}"
-SPARK_UI_URL="${SPARK_UI_URL:-http://master:8080}"
+SPARK_UI_URL="${SPARK_UI_URL:-http://master:8088}"
 
 # ─────────────────────────────────────────────
 # 1. 前置检测

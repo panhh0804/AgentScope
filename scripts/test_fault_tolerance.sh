@@ -145,4 +145,4 @@ echo "║    • 超阈值数据 → 触发告警但不崩溃                   
 echo "║    • 异常后的正常数据 → 继续正常处理                     ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
-echo "💡  请同时检查 Spark UI (http://master:8080) 确认 Streaming 作业状态为 RUNNING。"
+echo "💡  请同时检查 YARN UI (http://master:8088) 确认 Spark Streaming application 状态为 RUNNING。"

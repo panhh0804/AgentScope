@@ -104,7 +104,7 @@ com.agentscope.streaming.AgentEventStreamingJob
 运行模式：
 
 ```text
-spark://master:7077
+YARN client (--master yarn --deploy-mode client)
 ```
 
 验证结论：

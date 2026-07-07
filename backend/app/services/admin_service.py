@@ -459,11 +459,13 @@ class AdminService:
                 # Formulate the spark-submit command on master
                 spark_cmd = (
                     f"source /etc/profile && cd /root/projects/agentscope && "
+                    f"export SPARK_HOME=${{SPARK_HOME:-/usr/local/spark}} && "
                     f"export HADOOP_CONF_DIR=${{HADOOP_CONF_DIR:-/usr/local/hadoop-2.7.6/etc/hadoop}} && "
                     f"export YARN_CONF_DIR=${{YARN_CONF_DIR:-$HADOOP_CONF_DIR}} && "
-                    f"/usr/local/spark/bin/spark-submit "
+                    f"export PATH=$SPARK_HOME/bin:$PATH && "
+                    f"$SPARK_HOME/bin/spark-submit "
                     f"--class com.agentscope.batch.{job_class} "
-                    f"--master ${{SPARK_MASTER_URL:-yarn}} "
+                    f"--master ${{SPARK_MASTER:-${{SPARK_MASTER_URL:-yarn}}}} "
                     f"--deploy-mode ${{SPARK_DEPLOY_MODE:-client}} "
                     f"/root/projects/agentscope/spark-batch/target/agentscope-spark-batch-0.1.0.jar "
                     f"--input /agentscope/clean/agent_events/dt={biz_date.isoformat()} "

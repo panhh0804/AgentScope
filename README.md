@@ -141,7 +141,7 @@ agentscope/
 
 ### 1. 环境准备与初始化
 
-1. 确保 Hadoop (HDFS, YARN), Spark (Standalone/YARN), Kafka, Redis, MySQL 正常运行。
+1. 确保 Hadoop (HDFS, YARN), Spark client, Kafka, Redis, MySQL 正常运行。Spark 作业默认提交到 YARN，Standalone 仅作为显式 fallback。
 2. 初始化数据库结构：
    ```bash
    mysql -u root -p < sql/source_schema.sql
@@ -168,6 +168,21 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 bash scripts/start_streaming_job.sh
 ```
 
+Spark 提交默认使用 YARN client 模式：
+
+```bash
+export SPARK_MASTER=yarn
+export SPARK_DEPLOY_MODE=client
+export HADOOP_CONF_DIR=/usr/local/hadoop-2.7.6/etc/hadoop
+export YARN_CONF_DIR=/usr/local/hadoop-2.7.6/etc/hadoop
+```
+
+如需临时回退 Spark Standalone，可显式覆盖：
+
+```bash
+export SPARK_MASTER=spark://master:7077
+```
+
 **构建并运行前端大屏 (Vue 3 + Vite):**
 ```bash
 cd frontend
@@ -187,9 +202,9 @@ npm run dev -- --host 0.0.0.0 --port 5173
 
 | 主机名 | 核心组件分配 |
 | :--- | :--- |
-| **`master`** | Hadoop NameNode / YARN ResourceManager / Spark Master / FastAPI 后端 |
+| **`master`** | Hadoop NameNode / YARN ResourceManager / Spark 提交客户端 / FastAPI 后端 |
 | **`middleware`** | MySQL (业务与数仓) / Redis (缓存) / ZooKeeper / Kafka Broker |
-| **`slave1`, `slave2`** | HDFS DataNode / YARN NodeManager / Spark Worker |
+| **`slave1`, `slave2`** | HDFS DataNode / YARN NodeManager |
 
 ### 2. 基础集群与中间件启动顺序
 
@@ -199,8 +214,8 @@ npm run dev -- --host 0.0.0.0 --port 5173
    ```bash
    start-dfs.sh
    start-yarn.sh
-   /usr/local/spark/sbin/start-all.sh
    ```
+   Spark 使用 YARN 作为资源调度器，不需要默认启动 Spark Standalone Master/Worker。若需临时回退 Standalone，可显式设置 `SPARK_MASTER=spark://master:7077` 并自行启动 Standalone 集群。
 2. **中间件与数据库服务（`middleware` 节点）**：
    - 依次启动：`MySQL ➔ Redis ➔ ZooKeeper ➔ Kafka`。
    - 检查 Kafka 探针端口（`9092`）及创建实时事件 Topic：

@@ -9,7 +9,7 @@
 # 检查项（共 8 项）：
 #   1. HDFS       — NameNode 存活 + Live DataNode 数量
 #   2. YARN       — ResourceManager 存活 + Active NodeManager 数量
-#   3. Spark      — Master 存活 + Alive Worker 数量
+#   3. Spark      — YARN Application 可见（Standalone 仅显式 fallback）
 #   4. Kafka      — Broker 可达 + agent-events Topic 存在
 #   5. ZooKeeper  — 可连接
 #   6. Redis      — PING 响应
@@ -41,6 +41,9 @@ MYSQL_USER="${MYSQL_USER:-agentscope}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-agentscope_pass}"
 BACKEND_HOST="${BACKEND_PUBLIC_HOST:-${BACKEND_HOST:-master}}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
+SPARK_MASTER="${SPARK_MASTER:-${SPARK_MASTER_URL:-yarn}}"
+YARN_HOST="${YARN_HOST:-master}"
+YARN_PORT="${YARN_PORT:-8088}"
 
 # ─────────────────────────────────────────────
 # 输出工具
@@ -124,6 +127,23 @@ check_yarn() {
 # 3. Spark 检查
 # ─────────────────────────────────────────────
 check_spark() {
+  if [[ "${SPARK_MASTER}" != spark://* ]]; then
+    section "3/8  Spark on YARN"
+
+    local app_list
+    app_list=$(yarn application -list 2>/dev/null) || { check_fail "YARN application 列表不可用"; return; }
+
+    local running_apps
+    running_apps=$(echo "$app_list" | grep -c "RUNNING" || echo "0")
+
+    if curl -fsS --connect-timeout 5 "http://${YARN_HOST}:${YARN_PORT}/ws/v1/cluster/info" >/dev/null 2>&1; then
+      check_pass "YARN ResourceManager UI 正常（${YARN_HOST}:${YARN_PORT}），RUNNING Applications: ${running_apps}"
+    else
+      check_warn "yarn application 可用，但 YARN REST UI 不可访问（${YARN_HOST}:${YARN_PORT}）"
+    fi
+    return
+  fi
+
   section "3/8  Spark Standalone"
   
   # 检查 Master

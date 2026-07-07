@@ -9,10 +9,11 @@ fi
 BIZ_DATE="$1"
 SPARK_HOME="${SPARK_HOME:-/usr/local/spark}"
 APP_JAR="${APP_JAR:-spark-batch/target/agentscope-spark-batch-0.1.0.jar}"
-MASTER_URL="${SPARK_MASTER_URL:-yarn}"
+MASTER_URL="${SPARK_MASTER:-${SPARK_MASTER_URL:-yarn}}"
 DEPLOY_MODE="${SPARK_DEPLOY_MODE:-client}"
 export HADOOP_CONF_DIR="${HADOOP_CONF_DIR:-/usr/local/hadoop-2.7.6/etc/hadoop}"
 export YARN_CONF_DIR="${YARN_CONF_DIR:-${HADOOP_CONF_DIR}}"
+export PATH="${SPARK_HOME}/bin:${PATH}"
 HDFS_RAW_BASE="${HDFS_RAW_BASE:-/agentscope/raw/agent_events}"
 HDFS_CLEAN_BASE="${HDFS_CLEAN_BASE:-/agentscope/clean/agent_events}"
 

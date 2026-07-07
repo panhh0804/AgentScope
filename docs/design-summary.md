@@ -36,9 +36,9 @@ Agent 历史数据 -> MySQL Source -> DataX -> HDFS Raw
 
 | 节点 | 组件 |
 |---|---|
-| master | NameNode、ResourceManager、Spark Master、DataX、任务提交客户端 |
-| worker1 | DataNode、NodeManager、Spark Worker |
-| worker2 | DataNode、NodeManager、Spark Worker |
+| master | NameNode、ResourceManager、Spark 提交客户端、DataX、任务提交客户端 |
+| worker1 | DataNode、NodeManager |
+| worker2 | DataNode、NodeManager |
 | middleware | ZooKeeper、Kafka、Redis、MySQL |
 | visualization | FastAPI、Vue、ECharts、Nginx、AI 报告服务 |
 

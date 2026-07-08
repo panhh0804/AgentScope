@@ -126,7 +126,7 @@
                       <td>{{ formatNumber(issue.total_count) }}</td>
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
-                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
+                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json, `异常样本预览 (总异常行数: ${issue.failed_count} 行，此处仅展示最新 5 条样本)`)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
                     </tr>
                   </tbody>
                 </table>
@@ -761,7 +761,7 @@
       </a-tabs>
     </div>
 
-    <a-modal v-model:visible="jsonModalOpen" title="JSON 详情" width="760px" :footer="false">
+    <a-modal v-model:visible="jsonModalOpen" :title="jsonModalTitle" width="760px" :footer="false">
       <pre class="json-pre">{{ jsonPreview }}</pre>
     </a-modal>
 
@@ -879,6 +879,7 @@ function isStageRunning(stage) {
   return getJobsByStage(stage).some(job => runningJobs.value[job.job_code])
 }
 const jsonModalOpen = ref(false)
+const jsonModalTitle = ref('JSON 详情')
 const jsonPreview = ref('')
 const trendChartRef = ref(null)
 const funnelChartRef = ref(null)
@@ -974,8 +975,9 @@ function nodeName(id) {
   return lineage.value.nodes?.find((node) => node.id === id)?.name || id
 }
 
-function showJson(value) {
+function showJson(value, title = 'JSON 详情') {
   jsonPreview.value = JSON.stringify(value, null, 2)
+  jsonModalTitle.value = title
   jsonModalOpen.value = true
 }
 

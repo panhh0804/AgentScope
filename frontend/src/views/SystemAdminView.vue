@@ -12,7 +12,7 @@
       <div class="toolbar-actions">
         <button
           class="cyber-btn cyber-btn-primary"
-          style="background: linear-gradient(135deg, #f59e0b, #ef4444); border-color: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);"
+          style="background: linear-gradient(135deg, #0284c7, #0ea5e9); border-color: #0ea5e9; box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);"
           :disabled="isExecuting"
           @click="triggerCheck('system_all_checks')"
         >
@@ -44,7 +44,7 @@
           <span>异常容错与限流测试</span>
         </button>
         <button
-          class="cyber-btn cyber-btn-primary"
+          class="cyber-btn cyber-btn-outline"
           :disabled="isExecuting"
           @click="triggerCheck('system_benchmark')"
         >
@@ -203,13 +203,33 @@
       </div>
     </section>
 
-    <!-- 4. 第四通栏：诊断审计历史表格 -->
+    <!-- 4. 第四通栏：审计与记录流水 -->
     <section class="cyber-panel">
-      <div class="panel-title-bar">
-        <span class="glow-tag">AUDIT LOGS</span>
-        <h3>诊断审计历史</h3>
+      <div class="panel-title-bar" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <span class="glow-tag">AUDIT CENTER</span>
+          <div class="cyber-tab-group" style="display: flex; gap: 8px;">
+            <button 
+              :class="['cyber-tab-btn', activeAuditTab === 'diagnose' ? 'active' : '']" 
+              @click="activeAuditTab = 'diagnose'"
+            >
+              诊断审计历史
+            </button>
+            <button 
+              :class="['cyber-tab-btn', activeAuditTab === 'operation' ? 'active' : '']" 
+              @click="activeAuditTab = 'operation'"
+            >
+              系统操作审计
+            </button>
+          </div>
+        </div>
+        <button class="cyber-btn-outline" size="mini" style="padding: 2px 10px; font-size: 11px;" @click="loadData">
+          <RefreshCw :size="10" style="margin-right: 4px;" />刷新
+        </button>
       </div>
-      <div class="screen-table-wrap layer-table-wrap" style="overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px; max-height: 280px;">
+
+      <!-- 选项卡 1：诊断审计历史 -->
+      <div v-if="activeAuditTab === 'diagnose'" class="screen-table-wrap layer-table-wrap" style="overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px; max-height: 280px;">
         <table class="data-table screen-native-table admin-table cyber-table">
           <thead>
             <tr>
@@ -245,6 +265,39 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 选项卡 2：系统操作审计 -->
+      <div v-else class="screen-table-wrap layer-table-wrap" style="overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px; max-height: 280px;">
+        <table class="data-table screen-native-table admin-table cyber-table">
+          <thead>
+            <tr>
+              <th>审计ID</th>
+              <th>操作人</th>
+              <th>操作类型</th>
+              <th>目标资源</th>
+              <th>运行结果</th>
+              <th>发生时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="log in auditLogs" :key="log.audit_id" class="cyber-tr">
+              <td><code>{{ log.audit_id }}</code></td>
+              <td><strong class="job-accent">{{ log.operator }}</strong></td>
+              <td><span class="tag-cyan">{{ log.operation_type }}</span></td>
+              <td><code>{{ log.resource_type }}:{{ log.resource_id }}</code></td>
+              <td>
+                <span :class="['tag-neon', ['success', 'PASS', 'completed'].includes(log.operation_result) ? 'neon-success' : 'neon-failed']">
+                  {{ String(log.operation_result).toUpperCase() }}
+                </span>
+              </td>
+              <td class="time-col">{{ log.created_at.replace('T', ' ') }}</td>
+            </tr>
+            <tr v-if="!auditLogs.length">
+              <td colspan="6" class="empty-cell">暂无系统操作审计记录</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 </template>
@@ -270,8 +323,11 @@ import {
 import { Message } from '@arco-design/web-vue'
 import * as echarts from 'echarts'
 import { fetchSystemCheckRuns, runSystemCheck, fetchSystemRunningLog } from '../api/dashboard'
+import { fetchAuditLogs } from '../api/admin'
 
 const runs = ref([])
+const auditLogs = ref([])
+const activeAuditTab = ref('diagnose') // 'diagnose' | 'operation'
 const isExecuting = ref(false)
 const consoleTitle = ref('快照日志')
 const consoleRawText = ref('')
@@ -596,6 +652,12 @@ async function loadData() {
     updateChart()
   } catch (err) {
     console.error('Failed to load check runs:', err)
+  }
+  try {
+    const aRes = await fetchAuditLogs()
+    auditLogs.value = aRes || []
+  } catch (err) {
+    console.error('Failed to load audit logs:', err)
   }
 }
 
@@ -1583,4 +1645,46 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 24px;
 }
+
+/* 审计中心 Tab 按钮 */
+.cyber-tab-btn {
+  background: rgba(34, 211, 238, 0.03);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  color: #8ec5fc;
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: inherit;
+}
+
+.cyber-tab-btn:hover {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.35);
+  color: #06b6d4;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.1);
+}
+
+.cyber-tab-btn.active {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15));
+  border-color: #06b6d4;
+  color: #e0f7fa;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(6, 182, 212, 0.5);
+  box-shadow: inset 0 0 4px rgba(6, 182, 212, 0.2), 0 0 10px rgba(6, 182, 212, 0.15);
+}
+
+.tag-cyan {
+  display: inline-block;
+  padding: 2px 8px;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 3px;
+}
 </style>
+

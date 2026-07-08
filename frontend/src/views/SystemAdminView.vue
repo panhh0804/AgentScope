@@ -442,6 +442,16 @@ const parsedLogs = computed(() => {
     if (!line) continue
     if (line.startsWith('root@master:') || line.startsWith('root@visualization:')) continue
 
+    // Filter out raw payloads, formatting symbols, and intermediate state text
+    if (
+      line.includes('Payload:') || line.startsWith('{') || line.endsWith('}') ||
+      line.includes('>>') || line.startsWith('>') ||
+      line.match(/^[━─=-*+═╔╗╚╝║╟╢┼\u2550-\u257F\u2500-\u254F]+$/) || 
+      line.includes('发送完成') || line.includes('正在向 Kafka 发送')
+    ) {
+      continue
+    }
+
     // Format 1: health_check.sh ────── N/M Name ──────
     const m1 = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
     if (m1) {

@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <!-- 1. 顶层通栏：集群组件健康网格 -->
+    <!-- 1. 第一通栏：集群组件健康网格 -->
     <section class="cyber-panel" style="margin-bottom: 24px;">
       <div class="panel-title-bar">
         <span class="glow-tag">HEALTH MATRIX</span>
@@ -74,7 +74,7 @@
       </div>
     </section>
 
-    <!-- 2. 中层通栏：实时链路阶梯压测分析 (解决之前折线图在左侧挤压问题) -->
+    <!-- 2. 第二通栏：实时链路阶梯压测分析 -->
     <section class="cyber-panel" style="margin-bottom: 24px;">
       <div class="panel-title-bar">
         <span class="glow-tag">PERFORMANCE BENCHMARK</span>
@@ -85,108 +85,101 @@
       </div>
     </section>
 
-    <!-- 3. 底层分栏：诊断执行报告单 与 审计历史记录 -->
-    <div class="system-grid">
-      <!-- 左下 (1.1fr)：结构化诊断执行报告单 (剔除传统黑框 terminal 样式，渲染为直观报告单) -->
-      <div class="left-panel">
-        <section class="cyber-panel" style="height: 100%; min-height: 380px; display: flex; flex-direction: column;">
-          <div class="panel-title-bar">
-            <span class="glow-tag">DIAGNOSTIC REPORT</span>
-            <h3>最新诊断报告单</h3>
-            <span class="muted" style="margin-left: auto; font-family: monospace; font-size: 11px;">
-              {{ consoleTitle }}
-            </span>
-          </div>
-          
-          <div class="report-details-container" ref="terminalRef" style="flex: 1; overflow-y: auto; padding-right: 6px;">
-            <!-- 运行中状态 -->
-            <div v-if="isExecuting" class="report-executing-state">
-              <span class="loading-spinner large"></span>
-              <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
-              <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
-            </div>
+    <!-- 3. 第三通栏：最新诊断报告单 -->
+    <section class="cyber-panel" style="margin-bottom: 24px; min-height: 280px; display: flex; flex-direction: column;">
+      <div class="panel-title-bar">
+        <span class="glow-tag">DIAGNOSTIC REPORT</span>
+        <h3>最新诊断报告单</h3>
+        <span class="muted" style="margin-left: auto; font-family: monospace; font-size: 11px;">
+          {{ consoleTitle }}
+        </span>
+      </div>
+      
+      <div class="report-details-container" ref="terminalRef" style="flex: 1; overflow-y: auto; padding-right: 6px; max-height: 380px;">
+        <!-- 运行中状态 -->
+        <div v-if="isExecuting" class="report-executing-state">
+          <span class="loading-spinner large"></span>
+          <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
+          <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
+        </div>
 
-            <!-- 空置状态 -->
-            <div v-else-if="parsedLogs.length === 0" class="report-empty-state">
-              <p>请点击顶部按钮发起实时诊断自检，或在右侧审计列表中点击「查看日志」载入历史运行诊断单。</p>
-            </div>
+        <!-- 空置状态 -->
+        <div v-else-if="parsedLogs.length === 0" class="report-empty-state">
+          <p>请点击顶部按钮发起实时诊断自检，或在下方审计列表中点击「加载报告」载入历史运行诊断单。</p>
+        </div>
 
-            <!-- 结构化报告条目 -->
-            <div v-else class="report-steps-list">
+        <!-- 结构化报告条目 -->
+        <div v-else class="report-steps-list">
+          <div
+            v-for="(step, sIdx) in parsedLogs"
+            :key="sIdx"
+            :class="['report-step-card', `step-status-${step.status}`]"
+          >
+            <div class="step-card-header">
+              <span class="step-badge">{{ step.step }}</span>
+              <span class="step-name">{{ step.name }}</span>
+              <span :class="['step-status-tag', step.status]">
+                {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
+              </span>
+            </div>
+            <div class="step-card-body">
               <div
-                v-for="(step, sIdx) in parsedLogs"
-                :key="sIdx"
-                :class="['report-step-card', `step-status-${step.status}`]"
+                v-for="(detail, dIdx) in step.detail"
+                :key="dIdx"
+                :class="['step-detail-row', `detail-type-${detail.type}`]"
               >
-                <div class="step-card-header">
-                  <span class="step-badge">{{ step.step }}</span>
-                  <span class="step-name">{{ step.name }}</span>
-                  <span :class="['step-status-tag', step.status]">
-                    {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
-                  </span>
-                </div>
-                <div class="step-card-body">
-                  <div
-                    v-for="(detail, dIdx) in step.detail"
-                    :key="dIdx"
-                    :class="['step-detail-row', `detail-type-${detail.type}`]"
-                  >
-                    <span class="indicator-icon"></span>
-                    <p class="detail-text" v-html="detail.text"></p>
-                  </div>
-                </div>
+                <span class="indicator-icon"></span>
+                <p class="detail-text" v-html="detail.text"></p>
               </div>
             </div>
           </div>
-        </section>
+        </div>
       </div>
+    </section>
 
-      <!-- 右下 (0.9fr)：自检审计历史表格 -->
-      <div class="right-panel">
-        <section class="cyber-panel" style="height: 100%; min-height: 380px; display: flex; flex-direction: column;">
-          <div class="panel-title-bar">
-            <span class="glow-tag">AUDIT LOGS</span>
-            <h3>诊断审计历史</h3>
-          </div>
-          <div class="screen-table-wrap layer-table-wrap" style="flex: 1; overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px;">
-            <table class="data-table screen-native-table admin-table cyber-table">
-              <thead>
-                <tr>
-                  <th>诊断作业</th>
-                  <th>开始时间</th>
-                  <th>诊断耗时</th>
-                  <th>诊断结果</th>
-                  <th style="text-align: center;">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="run in runs" :key="run.run_id" class="cyber-tr">
-                  <td><strong class="job-accent">{{ run.job_name }}</strong></td>
-                  <td class="time-col">{{ run.start_time.replace('T', ' ') }}</td>
-                  <td class="dur-col">{{ run.duration_seconds }}s</td>
-                  <td>
-                    <span :class="['tag-neon', run.status === 'success' ? 'neon-success' : 'neon-failed']">
-                      {{ run.status === 'success' ? 'SUCCESS' : 'FAILED' }}
-                    </span>
-                  </td>
-                  <td style="text-align: center;">
-                    <button
-                      class="tbl-btn"
-                      @click="loadLogsToConsole(run)"
-                    >
-                      加载报告
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="!runs.length">
-                  <td colspan="5" class="empty-cell">暂无诊断记录</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+    <!-- 4. 第四通栏：诊断审计历史表格 -->
+    <section class="cyber-panel">
+      <div class="panel-title-bar">
+        <span class="glow-tag">AUDIT LOGS</span>
+        <h3>诊断审计历史</h3>
       </div>
-    </div>
+      <div class="screen-table-wrap layer-table-wrap" style="overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px; max-height: 280px;">
+        <table class="data-table screen-native-table admin-table cyber-table">
+          <thead>
+            <tr>
+              <th>诊断作业</th>
+              <th>开始时间</th>
+              <th>诊断耗时</th>
+              <th>诊断结果</th>
+              <th style="text-align: center;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="run in runs" :key="run.run_id" class="cyber-tr">
+              <td><strong class="job-accent">{{ run.job_name }}</strong></td>
+              <td class="time-col">{{ run.start_time.replace('T', ' ') }}</td>
+              <td class="dur-col">{{ run.duration_seconds }}s</td>
+              <td>
+                <span :class="['tag-neon', run.status === 'success' ? 'neon-success' : 'neon-failed']">
+                  {{ run.status === 'success' ? 'SUCCESS' : 'FAILED' }}
+                </span>
+              </td>
+              <td style="text-align: center;">
+                <button
+                  class="tbl-btn"
+                  @click="loadLogsToConsole(run)"
+                >
+                  加载报告
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!runs.length">
+              <td colspan="5" class="empty-cell">暂无诊断记录</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -244,7 +237,8 @@ const serviceGridItems = computed(() => {
     else if (log.includes('YARN ResourceManager 不可达') || log.includes('YARN 无 Active NodeManager')) statusMap.yarn = 'failed'
     else if (log.includes('Active NodeManager')) statusMap.yarn = 'warning'
 
-    if (log.includes('Spark on YARN 正常') || log.includes('Spark Master 运行中') || log.includes('Spark Alive Workers')) statusMap.spark = 'success'
+    // 匹配 Spark YARN 模式下的 ResourceManager 探活通过，即 "YARN ResourceManager UI 正常" 或者是 "yarn application 可用"
+    if (log.includes('Spark on YARN 正常') || log.includes('Spark Master 运行中') || log.includes('Spark Alive Workers') || log.includes('YARN ResourceManager UI 正常') || log.includes('yarn application 可用')) statusMap.spark = 'success'
     else if (log.includes('Spark Master 未运行') || log.includes('YARN application 列表不可用')) statusMap.spark = 'failed'
     else if (log.includes('Spark Worker 仅')) statusMap.spark = 'warning'
 
@@ -328,7 +322,7 @@ const serviceGridItems = computed(() => {
   }
 })
 
-// 核心自检日志结构化解析器 ➔ 剔除 raw terminal 控制字符，渲染成精美的步骤单
+// 核心自检日志结构化解析器
 const parsedLogs = computed(() => {
   if (!consoleRawText.value) return []
   const lines = consoleRawText.value.split('\n')
@@ -340,12 +334,10 @@ const parsedLogs = computed(() => {
     line = line.trim()
     if (!line) continue
     
-    // 跳过 SSH 指令提示前缀
     if (line.startsWith('root@master:')) {
       continue
     }
     
-    // 匹配章节标题，如 "1/8 HDFS" 或者 "3/8 Spark on YARN"
     const sectionMatch = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
     if (sectionMatch) {
       if (currentStep) {
@@ -360,7 +352,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 匹配阶梯压测标题，如 "梯度测试: 5 Events/s"
     const benchmarkGradeMatch = line.match(/梯度测试:\s*(\d+\s+Events\/s.*?)$/)
     if (benchmarkGradeMatch) {
       if (currentStep) {
@@ -375,12 +366,10 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 忽略自检主流程标题、ASCII 盒子及汇总统计行，保持面板清爽
     if (line.startsWith('汇总：') || line.includes('汇总：') || line.includes('存在失败项') || line.startsWith('╔══') || line.startsWith('║') || line.startsWith('╚══') || line.startsWith('====') || line.includes('AgentScope 集群健康检查报告') || line.includes('收到 SIG')) {
       continue
     }
     
-    // 匹配 PASS 状态行
     if (line.includes('[✅ PASS]')) {
       const msg = line.substring(line.indexOf('[✅ PASS]') + 8).trim()
       const row = { type: 'pass', text: msg }
@@ -392,7 +381,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 匹配 FAIL 状态行
     if (line.includes('[❌ FAIL]')) {
       const msg = line.substring(line.indexOf('[❌ FAIL]') + 8).trim()
       const row = { type: 'fail', text: msg }
@@ -405,7 +393,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 匹配 WARN 状态行
     if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
       const idx = line.indexOf('WARN]') + 5
       const msg = line.substring(idx).trim()
@@ -419,7 +406,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 匹配压测模拟器启动 INFO 提示
     const infoMatch = line.match(/^\[.+?\]\s*\[INFO\]\s*(.+)$/)
     if (infoMatch) {
       const msg = infoMatch[1]
@@ -429,7 +415,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 匹配压测模拟器启动 WARN 提示
     const warnMatch = line.match(/^\[.+?\]\s*\[WARN\]\s*(.+)$/)
     if (warnMatch) {
       const msg = warnMatch[1]
@@ -440,7 +425,6 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 普通日志输出行
     if (currentStep) {
       currentStep.detail.push({ type: 'info', text: line })
     }
@@ -495,7 +479,7 @@ async function triggerCheck(jobCode) {
     system_benchmark: 'bash scripts/benchmark.sh --duration 15'
   }
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
-  Message.info({ content: '正在调度集群客户端自检脚本，请关注左侧自检报告单更新...', duration: 5000 })
+  Message.info({ content: '正在调度集群客户端自检脚本，请关注检测报告单更新...', duration: 5000 })
 
   try {
     const runRes = await runSystemCheck(jobCode)
@@ -733,13 +717,6 @@ onUnmounted(() => {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
-}
-
-/* 两栏网格 */
-.system-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 24px;
 }
 
 /* 玻璃态面板 */
@@ -1173,9 +1150,10 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 1024px) {
-  .system-grid {
-    grid-template-columns: 1fr;
-  }
+/* 彻底改成通栏一列流动排版 */
+.system-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 </style>

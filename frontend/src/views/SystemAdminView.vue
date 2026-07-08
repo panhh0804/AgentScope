@@ -24,7 +24,7 @@
           @click="triggerCheck('system_local_checks')"
         >
           <ShieldAlert :size="15" />
-          <span>综合自检</span>
+          <span>运行自检</span>
         </button>
         <button
           class="cyber-btn cyber-btn-outline"
@@ -45,54 +45,53 @@
       </div>
     </div>
 
-    <!-- 主面板区 -->
-    <div class="system-grid">
-      <!-- 左栏：指标网格与压测分析 -->
-      <div class="left-panel">
-        <!-- 1. 服务健康状态网络 -->
-        <section class="cyber-panel">
-          <div class="panel-title-bar">
-            <span class="glow-tag">HEALTH MATRIX</span>
-            <h3>集群组件健康网格</h3>
-            <span class="pulse-indicator"></span>
-          </div>
-          <div class="health-grid">
-            <div
-              v-for="(status, svc) in serviceGridItems"
-              :key="svc"
-              :class="['health-card', `status-${status.val}`]"
-            >
-              <div class="health-card-glow"></div>
-              <div class="health-card-head">
-                <div class="svc-icon-wrapper">
-                  <component :is="status.icon" :size="18" class="svc-icon" />
-                </div>
-                <span class="svc-name">{{ status.name }}</span>
-              </div>
-              <div class="health-card-status">
-                <span class="dot-breath"></span>
-                <span class="status-text">{{ status.text.toUpperCase() }}</span>
-              </div>
-              <p class="svc-desc">{{ status.desc }}</p>
+    <!-- 1. 顶层通栏：集群组件健康网格 -->
+    <section class="cyber-panel" style="margin-bottom: 24px;">
+      <div class="panel-title-bar">
+        <span class="glow-tag">HEALTH MATRIX</span>
+        <h3>集群组件健康网格</h3>
+        <span class="pulse-indicator"></span>
+      </div>
+      <div class="health-grid">
+        <div
+          v-for="(status, svc) in serviceGridItems"
+          :key="svc"
+          :class="['health-card', `status-${status.val}`]"
+        >
+          <div class="health-card-glow"></div>
+          <div class="health-card-head">
+            <div class="svc-icon-wrapper">
+              <component :is="status.icon" :size="18" class="svc-icon" />
             </div>
+            <span class="svc-name">{{ status.name }}</span>
           </div>
-        </section>
+          <div class="health-card-status">
+            <span class="dot-breath"></span>
+            <span class="status-text">{{ status.text.toUpperCase() }}</span>
+          </div>
+          <p class="svc-desc">{{ status.desc }}</p>
+        </div>
+      </div>
+    </section>
 
-        <!-- 2. 压测性能折线图 -->
-        <section class="cyber-panel" style="margin-top: 20px;">
-          <div class="panel-title-bar">
+    <!-- 2. 下层左右分栏 -->
+    <div class="system-grid">
+      <!-- 左下：压测性能折线图 -->
+      <div class="left-panel">
+        <section class="cyber-panel" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="panel-title-bar" style="margin-bottom: 12px;">
             <span class="glow-tag">PERFORMANCE</span>
             <h3>实时链路阶梯压测分析</h3>
           </div>
-          <div class="chart-container">
-            <div ref="chartRef" style="width: 100%; height: 260px;"></div>
+          <div class="chart-container" style="flex: 1; display: flex; align-items: center;">
+            <div ref="chartRef" style="width: 100%; height: 350px;"></div>
           </div>
         </section>
       </div>
 
-      <!-- 右栏：终端与诊断审计记录 -->
-      <div class="right-panel">
-        <!-- 3. CRT 复古控制台 -->
+      <!-- 右下：终端和自检历史 -->
+      <div class="right-panel" style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- CRT 控制台 -->
         <div class="terminal-container">
           <div class="terminal-header">
             <div class="mac-buttons">
@@ -125,13 +124,13 @@
           </div>
         </div>
 
-        <!-- 4. 诊断审计历史表格 -->
-        <section class="cyber-panel" style="margin-top: 20px;">
+        <!-- 诊断审计历史表格 -->
+        <section class="cyber-panel">
           <div class="panel-title-bar">
             <span class="glow-tag">AUDIT LOGS</span>
             <h3>诊断审计历史</h3>
           </div>
-          <div class="screen-table-wrap layer-table-wrap" style="max-height: 240px; overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px;">
+          <div class="screen-table-wrap layer-table-wrap" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px;">
             <table class="data-table screen-native-table admin-table cyber-table">
               <thead>
                 <tr>
@@ -472,7 +471,7 @@ function updateChart() {
       {
         type: 'value',
         name: '延时 (ms)',
-        nameTextStyle: { color: '#64748b', fontSize: 10 },
+        nameTextStyle: { color: '#fb7185', fontSize: 10 },
         splitLine: { show: false },
         axisLine: { lineStyle: { color: 'rgba(251, 113, 133, 0.15)' } },
         axisLabel: { color: '#fb7185' }
@@ -632,7 +631,7 @@ onUnmounted(() => {
 /* 两栏网格 */
 .system-grid {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: 1.25fr 0.75fr;
   gap: 24px;
 }
 
@@ -686,18 +685,18 @@ onUnmounted(() => {
   100% { transform: scale(0.9); opacity: 0.7; }
 }
 
-/* 健康卡片芯片样式 */
+/* 健康卡片通栏样式 —— 宽屏下 4 列排布极具张力 */
 .health-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
 }
 
 .health-card {
   background: linear-gradient(135deg, rgba(8, 22, 42, 0.5) 0%, rgba(4, 12, 26, 0.7) 100%);
   border: 1px solid rgba(34, 211, 238, 0.08);
   border-radius: 4px;
-  padding: 14px;
+  padding: 16px;
   position: relative;
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   overflow: hidden;
@@ -731,8 +730,8 @@ onUnmounted(() => {
 .svc-icon-wrapper {
   background: rgba(34, 211, 238, 0.06);
   border: 1px solid rgba(34, 211, 238, 0.12);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -883,13 +882,13 @@ onUnmounted(() => {
 
 .terminal-box {
   background: #030712;
-  height: 290px;
+  height: 250px;
   overflow-y: auto;
   padding: 16px;
   position: relative;
 }
 
-/* 终端绿光和扫描线滤镜 */
+/* 终端滤镜 */
 .terminal-glow {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -1010,7 +1009,7 @@ onUnmounted(() => {
   box-shadow: 0 0 5px rgba(34, 211, 238, 0.15);
 }
 
-/* 滚动条美化 */
+/* 滚动条 */
 .terminal-box::-webkit-scrollbar,
 .layer-table-wrap::-webkit-scrollbar {
   width: 6px;
@@ -1028,12 +1027,15 @@ onUnmounted(() => {
   background: rgba(34, 211, 238, 0.4);
 }
 
-@media (max-width: 1150px) {
-  .system-grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 1300px) {
   .health-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .system-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

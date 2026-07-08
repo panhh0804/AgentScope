@@ -276,14 +276,6 @@ class MySQLAnalyticsRepository:
                 "SELECT event_id, trace_id, run_id, agent_id, latency_ms FROM agentscope_source.agent_events_source WHERE latency_ms < 0 LIMIT 5",
                 ()
             )
-        # Ensure at least 3 mock sample lines for demo if actual counts are low
-        if len(neg_latency) < 3:
-            neg_latency = neg_latency + [
-                {"event_id": "evt_bad_latency_001", "latency_ms": -42, "agent_id": "writer_agent"},
-                {"event_id": "evt_bad_latency_002", "latency_ms": -7, "agent_id": "search_agent"},
-                {"event_id": "evt_bad_latency_003", "latency_ms": -128, "agent_id": "reviewer_agent"}
-            ]
-        real_neg_cnt = max(neg_latency_cnt, len(neg_latency))
 
         # 2. Query real DB for token mismatch count and samples
         tok_cnt_res = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE prompt_tokens + completion_tokens != total_tokens", ())
@@ -295,13 +287,6 @@ class MySQLAnalyticsRepository:
                 "SELECT event_id, trace_id, run_id, agent_id, prompt_tokens, completion_tokens, total_tokens FROM agentscope_source.agent_events_source WHERE prompt_tokens + completion_tokens != total_tokens LIMIT 5",
                 ()
             )
-        if len(token_mis) < 3:
-            token_mis = token_mis + [
-                {"event_id": "evt_tok_001", "prompt_tokens": 1200, "completion_tokens": 900, "total_tokens": 2198},
-                {"event_id": "evt_tok_002", "prompt_tokens": 800, "completion_tokens": 600, "total_tokens": 1500},
-                {"event_id": "evt_tok_003", "prompt_tokens": 450, "completion_tokens": 380, "total_tokens": 900}
-            ]
-        real_tok_cnt = max(token_mis_cnt, len(token_mis))
 
         # 3. Query real DB for missing fields count and samples
         miss_cnt_res = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE event_id = '' OR trace_id = '' OR run_id = '' OR agent_id = ''", ())
@@ -313,13 +298,6 @@ class MySQLAnalyticsRepository:
                 "SELECT event_id, trace_id, run_id, agent_id FROM agentscope_source.agent_events_source WHERE event_id = '' OR trace_id = '' OR run_id = '' OR agent_id = '' LIMIT 5",
                 ()
             )
-        if len(missing_fields) < 3:
-            missing_fields = missing_fields + [
-                {"event_id": "", "trace_id": "trace_demo_108", "agent_id": "planner_agent"},
-                {"event_id": "evt_bad_001", "trace_id": "", "agent_id": "writer_agent"},
-                {"event_id": "", "trace_id": "", "agent_id": "search_agent"}
-            ]
-        real_miss_cnt = max(missing_fields_cnt, len(missing_fields))
         
         issues = []
         
@@ -334,8 +312,8 @@ class MySQLAnalyticsRepository:
                 "dataset_code": "agent_source_events",
                 "biz_date": metric_date.isoformat(),
                 "total_count": total_cnt,
-                "failed_count": real_neg_cnt,
-                "pass_rate": round(1 - real_neg_cnt / total_cnt, 4),
+                "failed_count": neg_latency_cnt,
+                "pass_rate": round(1 - neg_latency_cnt / total_cnt, 4),
                 "sample_data_json": neg_latency
             })
             
@@ -346,8 +324,8 @@ class MySQLAnalyticsRepository:
                 "dataset_code": "agent_clean_events",
                 "biz_date": metric_date.isoformat(),
                 "total_count": total_cnt,
-                "failed_count": real_tok_cnt,
-                "pass_rate": round(1 - real_tok_cnt / total_cnt, 4),
+                "failed_count": token_mis_cnt,
+                "pass_rate": round(1 - token_mis_cnt / total_cnt, 4),
                 "sample_data_json": token_mis
             })
             
@@ -358,8 +336,8 @@ class MySQLAnalyticsRepository:
                 "dataset_code": "agent_clean_events",
                 "biz_date": metric_date.isoformat(),
                 "total_count": total_cnt,
-                "failed_count": real_miss_cnt,
-                "pass_rate": round(1 - real_miss_cnt / total_cnt, 4),
+                "failed_count": missing_fields_cnt,
+                "pass_rate": round(1 - missing_fields_cnt / total_cnt, 4),
                 "sample_data_json": missing_fields
             })
             

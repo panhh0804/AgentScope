@@ -19,3 +19,4 @@ export const fetchReportDetail = (reportId) => getData(`/reports/${reportId}`)
 
 export const fetchSystemCheckRuns = () => getData('/admin/system/check-runs')
 export const runSystemCheck = (jobCode) => postData(`/admin/system/run-check?job_code=${jobCode}`, {})
+export const fetchSystemRunningLog = () => getData('/admin/system/running-log')

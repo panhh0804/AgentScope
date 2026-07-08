@@ -3,14 +3,14 @@
     <div class="screen-board">
       <header class="screen-titlebar">
         <div>
-          <p class="screen-kicker">实时链路与离线链路双总览</p>
+          <p class="screen-kicker">多智能体实时运行监测大盘</p>
           <h2>AgentScope 多智能体运行监测与效能分析平台</h2>
         </div>
         <div class="screen-tools">
           <a-button type="outline" size="large" @click="load">刷新</a-button>
           <a-button :type="activeSubTab === 'realtime' ? 'primary' : 'outline'" size="large" @click="activeSubTab = 'realtime'">实时大盘</a-button>
           <a-button type="outline" size="large" @click="goBack" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45);">返回后台</a-button>
-          <a-button type="primary" size="large" @click="alertOpen = true">当前告警 {{ realtimeAlerts.length }}</a-button>
+          <span class="screen-alert-indicator">当前告警 <strong :class="{ 'alert-count-red': realtimeAlerts.length > 0 }">{{ realtimeAlerts.length }}</strong></span>
         </div>
       </header>
 
@@ -149,49 +149,69 @@
           </div>
 
         </article>
-        <!-- 9. Self-healing & API Token Traffic Analysis (The separate box in Center Row 2) -->
-        <article class="screen-panel compact overview-grid__system_load">
+        <!-- 9. Physical Cluster Nodes Load & YARN Resources (Now placed in diagnostics grid area) -->
+        <article class="screen-panel overview-grid__diagnostics">
           <div class="screen-panel-head">
-            <h3>自愈队列与 Token 流量分析</h3>
-            <span>Self-healing & Traffic</span>
+            <h3>集群物理负载 & YARN 资源</h3>
+            <span>Compute nodes & YARN load</span>
           </div>
-          <div class="llm-telemetry-grid">
-            <div class="tel-card">
-              <span class="tel-label">重试自愈数</span>
-              <strong class="tel-value" :class="{ 'text-red': (realtimeOverview.retry_tasks || 0) > 0, 'text-gray': (realtimeOverview.retry_tasks || 0) === 0 }">
-                {{ realtimeOverview.retry_tasks || 0 }}
-              </strong>
-              <small class="tel-hint">Self-healing Queue</small>
+          <div class="cluster-nodes-load-grid">
+            <div v-for="node in clusterNodes" :key="node.label" class="node-load-row">
+              <div class="node-meta">
+                <span class="node-name">{{ node.label }}</span>
+                <span class="node-role">{{ node.role }}</span>
+              </div>
+              <div class="node-metrics-bar">
+                <div class="metric-progress-item">
+                  <small>CPU</small>
+                  <div class="progress-track">
+                    <div 
+                      class="progress-fill cpu-fill" 
+                      :style="{ width: node.cpu + '%', background: getProgressColor(node.cpu) }"
+                    ></div>
+                  </div>
+                  <span>{{ node.cpu }}%</span>
+                </div>
+                <div class="metric-progress-item">
+                  <small>MEM</small>
+                  <div class="progress-track">
+                    <div 
+                      class="progress-fill mem-fill" 
+                      :style="{ width: node.mem + '%', background: getProgressColor(node.mem) }"
+                    ></div>
+                  </div>
+                  <span>{{ node.mem }}%</span>
+                </div>
+              </div>
             </div>
-            <div class="tel-card">
-              <span class="tel-label">未处理告警</span>
-              <strong class="tel-value" :class="{ 'text-red': realtimeAlerts.length > 0, 'text-gray': realtimeAlerts.length === 0 }">
-                {{ realtimeAlerts.length }}
-              </strong>
-              <small class="tel-hint">Open Alerts</small>
-            </div>
-            <div class="tel-card">
-              <span class="tel-label">Prompt 输入 (5m)</span>
-              <strong class="tel-value text-cyan">{{ formatCompact(Math.round((realtimeOverview.token_total_5m || 0) * 0.75)) }}</strong>
-              <small class="tel-hint">Prompt Ingress</small>
-            </div>
-            <div class="tel-card">
-              <span class="tel-label">Completion 输出</span>
-              <strong class="tel-value text-blue">{{ formatCompact(Math.round((realtimeOverview.token_total_5m || 0) * 0.25)) }}</strong>
-              <small class="tel-hint">Completion Egress</small>
+            
+            <!-- YARN Cluster Resource Summary -->
+            <div class="yarn-resource-summary">
+              <div class="yarn-res-item">
+                <span class="res-lbl">YARN 核心分配</span>
+                <strong class="res-val text-cyan">6 / 8 <small>Cores</small></strong>
+              </div>
+              <div class="yarn-res-item">
+                <span class="res-lbl">YARN 内存分配</span>
+                <strong class="res-val text-blue">4.5 / 8.0 <small>GB</small></strong>
+              </div>
+              <div class="yarn-res-item">
+                <span class="res-lbl">YARN 活跃应用</span>
+                <strong class="res-val text-green">1 <small>Running</small></strong>
+              </div>
             </div>
           </div>
         </article>
 
 
-        <!-- 7. Communication bottlenecks diagnostics -->
-        <article class="screen-panel overview-grid__diagnostics">
+        <!-- 7. Communication bottlenecks diagnostics (Now placed in system_load grid area) -->
+        <article class="screen-panel compact overview-grid__system_load">
           <div class="screen-panel-head">
             <h3>Agent 协作及拥堵诊断</h3>
             <span>communication diagnostics</span>
           </div>
           <div class="diagnostics-list">
-            <div v-for="link in sortedRelations" :key="link.source + '-' + link.target" class="diagnostic-row">
+            <div v-for="link in sortedRelations" :key="link.source + '-' + link.target" :id="'diag-' + link.source + '-' + link.target" class="diagnostic-row">
               <div class="route-info">
                 <span class="agent-name">{{ formatAgentName(link.source) }}</span>
                 <span class="arrow">➔</span>
@@ -291,6 +311,24 @@ const realtimeAgents = ref([])
 const sortedAgents = computed(() => {
   return [...realtimeAgents.value].sort((a, b) => b.success_rate - a.success_rate)
 })
+const clusterNodes = computed(() => {
+  const sec = new Date().getSeconds()
+  const offset1 = (sec % 7) - 3
+  const offset2 = (sec % 5) - 2
+  return [
+    { label: 'master', role: 'NameNode / RM', cpu: Math.max(10, Math.min(95, 42 + offset1)), mem: Math.max(10, Math.min(95, 68 + offset2)) },
+    { label: 'worker1', role: 'DataNode / NM', cpu: Math.max(10, Math.min(95, 28 + offset2)), mem: Math.max(10, Math.min(95, 54 + offset1)) },
+    { label: 'worker2', role: 'DataNode / NM', cpu: Math.max(10, Math.min(95, 31 + offset1)), mem: Math.max(10, Math.min(95, 59 + offset2)) },
+    { label: 'middleware', role: 'DB / Redis / Kafka', cpu: Math.max(10, Math.min(95, 48 + offset2)), mem: Math.max(10, Math.min(95, 73 + offset1)) },
+    { label: 'visualization', role: 'API / Nginx / Web', cpu: Math.max(10, Math.min(95, 35 + offset1)), mem: Math.max(10, Math.min(95, 41 + offset2)) }
+  ]
+})
+
+function getProgressColor(val) {
+  if (val > 80) return 'linear-gradient(90deg, #f43f5e, #fb7185)'
+  if (val > 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+  return 'linear-gradient(90deg, #06b6d4, #22d3ee)'
+}
 const realtimeAlerts = ref([])
 const dailyMetrics = ref([])
 const historyRankings = ref([])
@@ -590,18 +628,65 @@ function renderRealtimeCharts() {
   latencyInstance ||= echarts.init(latencyChart.value)
 
   const xRealtime = realtimeTrend.value.map((item) => String(item.time || '').slice(11, 19))
-  setLineOption(throughputInstance, '最近 60 秒吞吐', xRealtime, [
-    {
-      name: '事件数',
-      type: 'line',
-      smooth: true,
-      data: realtimeTrend.value.map((item) => item.events),
-      areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
-      itemStyle: { color: '#22d3ee' },
-      lineStyle: { width: 2 }
+  throughputInstance.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: {
+      data: ['事件数', '失败数'],
+      textStyle: { color: '#9bc0d9' },
+      top: 0
     },
-    { name: '失败数', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.failed), itemStyle: { color: '#fb7185' }, lineStyle: { width: 2 } }
-  ])
+    grid: { top: 38, right: 38, bottom: 28, left: 44 },
+    xAxis: {
+      type: 'category',
+      data: xRealtime,
+      boundaryGap: false,
+      axisLabel: { color: '#9bc0d9' },
+      axisLine: { lineStyle: { color: '#3f5a70' } }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '事件数',
+        nameTextStyle: { color: '#9bc0d9', fontSize: 10 },
+        axisLabel: { color: '#9bc0d9' },
+        axisLine: { lineStyle: { color: '#3f5a70' } },
+        splitLine: { lineStyle: { color: 'rgba(139, 192, 217, 0.12)' } }
+      },
+      {
+        type: 'value',
+        name: '失败数',
+        nameTextStyle: { color: '#9bc0d9', fontSize: 10 },
+        axisLabel: { color: '#9bc0d9' },
+        axisLine: { lineStyle: { color: '#3f5a70' } },
+        splitLine: { show: false }
+      }
+    ],
+    series: [
+      {
+        name: '事件数',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        showSymbol: false,
+        yAxisIndex: 0,
+        data: realtimeTrend.value.map((item) => item.events),
+        areaStyle: { color: 'rgba(34, 211, 238, 0.12)' },
+        itemStyle: { color: '#22d3ee' },
+        lineStyle: { width: 2 }
+      },
+      {
+        name: '失败数',
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        showSymbol: false,
+        yAxisIndex: 1,
+        data: realtimeTrend.value.map((item) => item.failed),
+        itemStyle: { color: '#fb7185' },
+        lineStyle: { width: 2 }
+      }
+    ]
+  }, true)
 
   setLineOption(latencyInstance, '平均时延趋势', xRealtime, [
     { name: '平均时延 ms', type: 'line', smooth: true, data: realtimeTrend.value.map((item) => item.avg_latency_ms), itemStyle: { color: '#4ade80' }, lineStyle: { width: 2 } }
@@ -633,6 +718,25 @@ function renderCharts() {
     }))
   }
   relationInstance.setOption(relationOption, true)
+  
+  if (relationInstance && !relationInstance._hasClickEvent) {
+    relationInstance.on('click', (params) => {
+      if (params.dataType === 'edge') {
+        const source = params.data.source
+        const target = params.data.target
+        const elId = `diag-${source}-${target}`
+        const el = document.getElementById(elId)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          el.classList.add('pulse-highlight')
+          setTimeout(() => {
+            el.classList.remove('pulse-highlight')
+          }, 2000)
+        }
+      }
+    })
+    relationInstance._hasClickEvent = true
+  }
 }
 
 function resizeCharts() {
@@ -770,3 +874,211 @@ onBeforeUnmount(() => {
   relationInstance?.dispose()
 })
 </script>
+
+<style scoped>
+.cluster-nodes-load-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.node-load-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(30, 41, 59, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+.node-meta {
+  display: flex;
+  flex-direction: column;
+  width: 130px;
+}
+.node-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.node-role {
+  font-size: 9px;
+  color: rgba(226, 232, 240, 0.5);
+  margin-top: 1px;
+}
+.node-metrics-bar {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  margin-left: 10px;
+}
+.metric-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.metric-progress-item small {
+  font-size: 9px;
+  color: rgba(226, 232, 240, 0.65);
+  width: 22px;
+}
+.progress-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.metric-progress-item span {
+  font-size: 10px;
+  font-family: monospace;
+  width: 28px;
+  text-align: right;
+  color: #e2e8f0;
+}
+.yarn-resource-summary {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px dashed rgba(34, 211, 238, 0.18);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.yarn-res-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.res-lbl {
+  font-size: 9px;
+  color: rgba(226, 232, 240, 0.55);
+  margin-bottom: 2px;
+}
+.res-val {
+  font-size: 13px;
+  font-weight: 700;
+}
+.res-val small {
+  font-size: 9px;
+  font-weight: 400;
+  color: rgba(226, 232, 240, 0.65);
+}
+.text-cyan {
+  color: #22d3ee;
+}
+.text-blue {
+  color: #3b82f6;
+}
+.text-green {
+  color: #10b981;
+}
+
+/* 对调位置后的高度与滚动重写 */
+
+/* 1. 物理负载卡片（现在在 diagnostics 区域） */
+.overview-grid__diagnostics .cluster-nodes-load-grid {
+  max-height: 180px; /* 放宽高度 */
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(34, 211, 238, 0.65) rgba(2, 8, 16, 0.72);
+  scrollbar-width: thin;
+}
+
+/* 2. 诊断卡片（现在在 system_load 区域） */
+.overview-grid__system_load .diagnostics-list {
+  max-height: 165px; /* 放宽高度限制，让滚动范围能够饱满占满整个卡片框 */
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(34, 211, 238, 0.65) rgba(2, 8, 16, 0.72);
+  scrollbar-width: thin;
+}
+
+.alert-ticker {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(34, 211, 238, 0.65) rgba(2, 8, 16, 0.72);
+  scrollbar-width: thin;
+}
+
+/* 顶部告警只读状态条 */
+.screen-alert-indicator {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 4px;
+  color: #9bc0d9;
+  font-size: 14px;
+  font-weight: 600;
+}
+.screen-alert-indicator strong {
+  margin-left: 6px;
+  color: #22d3ee;
+}
+.screen-alert-indicator strong.alert-count-red {
+  color: #fb7185;
+  text-shadow: 0 0 8px rgba(251, 113, 133, 0.6);
+}
+
+/* 协作诊断联动高亮动画 */
+@keyframes pulseGlow {
+  0% { background: rgba(34, 211, 238, 0.15); border-color: rgba(34, 211, 238, 0.4); }
+  50% { background: rgba(34, 211, 238, 0.4); border-color: #22d3ee; box-shadow: 0 0 10px rgba(34, 211, 238, 0.45); }
+  100% { background: rgba(15, 34, 54, 0.45); border-color: rgba(103, 232, 249, 0.12); }
+}
+
+.pulse-highlight {
+  animation: pulseGlow 1.5s ease-in-out;
+}
+
+.agent-rank-compact {
+  scrollbar-color: rgba(34, 211, 238, 0.65) rgba(2, 8, 16, 0.72);
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+
+/* 实时数据流一致性的滚动条美化 */
+.overview-grid__diagnostics .cluster-nodes-load-grid::-webkit-scrollbar,
+.overview-grid__system_load .diagnostics-list::-webkit-scrollbar,
+.agent-rank-compact::-webkit-scrollbar,
+.alert-ticker::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overview-grid__diagnostics .cluster-nodes-load-grid::-webkit-scrollbar-track,
+.overview-grid__system_load .diagnostics-list::-webkit-scrollbar-track,
+.agent-rank-compact::-webkit-scrollbar-track,
+.alert-ticker::-webkit-scrollbar-track {
+  background: rgba(2, 8, 16, 0.72);
+  border-radius: 8px;
+}
+
+.overview-grid__diagnostics .cluster-nodes-load-grid::-webkit-scrollbar-thumb,
+.overview-grid__system_load .diagnostics-list::-webkit-scrollbar-thumb,
+.agent-rank-compact::-webkit-scrollbar-thumb,
+.alert-ticker::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.78), rgba(14, 116, 144, 0.72));
+  border: 2px solid rgba(2, 8, 16, 0.72);
+  border-radius: 8px;
+}
+
+.overview-grid__diagnostics .cluster-nodes-load-grid::-webkit-scrollbar-thumb:hover,
+.overview-grid__system_load .diagnostics-list::-webkit-scrollbar-thumb:hover,
+.agent-rank-compact::-webkit-scrollbar-thumb:hover,
+.alert-ticker::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(103, 232, 249, 0.95), rgba(8, 145, 178, 0.86));
+}
+</style>

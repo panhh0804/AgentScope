@@ -53,7 +53,7 @@ Agent 模拟器 -> Kafka -> Spark Streaming on YARN -> Redis -> FastAPI realtime
 推荐在 Kafka、Redis、YARN 已启动后，使用一键脚本同时拉起 simulator 和 Spark Streaming：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 bash scripts/start_realtime_yarn_pipeline.sh
 ```
 
@@ -140,7 +140,7 @@ ss -lntp | grep 9092
 实时模式会持续向 Kafka 写入 Agent 事件：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 mkdir -p logs
 
 nohup python3 simulator/main.py \
@@ -179,7 +179,7 @@ spark-streaming/target/agentscope-spark-streaming-0.1.0.jar
 推荐使用项目脚本后台启动：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 
 export SPARK_MASTER=yarn
 export SPARK_DEPLOY_MODE=client
@@ -305,7 +305,7 @@ rsync -av --delete \
   --exclude '.git' \
   --exclude 'frontend/node_modules' \
   --exclude 'backend/.venv' \
-  root@123.56.215.82:/root/projects/agentscope/ \
+  root@123.56.215.82:/root/agentscope/ \
   /root/agentscope/
 ```
 
@@ -461,7 +461,7 @@ curl -X POST http://your_server_ip/api/v1/reports/generate \
 常用离线任务命令：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 
 bash scripts/run_clean_job.sh 2026-06-30
 bash scripts/run_batch_jobs.sh 2026-06-30
@@ -500,7 +500,7 @@ yarn application -kill application_xxxxxxxxxxxxx_xxxx
 推荐使用一键停止脚本同时停止 simulator 和 YARN 上运行中的 `AgentScopeStreaming`：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 bash scripts/stop_realtime_yarn_pipeline.sh
 ```
 
@@ -601,7 +601,7 @@ npm run build
 在 master 节点执行：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 bash scripts/start_realtime_yarn_pipeline.sh
 ```
 
@@ -616,6 +616,6 @@ redis-cli -h middleware -p 6379 get agentscope:realtime:overview
 停止：
 
 ```bash
-cd /root/projects/agentscope
+cd /root/agentscope
 bash scripts/stop_realtime_yarn_pipeline.sh
 ```

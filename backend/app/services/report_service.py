@@ -118,23 +118,27 @@ class ReportService:
                     metrics_snapshot = json.loads(row["metrics_snapshot_json"]) if row.get("metrics_snapshot_json") else {}
                 except Exception:
                     metrics_snapshot = {}
+                report_date = row["report_date"] if isinstance(row["report_date"], date) else date.fromisoformat(str(row["report_date"]))
+                content = self._normalize_report_content(row["content_md"] or "", report_date, row["report_type"] or "daily")
                 return {
                     "report_id": row["report_id"],
                     "report_type": row["report_type"],
-                    "report_date": row["report_date"].isoformat() if isinstance(row["report_date"], date) else str(row["report_date"]),
+                    "report_date": report_date.isoformat(),
                     "model_name": row["model_name"],
-                    "content": row["content_md"],
+                    "content": content,
                     "metrics_snapshot": metrics_snapshot,
                     "create_time": row["create_time"].isoformat() if hasattr(row["create_time"], "isoformat") else str(row["create_time"])
                 }
 
-        return self._reports.get(
-            report_id,
-            {
-                "report_id": report_id,
-                "content": "报告不存在或服务重启后内存缓存已清空。",
-            },
-        )
+        report = self._reports.get(report_id)
+        if report:
+            content = self._normalize_report_content(report.get("content", ""), date.fromisoformat(report["report_date"]), report.get("report_type", "daily"))
+            return {**report, "content": content}
+
+        return {
+            "report_id": report_id,
+            "content": "报告不存在或服务重启后内存缓存已清空。",
+        }
 
     def _render_llm_markdown(
         self,
@@ -173,7 +177,7 @@ class ReportService:
         content = response.choices[0].message.content
         if not content or not content.strip():
             raise ValueError("LLM returned empty report content")
-        return content.strip()
+        return self._normalize_report_content(content.strip(), report_date, report_type)
 
     @staticmethod
     def _env(primary: str, fallback: str) -> Optional[str]:
@@ -234,7 +238,8 @@ class ReportService:
         best_agent = max(rankings, key=lambda item: item.get("success_rate", 0)) if isinstance(rankings, list) and rankings else {}
         edge_count = len(relation.get("links", [])) if isinstance(relation, dict) else 0
         no_daily_notice = "" if summary else "\n> 暂无当日离线指标，以下报告基于当前可用的 Agent 排名、告警和关系数据生成。\n"
-        return f"""# AgentScope {report_type} report - {report_date.isoformat()}
+        return self._normalize_report_content(
+            f"""# {self._report_title(report_date)}
 
 ## 总体结论
 {no_daily_notice}
@@ -262,7 +267,10 @@ class ReportService:
 1. 优先排查高时延和高失败率 Agent 的输入规模、工具调用和重试逻辑。
 2. 对 Token 超额任务增加 prompt 长度限制和摘要压缩步骤。
 3. 对 Reviewer 退回链路设置最大重试次数，避免循环调用扩大成本。
-"""
+""",
+            report_date,
+            report_type,
+        )
 
     @staticmethod
     def _render_alert_lines(alerts: List[Dict]) -> str:
@@ -273,3 +281,42 @@ class ReportService:
             for item in alerts
         )
 
+    @staticmethod
+    def _report_title(report_date: date) -> str:
+        return f"多智能体系统运行分析报告（{report_date.isoformat()}）"
+
+    def _normalize_report_content(self, content: str, report_date: date, report_type: str) -> str:
+        text = content.replace("\r\n", "\n").strip()
+        title = self._report_title(report_date)
+        lines = [line.rstrip() for line in text.split("\n")]
+        cleaned: List[str] = []
+        seen_title = False
+
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line:
+                cleaned.append("")
+                continue
+            if line in {"报告主题", f"# {title}", title} or line.startswith("多智能体系统运行分析报告") or line.startswith("AgentScope"):
+                if not seen_title:
+                    cleaned.append(f"# {title}")
+                    seen_title = True
+                continue
+            if not seen_title and line.startswith("#"):
+                cleaned.append(f"# {title}")
+                seen_title = True
+                continue
+            if not seen_title and ("多智能体系统运行分析报告" in line or "AgentScope" in line):
+                cleaned.append(f"# {title}")
+                seen_title = True
+                continue
+            cleaned.append(raw_line.rstrip())
+
+        normalized = "\n".join(cleaned).strip()
+        normalized = normalized.replace("（ ）", f"（{report_date.isoformat()}）")
+        normalized = normalized.replace("()", f"({report_date.isoformat()})")
+        normalized = normalized.replace("（　）", f"（{report_date.isoformat()}）")
+        normalized = normalized.replace("报告主题", "")
+        if not normalized.startswith(f"# {title}"):
+            normalized = f"# {title}\n\n{normalized}"
+        return normalized.strip()

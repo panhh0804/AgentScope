@@ -16,21 +16,15 @@ HDFS_RAW_BASE="${HDFS_RAW_BASE:-/agentscope/raw/agent_events}"
 TARGET_DIR="${HDFS_RAW_BASE}/dt=${BIZ_DATE}"
 DATAX_HOME="${DATAX_HOME:-/usr/local/datax}"
 DATAX_PY="${DATAX_PY:-}"
+HADOOP_HOME="${HADOOP_HOME:-/usr/local/hadoop-2.7.6}"
+
+if ! command -v hdfs >/dev/null 2>&1; then
+  export PATH="${HADOOP_HOME}/bin:${PATH}"
+fi
 
 if ! command -v hdfs >/dev/null 2>&1; then
   echo "hdfs command not found. Load the Hadoop environment first." >&2
   exit 1
-fi
-
-if [[ -z "${DATAX_PY}" ]]; then
-  if [[ -f "${DATAX_HOME}/bin/datax.py" ]]; then
-    DATAX_PY="${DATAX_HOME}/bin/datax.py"
-  elif command -v datax.py >/dev/null 2>&1; then
-    DATAX_PY="$(command -v datax.py)"
-  else
-    echo "DataX launcher not found. Set DATAX_HOME or DATAX_PY." >&2
-    exit 1
-  fi
 fi
 
 if [[ -z "${HADOOP_CONF_DIR:-}" ]]; then
@@ -44,6 +38,17 @@ if [[ -z "${DEFAULT_FS}" ]]; then
   DEFAULT_FS="$(hdfs getconf -confKey fs.defaultFS 2>/dev/null || true)"
   if [[ -z "${DEFAULT_FS}" ]]; then
     DEFAULT_FS="hdfs://master:9000"
+  fi
+fi
+
+if [[ -z "${DATAX_PY}" ]]; then
+  if [[ -f "${DATAX_HOME}/bin/datax.py" ]]; then
+    DATAX_PY="${DATAX_HOME}/bin/datax.py"
+  elif command -v datax.py >/dev/null 2>&1; then
+    DATAX_PY="$(command -v datax.py)"
+  else
+    echo "DataX launcher not found. Set DATAX_HOME or DATAX_PY." >&2
+    exit 1
   fi
 fi
 

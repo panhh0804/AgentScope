@@ -13,7 +13,7 @@
 #   ./run_daily_offline_pipeline.sh 2026-06-25     # 指定业务日期
 #
 # Crontab 配置（每天凌晨 2:00 自动执行）：
-#   0 2 * * * cd /root/projects/agentscope && bash scripts/run_daily_offline_pipeline.sh >> logs/daily_pipeline.log 2>&1
+#   0 2 * * * cd /root/agentscope && bash scripts/run_daily_offline_pipeline.sh >> logs/daily_pipeline.log 2>&1
 # ============================================================================
 set -euo pipefail
 

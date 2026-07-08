@@ -3,7 +3,7 @@
     <div class="screen-board data-admin-board">
       <header class="screen-titlebar">
         <div>
-          <p class="screen-kicker">离线数据链路与数据治理</p>
+          <p class="screen-kicker">离线数仓治理与任务运维</p>
           <h2>{{ pageTitle }}</h2>
         </div>
         <div class="screen-tools">
@@ -14,7 +14,7 @@
 
       <!-- Unified States overlay/container -->
       <div v-if="loading" class="state-wrapper">
-        <LoadingState message="正在加载数据治理与任务治理指标..." />
+        <LoadingState message="正在加载数仓治理与任务运维指标..." />
       </div>
       <div v-else-if="error" class="state-wrapper">
         <ErrorState :reason="error" @retry="loadAll" />
@@ -128,7 +128,7 @@
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
                       <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
-                      <td><a-button type="primary" size="mini" :loading="recleaning[issue.biz_date]" @click="recleanData(issue.biz_date)">一键重洗</a-button></td>
+                      <td><a-button type="primary" size="mini" :loading="recleaning[issue.biz_date]" @click="recleanData(issue.biz_date)">按日期重跑清洗</a-button></td>
                     </tr>
                   </tbody>
                 </table>
@@ -170,52 +170,12 @@
             </article>
           </section>
 
-          <!-- 数据质量规则配置 (Data Quality Rules Configuration) -->
-          <section class="screen-panel" style="margin-top: 16px; margin-bottom: 16px;">
-            <div class="screen-panel-head">
-              <h3>数据质量检测规则配置</h3>
-              <a-button type="primary" size="small" @click="openRuleModal">新增校验规则</a-button>
-            </div>
-            <div class="screen-table-wrap">
-              <table class="data-table screen-native-table admin-table">
-                <thead>
-                  <tr>
-                    <th style="width: 130px;">规则代码 (rule_id)</th>
-                    <th style="width: 150px;">规则名称 (rule_name)</th>
-                    <th style="width: 320px;">SQL 校验表达式 (rule_sql)</th>
-                    <th style="width: 100px;">启用状态 (is_active)</th>
-                    <th style="width: 80px;">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="rule in qualityRules" :key="rule.rule_id">
-                    <td><code>{{ rule.rule_id }}</code></td>
-                    <td>{{ rule.rule_name }}</td>
-                    <td><code class="sql-code" style="color: #67e8f9; background: rgba(103, 232, 249, 0.08); padding: 2px 6px; border-radius: 4px;">{{ rule.rule_sql }}</code></td>
-                    <td>
-                      <span :class="['tag', rule.is_active ? 'success' : 'failed']">
-                        {{ rule.is_active ? '已启用' : '已禁用' }}
-                      </span>
-                    </td>
-                    <td>
-                      <a-button size="mini" :type="rule.is_active ? 'outline' : 'primary'" @click="toggleRule(rule)">
-                        {{ rule.is_active ? '禁用' : '启用' }}
-                      </a-button>
-                    </td>
-                  </tr>
-                  <tr v-if="!qualityRules.length">
-                    <td colspan="5" class="empty-cell">暂无配置规则</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
 
           <!-- Three-Layer Data Warehouse Responsibility Section with Integrated Data Viewer -->
           <section class="screen-panel warehouse-layers-panel" style="margin-top: 16px;">
             <div class="screen-panel-head">
               <h3>数仓分层职责架构与数据查看</h3>
-              <span>ODS ➔ DWD ➔ DWS (点击对应层级卡片可直接查看/筛选物理数据)</span>
+              <span>ODS ➔ DWD ➔ DWS ➔ ADS (点击对应层级卡片可直接查看/查询物理数据)</span>
             </div>
             <div class="warehouse-layers-flow">
               <div :class="['layer-card', 'ods-card', { active: selectedLayer === 'ods' }]" @click="selectLayer('ods')">
@@ -235,7 +195,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div class="layer-title">DWD 层</div>
                   <span :class="['tag', qualityOverview.issue_count > 0 ? 'failed' : 'success']" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">
-                    {{ qualityOverview.issue_count > 0 ? `检测出 ${qualityOverview.issue_count} 个异常` : '正常' }}
+                    {{ qualityOverview.issue_count > 0 ? `已过滤掉 ${qualityOverview.issue_count} 个异常` : '正常' }}
                   </span>
                 </div>
                 <div class="layer-eng">Data Warehouse Detail</div>
@@ -258,6 +218,19 @@
                   <div>载体：<code>daily_metrics</code> / <code>agent_rankings</code> 表</div>
                 </div>
               </div>
+              <div class="layer-arrow">➔</div>
+              <div :class="['layer-card', 'ads-card', { active: selectedLayer === 'ads' }]" @click="selectLayer('ads')">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="layer-title">ADS 层</div>
+                  <span class="tag success" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">服务已就绪</span>
+                </div>
+                <div class="layer-eng">Application Data Service</div>
+                <p class="layer-desc">面向特定图表与AI报告等直接定制的分析视图数据，与底层公共汇总解耦。</p>
+                <div class="layer-mapping">
+                  <div>链路：<strong>DWD / DWS ➔ MySQL ADS</strong></div>
+                  <div>载体：<code>error_distribution</code> / <code>historical_alerts</code> 表</div>
+                </div>
+              </div>
             </div>
 
             <!-- Filters & Data Table for Selected Layer -->
@@ -269,7 +242,7 @@
                 <label>agent_id<select v-model="eventFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
                 <label>event_type<select v-model="eventFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
                 <label>status<select v-model="eventFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
-                <a-button type="primary" @click="loadEvents">筛选</a-button>
+                <a-button type="primary" @click="loadEvents">查询</a-button>
               </section>
               <section v-if="selectedLayer === 'dwd'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
                 <label>event_id<input v-model="dwdFilters.event_id" /></label>
@@ -277,7 +250,7 @@
                 <label>agent_id<select v-model="dwdFilters.agent_id"><option value="">全部</option><option v-for="agent in agentOptions" :key="agent" :value="agent">{{ agent }}</option></select></label>
                 <label>event_type<select v-model="dwdFilters.event_type"><option value="">全部</option><option v-for="type in eventTypeOptions" :key="type" :value="type">{{ type }}</option></select></label>
                 <label>status<select v-model="dwdFilters.status"><option value="">全部</option><option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option></select></label>
-                <a-button type="primary" @click="loadLayerData">筛选</a-button>
+                <a-button type="primary" @click="loadLayerData">查询</a-button>
               </section>
               <section v-if="selectedLayer === 'dws'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
                 <label>
@@ -300,7 +273,7 @@
                     @change="(value) => setDwsDate('end_date', value)"
                   />
                 </label>
-                <a-button type="primary" @click="loadLayerData">筛选</a-button>
+                <a-button type="primary" @click="loadLayerData">查询</a-button>
               </section>
 
               <!-- Tables -->
@@ -413,6 +386,108 @@
                   </tbody>
                 </table>
               </div>
+
+              <!-- ADS Filters -->
+              <section v-if="selectedLayer === 'ads'" class="toolbar admin-filter warehouse-filter" style="margin-top: 0;">
+                <label style="flex: 0 0 240px; min-width: 240px;">
+                  选择应用数据表
+                  <select v-model="adsSelectedTable" @change="loadLayerData" style="width: 200px;">
+                    <option value="error_distribution">error_distribution (异常分布)</option>
+                    <option value="historical_alerts">historical_alerts (历史告警)</option>
+                  </select>
+                </label>
+                <label>
+                  开始日期
+                  <a-date-picker
+                    v-model="adsFilters.start_date"
+                    value-format="YYYY-MM-DD"
+                    allow-clear
+                    @change="loadLayerData"
+                  />
+                </label>
+                <label>
+                  结束日期
+                  <a-date-picker
+                    v-model="adsFilters.end_date"
+                    value-format="YYYY-MM-DD"
+                    allow-clear
+                    @change="loadLayerData"
+                  />
+                </label>
+                <a-button type="primary" @click="loadLayerData">查询</a-button>
+              </section>
+
+              <!-- ADS error_distribution Table -->
+              <div v-if="selectedLayer === 'ads' && adsSelectedTable === 'error_distribution'" class="screen-table-wrap layer-table-wrap" style="margin-top: 12px;">
+                <div class="layer-table-title">
+                  <strong>ADS 异常错误分布表 (error_distribution)</strong>
+                  <span>{{ adsDataList.length }} records</span>
+                </div>
+                <table class="data-table screen-native-table admin-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 250px;">错误类型 (error_type)</th>
+                      <th style="width: 150px;">异常次数 (total_count)</th>
+                      <th style="width: 150px;">占比 (percentage)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, idx) in adsDataList" :key="idx">
+                      <td><code>{{ item.error_type }}</code></td>
+                      <td>{{ formatNumber(item.total_count) }}</td>
+                      <td>{{ (Number(item.percentage || 0) * 100).toFixed(2) }}%</td>
+                    </tr>
+                    <tr v-if="!adsDataList.length">
+                      <td colspan="3" class="empty-cell">暂无异常分布数据</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- ADS historical_alerts Table -->
+              <div v-if="selectedLayer === 'ads' && adsSelectedTable === 'historical_alerts'" class="screen-table-wrap layer-table-wrap" style="margin-top: 12px;">
+                <div class="layer-table-title">
+                  <strong>ADS 历史告警归档表 (historical_alerts)</strong>
+                  <span>{{ adsDataList.length }} records</span>
+                </div>
+                <table class="data-table screen-native-table admin-table">
+                  <thead>
+                    <tr>
+                      <th>告警 ID (alert_id)</th>
+                      <th>业务日期 (metric_date)</th>
+                      <th>告警类型 (alert_type)</th>
+                      <th>级别 (level)</th>
+                      <th>智能体 (agent_id)</th>
+                      <th>当前值 (current_val)</th>
+                      <th>阀值 (threshold)</th>
+                      <th>状态 (status)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in adsDataList" :key="item.alert_id">
+                      <td><code>{{ item.alert_id }}</code></td>
+                      <td>{{ item.metric_date }}</td>
+                      <td>{{ item.alert_type }}</td>
+                      <td>
+                        <span :class="['tag', item.level === 'error' || item.level === 'critical' ? 'failed' : 'warning']">
+                          {{ item.level }}
+                        </span>
+                      </td>
+                      <td><code>{{ item.agent_id || 'system' }}</code></td>
+                      <td>{{ item.current_value ?? item.current_val }}</td>
+                      <td>{{ item.threshold_value ?? item.threshold }}</td>
+                      <td>
+                        <span :class="['tag', item.status === 'resolved' ? 'success' : 'failed']">
+                          {{ item.status }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr v-if="!adsDataList.length">
+                      <td colspan="8" class="empty-cell">暂无历史告警数据</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -426,6 +501,48 @@
               <p>离线计算流水线在生产环境中由 <strong>Crontab 定时任务（每天凌晨 02:00）</strong> 自动触发运行。此控制台主要用于开发与运维进行历史日期补数（Backfill）或失败作业的手动重试。运行前请确认源数据库（MySQL Source）在所选业务日期是否有数据。</p>
             </div>
           </div>
+
+          <!-- 清洗前置：数据质量规则配置 (Data Quality Rules Configuration) -->
+          <section class="screen-panel" style="margin-top: 16px; margin-bottom: 16px;">
+            <div class="screen-panel-head">
+              <h3>清洗前置：质量规则配置</h3>
+            </div>
+            <div style="margin: 0 0 12px; color: rgba(226, 232, 240, 0.72); font-size: 12px; line-height: 1.6;">
+              <span style="color: #22d3ee; font-weight: bold;">[说明]</span>
+              Spark 离线清洗任务运行前，会加载此处已启用的质量规则，并在 <strong>Stage 2 (数据清洗)</strong> 中对 ODS 原始事件进行过滤，不符合规则的记录将进入脏数据归档。
+            </div>
+            <div class="screen-table-wrap">
+              <table class="data-table screen-native-table admin-table">
+                <thead>
+                  <tr>
+                    <th style="width: 150px;">规则代码 (rule_id)</th>
+                    <th style="width: 250px;">规则名称 (rule_name)</th>
+                    <th style="width: 120px;">启用状态 (is_active)</th>
+                    <th style="width: 100px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="rule in qualityRules" :key="rule.rule_id">
+                    <td><code>{{ rule.rule_id }}</code></td>
+                    <td>{{ rule.rule_name }}</td>
+                    <td>
+                      <span :class="['tag', rule.is_active ? 'success' : 'failed']">
+                        {{ rule.is_active ? '已启用' : '已禁用' }}
+                      </span>
+                    </td>
+                    <td>
+                      <a-button size="mini" :type="rule.is_active ? 'outline' : 'primary'" @click="toggleRule(rule)">
+                        {{ rule.is_active ? '禁用' : '启用' }}
+                      </a-button>
+                    </td>
+                  </tr>
+                  <tr v-if="!qualityRules.length">
+                    <td colspan="4" class="empty-cell">暂无配置规则</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <section class="screen-panel">
             <div class="screen-panel-head">
@@ -650,36 +767,7 @@
       <pre class="json-pre">{{ jsonPreview }}</pre>
     </a-modal>
 
-    <!-- 新增规则 Modal -->
-    <a-modal v-model:visible="ruleModalVisible" title="新增数据质量检测规则" @ok="handleCreateRule" width="600px">
-      <a-form :model="newRule" layout="vertical">
-        <a-form-item label="常用 SQL 模板参考 (点击可快捷输入)">
-          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_tokens_limit', 'LLM调用Token数上限校验', 'total_tokens <= 8192')">
-              Token上限校验
-            </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_latency_limit', '智能体运行超长耗时校验', 'latency_ms <= 60000')">
-              超时限额校验
-            </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('api_key_leakage', 'API Key 泄露风险校验', 'content NOT LIKE \'%sk-%\' AND content NOT LIKE \'%key%\'')">
-              API秘钥防泄露
-            </a-tag>
-            <a-tag color="arcoblue" style="cursor: pointer;" @click="applySqlTemplate('max_retries_limit', '重试次数越界校验', 'retry_count <= 5')">
-              重试上限校验
-            </a-tag>
-          </div>
-        </a-form-item>
-        <a-form-item label="规则代码 (rule_id)">
-          <a-input v-model="newRule.rule_id" placeholder="例如: non_negative_latency" />
-        </a-form-item>
-        <a-form-item label="规则名称 (rule_name)">
-          <a-input v-model="newRule.rule_name" placeholder="例如: 时延非负校验" />
-        </a-form-item>
-        <a-form-item label="SQL 校验表达式 (rule_sql)">
-          <a-textarea v-model="newRule.rule_sql" placeholder="例如: latency_ms >= 0 (Spark SQL 语法)" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
+
   </section>
 </template>
 
@@ -716,6 +804,8 @@ import {
   updateQualityRule,
   retryAdminJobRun
 } from '../api/admin'
+import { fetchHistoryAlerts } from '../api/dashboard'
+import { fetchAnalyticsErrors } from '../api/statistics'
 import { lineOption } from '../charts/options'
 const route = useRoute()
 const router = useRouter()
@@ -757,6 +847,9 @@ const dwdEvents = ref([])
 const dwsMetrics = ref([])
 const dwdFilters = ref({ event_id: '', trace_id: '', agent_id: '', event_type: '', status: '' })
 const dwsFilters = ref({ start_date: '', end_date: '' })
+const adsSelectedTable = ref('error_distribution')
+const adsFilters = ref({ start_date: todayString(), end_date: todayString() })
+const adsDataList = ref([])
 const jobs = ref([])
 const jobRuns = ref([])
 const qualityOverview = ref({})
@@ -764,13 +857,6 @@ const qualityIssues = ref([])
 const auditLogs = ref([])
 const qualityRules = ref([])
 const recleaning = ref({})
-const ruleModalVisible = ref(false)
-const newRule = ref({
-  rule_id: '',
-  rule_name: '',
-  rule_sql: '',
-  is_active: 1
-})
 const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
 const agentOptions = ['planner_agent', 'search_agent', 'analysis_agent', 'writer_agent', 'reviewer_agent']
 const eventTypeOptions = ['task_start', 'tool_call', 'llm_call', 'handoff', 'task_finish', 'agent_start', 'agent_complete', 'llm_response']
@@ -961,6 +1047,25 @@ async function loadLayerData() {
     } catch (err) {
       Message.error({ content: `DWS 查询失败: ${err.message || err}`, duration: 5000 })
     }
+    return
+  }
+  if (selectedLayer.value === 'ads') {
+    if (adsSelectedTable.value === 'error_distribution') {
+      try {
+        const res = await fetchAnalyticsErrors()
+        adsDataList.value = (res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []))
+      } catch (err) {
+        Message.error({ content: `ADS 异常分布查询失败: ${err.message || err}`, duration: 5000 })
+      }
+    } else if (adsSelectedTable.value === 'historical_alerts') {
+      const queryDate = adsFilters.value.end_date || adsFilters.value.start_date || todayString()
+      try {
+        const res = await fetchHistoryAlerts(queryDate)
+        adsDataList.value = (res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []))
+      } catch (err) {
+        Message.error({ content: `ADS 历史告警查询失败: ${err.message || err}`, duration: 5000 })
+      }
+    }
   }
 }
 
@@ -983,25 +1088,7 @@ async function loadRules() {
   }
 }
 
-function openRuleModal() {
-  newRule.value = { rule_id: '', rule_name: '', rule_sql: '', is_active: 1 }
-  ruleModalVisible.value = true
-}
 
-async function handleCreateRule() {
-  if (!newRule.value.rule_id || !newRule.value.rule_name || !newRule.value.rule_sql) {
-    Message.error('请填写完整信息')
-    return
-  }
-  try {
-    await createQualityRule(newRule.value)
-    Message.success('质量规则添加成功')
-    ruleModalVisible.value = false
-    await loadRules()
-  } catch (e) {
-    Message.error(e.response?.data?.detail || '添加规则失败')
-  }
-}
 
 async function toggleRule(rule) {
   try {
@@ -1029,11 +1116,7 @@ async function recleanData(dateVal) {
   }
 }
 
-function applySqlTemplate(id, name, sql) {
-  newRule.value.rule_id = id
-  newRule.value.rule_name = name
-  newRule.value.rule_sql = sql
-}
+
 
 
 async function loadJobs() {
@@ -1211,7 +1294,13 @@ function renderLineage() {
       source: e.from,
       target: e.to,
       value: e.label,
-      label: { show: false },
+      label: {
+        show: true,
+        position: 'middle',
+        color: '#c5f5ff',
+        fontSize: 10,
+        formatter: (params) => params.data?.value || ''
+      },
       lineStyle: {
         color: 'rgba(103, 232, 249, 0.55)',
         curveness: 0.16,

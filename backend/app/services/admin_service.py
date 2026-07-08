@@ -391,7 +391,7 @@ class AdminService:
         ssh_opts_str = os.getenv("SSH_OPTS", "-o StrictHostKeyChecking=no")
         import shlex
         ssh_opts = shlex.split(ssh_opts_str)
-        project_home = os.getenv("PROJECT_HOME", "/root/projects/agentscope")
+        project_home = os.getenv("PROJECT_HOME", "/root/agentscope")
         self._ensure_job(job_code)
         if biz_date > date.today():
             raise ValueError("业务日期不能晚于今天")
@@ -458,7 +458,7 @@ class AdminService:
                 
                 # Formulate the spark-submit command on master
                 spark_cmd = (
-                    f"source /etc/profile && cd /root/projects/agentscope && "
+                    f"source /etc/profile && cd /root/agentscope && "
                     f"export SPARK_HOME=${{SPARK_HOME:-/usr/local/spark}} && "
                     f"export HADOOP_CONF_DIR=${{HADOOP_CONF_DIR:-/usr/local/hadoop-2.7.6/etc/hadoop}} && "
                     f"export YARN_CONF_DIR=${{YARN_CONF_DIR:-$HADOOP_CONF_DIR}} && "
@@ -467,7 +467,7 @@ class AdminService:
                     f"--class com.agentscope.batch.{job_class} "
                     f"--master ${{SPARK_MASTER:-${{SPARK_MASTER_URL:-yarn}}}} "
                     f"--deploy-mode ${{SPARK_DEPLOY_MODE:-client}} "
-                    f"/root/projects/agentscope/spark-batch/target/agentscope-spark-batch-0.1.0.jar "
+                    f"/root/agentscope/spark-batch/target/agentscope-spark-batch-0.1.0.jar "
                     f"--input /agentscope/clean/agent_events/dt={biz_date.isoformat()} "
                     f"--metric-base /agentscope/metric "
                     f"--date {biz_date.isoformat()} "

@@ -46,24 +46,48 @@ export function barOption(title, xData, data, name) {
 }
 
 export function graphOption(graph) {
+  const nodes = (graph.nodes || []).map((node) => ({
+    ...node,
+    symbolSize: Math.max(36, Math.min(82, Number(node.value || node.symbolSize || 36))),
+    itemStyle: { color: '#06b6d4' }
+  }))
+  const links = (graph.links || []).map((link) => ({
+    ...link,
+    lineStyle: {
+      color: 'rgba(103, 232, 249, 0.55)',
+      curveness: 0.16,
+      width: Math.max(1, Math.min(8, Number(link.call_count || 1) / 150))
+    }
+  }))
   return {
-    tooltip: {},
+    tooltip: {
+      trigger: 'item',
+      confine: true,
+      formatter: (params) => {
+        if (params.dataType === 'node') {
+          return `节点: <b>${params.name}</b><br/>交互数: ${params.value ?? 0}`
+        }
+        const link = params.data || {}
+        return `协作流动: <b>${link.source} ➔ ${link.target}</b><br/>交互次数: ${link.call_count ?? 0}<br/>平均时延: ${link.avg_latency_ms ?? 0} ms<br/>失败次数: ${link.failed_count ?? 0}`
+      }
+    },
     series: [
       {
         type: 'graph',
         layout: 'force',
         roam: true,
-        label: { show: true, color: '#f8fafc', fontSize: 11 },
-        force: { repulsion: 240, edgeLength: 130 },
-        data: (graph.nodes || []).map((node) => ({
-          ...node,
-          symbolSize: Math.max(36, Math.min(82, node.value || 36)),
-          itemStyle: { color: '#06b6d4' }
-        })),
-        links: (graph.links || []).map((link) => ({
-          ...link,
-          lineStyle: { width: Math.max(1, Math.min(8, (link.call_count || 1) / 150)), color: 'rgba(103, 232, 249, 0.35)' }
-        }))
+        draggable: true,
+        top: 24,
+        right: 28,
+        bottom: 30,
+        left: 28,
+        symbol: 'circle',
+        edgeSymbol: ['none', 'arrow'],
+        edgeSymbolSize: [4, 9],
+        label: { show: true, position: 'bottom', color: '#bdefff', fontSize: 10, fontWeight: 'bold' },
+        force: { repulsion: 360, edgeLength: [170, 240], gravity: 0.035 },
+        data: nodes,
+        links
       }
     ]
   }

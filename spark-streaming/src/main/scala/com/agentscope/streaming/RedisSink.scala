@@ -73,12 +73,14 @@ object RedisSink {
   }
 
   private def overviewToMap(overview: RealtimeOverview, alertCount: Int): Map[String, Any] = {
+    val total = math.max(overview.successCount + overview.failedCount, 1L)
     Map(
       "running_tasks" -> overview.runningTasks,
       "active_agents" -> overview.activeAgents,
       "events_per_minute" -> overview.eventsPerMinute,
       "success_count" -> overview.successCount,
       "failed_count" -> overview.failedCount,
+      "success_rate" -> overview.successCount.toDouble / total.toDouble,
       "error_rate" -> overview.errorRate,
       "avg_latency_ms" -> overview.avgLatencyMs,
       "token_total_5m" -> overview.tokenTotal,

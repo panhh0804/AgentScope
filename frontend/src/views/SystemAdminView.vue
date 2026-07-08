@@ -74,63 +74,81 @@
       </div>
     </section>
 
-    <!-- 2. 下层左右分栏 -->
+    <!-- 2. 中层通栏：实时链路阶梯压测分析 (解决之前折线图在左侧挤压问题) -->
+    <section class="cyber-panel" style="margin-bottom: 24px;">
+      <div class="panel-title-bar">
+        <span class="glow-tag">PERFORMANCE BENCHMARK</span>
+        <h3>实时链路阶梯压测分析</h3>
+      </div>
+      <div class="chart-container" style="padding: 10px 0;">
+        <div ref="chartRef" style="width: 100%; height: 280px;"></div>
+      </div>
+    </section>
+
+    <!-- 3. 底层分栏：诊断执行报告单 与 审计历史记录 -->
     <div class="system-grid">
-      <!-- 左下：压测性能折线图 -->
+      <!-- 左下 (1.1fr)：结构化诊断执行报告单 (剔除传统黑框 terminal 样式，渲染为直观报告单) -->
       <div class="left-panel">
-        <section class="cyber-panel" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
-          <div class="panel-title-bar" style="margin-bottom: 12px;">
-            <span class="glow-tag">PERFORMANCE</span>
-            <h3>实时链路阶梯压测分析</h3>
+        <section class="cyber-panel" style="height: 100%; min-height: 380px; display: flex; flex-direction: column;">
+          <div class="panel-title-bar">
+            <span class="glow-tag">DIAGNOSTIC REPORT</span>
+            <h3>最新诊断报告单</h3>
+            <span class="muted" style="margin-left: auto; font-family: monospace; font-size: 11px;">
+              {{ consoleTitle }}
+            </span>
           </div>
-          <div class="chart-container" style="flex: 1; display: flex; align-items: center;">
-            <div ref="chartRef" style="width: 100%; height: 350px;"></div>
+          
+          <div class="report-details-container" ref="terminalRef" style="flex: 1; overflow-y: auto; padding-right: 6px;">
+            <!-- 运行中状态 -->
+            <div v-if="isExecuting" class="report-executing-state">
+              <span class="loading-spinner large"></span>
+              <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
+              <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
+            </div>
+
+            <!-- 空置状态 -->
+            <div v-else-if="parsedLogs.length === 0" class="report-empty-state">
+              <p>请点击顶部按钮发起实时诊断自检，或在右侧审计列表中点击「查看日志」载入历史运行诊断单。</p>
+            </div>
+
+            <!-- 结构化报告条目 -->
+            <div v-else class="report-steps-list">
+              <div
+                v-for="(step, sIdx) in parsedLogs"
+                :key="sIdx"
+                :class="['report-step-card', `step-status-${step.status}`]"
+              >
+                <div class="step-card-header">
+                  <span class="step-badge">{{ step.step }}</span>
+                  <span class="step-name">{{ step.name }}</span>
+                  <span :class="['step-status-tag', step.status]">
+                    {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
+                  </span>
+                </div>
+                <div class="step-card-body">
+                  <div
+                    v-for="(detail, dIdx) in step.detail"
+                    :key="dIdx"
+                    :class="['step-detail-row', `detail-type-${detail.type}`]"
+                  >
+                    <span class="indicator-icon"></span>
+                    <p class="detail-text" v-html="detail.text"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
 
-      <!-- 右下：终端和自检历史 -->
-      <div class="right-panel" style="display: flex; flex-direction: column; gap: 24px;">
-        <!-- CRT 控制台 -->
-        <div class="terminal-container">
-          <div class="terminal-header">
-            <div class="mac-buttons">
-              <span class="close"></span>
-              <span class="minimize"></span>
-              <span class="maximize"></span>
-            </div>
-            <div class="terminal-logo">
-              <Terminal :size="12" />
-              <span class="terminal-title">SHELL LOG: {{ consoleTitle }}</span>
-            </div>
-            <div class="terminal-status" v-if="isExecuting">
-              <RefreshCw class="spin" :size="12" />
-              <span>RUNNING</span>
-            </div>
-          </div>
-          <div class="terminal-box" ref="terminalRef">
-            <div class="terminal-glow"></div>
-            <div class="terminal-content">
-              <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
-                <p :class="['terminal-line', `line-type-${line.type}`]">
-                  <span class="line-prompt" v-if="line.type === 'command'">root@master:~# </span>
-                  <span v-html="line.html"></span>
-                </p>
-              </template>
-              <div v-if="isExecuting" class="terminal-line line-type-info blink" style="margin-top: 10px;">
-                <span class="loading-spinner"></span>正在执行诊断指令并捕获集群日志流，这大约需要数秒到几十秒，请稍候...
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 诊断审计历史表格 -->
-        <section class="cyber-panel">
+      <!-- 右下 (0.9fr)：自检审计历史表格 -->
+      <div class="right-panel">
+        <section class="cyber-panel" style="height: 100%; min-height: 380px; display: flex; flex-direction: column;">
           <div class="panel-title-bar">
             <span class="glow-tag">AUDIT LOGS</span>
             <h3>诊断审计历史</h3>
           </div>
-          <div class="screen-table-wrap layer-table-wrap" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px;">
+          <div class="screen-table-wrap layer-table-wrap" style="flex: 1; overflow-y: auto; border: 1px solid rgba(103, 232, 249, 0.08); border-radius: 4px;">
             <table class="data-table screen-native-table admin-table cyber-table">
               <thead>
                 <tr>
@@ -156,7 +174,7 @@
                       class="tbl-btn"
                       @click="loadLogsToConsole(run)"
                     >
-                      查看日志
+                      加载报告
                     </button>
                   </td>
                 </tr>
@@ -247,7 +265,7 @@ const serviceGridItems = computed(() => {
     else if (log.includes('MySQL 端口') || log.includes('mysqladmin ping')) statusMap.mysql = 'warning'
 
     if (log.includes('FastAPI 后端正常')) statusMap.backend = 'success'
-    else if (log.includes('FastAPI 后端不可达')) statusMap.backend = 'failed'
+    else if (log.includes('FastAPI 后端不可达') || log.includes('FastAPI 后端已中断')) statusMap.backend = 'failed'
   }
 
   return {
@@ -310,40 +328,129 @@ const serviceGridItems = computed(() => {
   }
 })
 
-// 解析控制台颜色行
-const formattedConsoleLines = computed(() => {
+// 核心自检日志结构化解析器 ➔ 剔除 raw terminal 控制字符，渲染成精美的步骤单
+const parsedLogs = computed(() => {
   if (!consoleRawText.value) return []
-  return consoleRawText.value.split('\n').map(line => {
-    let type = 'info'
-    let html = line
-
-    if (line.startsWith('$ ') || line.startsWith('root@master:')) {
-      type = 'command'
-      html = line.substring(line.indexOf('#') + 1).trim()
-    } else if (line.includes('[✅ PASS]')) {
-      type = 'pass'
-      html = line.replace('[✅ PASS]', '<span class="status-badge pass">PASS</span>')
-    } else if (line.includes('[❌ FAIL]')) {
-      type = 'fail'
-      html = line.replace('[❌ FAIL]', '<span class="status-badge fail">FAIL</span>')
-    } else if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
-      type = 'warn'
-      html = line.replace(/\[⚠️\s*WARN\]/, '<span class="status-badge warn">WARN</span>')
-    } else if (line.includes('[INFO]')) {
-      type = 'info'
-      html = line.replace('[INFO]', '<span class="status-badge info">INFO</span>')
-    } else if (line.includes('[ERROR]')) {
-      type = 'fail'
-      html = line.replace('[ERROR]', '<span class="status-badge fail">ERROR</span>')
-    } else if (line.includes('[WARN]')) {
-      type = 'warn'
-      html = line.replace('[WARN]', '<span class="status-badge warn">WARN</span>')
-    } else if (line.startsWith('──────') || line.startsWith('╔══') || line.startsWith('║') || line.startsWith('╚══') || line.startsWith('====')) {
-      type = 'banner'
+  const lines = consoleRawText.value.split('\n')
+  const steps = []
+  
+  let currentStep = null
+  
+  for (let line of lines) {
+    line = line.trim()
+    if (!line) continue
+    
+    // 跳过 SSH 指令提示前缀
+    if (line.startsWith('root@master:')) {
+      continue
+    }
+    
+    // 匹配章节标题，如 "1/8 HDFS" 或者 "3/8 Spark on YARN"
+    const sectionMatch = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
+    if (sectionMatch) {
+      if (currentStep) {
+        steps.push(currentStep)
+      }
+      currentStep = {
+        step: sectionMatch[1],
+        name: sectionMatch[2],
+        status: 'success',
+        detail: []
+      }
+      continue
     }
 
-    return { type, html }
-  })
+    // 匹配阶梯压测标题，如 "梯度测试: 5 Events/s"
+    const benchmarkGradeMatch = line.match(/梯度测试:\s*(\d+\s+Events\/s.*?)$/)
+    if (benchmarkGradeMatch) {
+      if (currentStep) {
+        steps.push(currentStep)
+      }
+      currentStep = {
+        step: 'TEST',
+        name: benchmarkGradeMatch[1],
+        status: 'success',
+        detail: []
+      }
+      continue
+    }
+
+    // 忽略自检主流程标题、ASCII 盒子及汇总统计行，保持面板清爽
+    if (line.startsWith('汇总：') || line.includes('汇总：') || line.includes('存在失败项') || line.startsWith('╔══') || line.startsWith('║') || line.startsWith('╚══') || line.startsWith('====') || line.includes('AgentScope 集群健康检查报告') || line.includes('收到 SIG')) {
+      continue
+    }
+    
+    // 匹配 PASS 状态行
+    if (line.includes('[✅ PASS]')) {
+      const msg = line.substring(line.indexOf('[✅ PASS]') + 8).trim()
+      const row = { type: 'pass', text: msg }
+      if (currentStep) {
+        currentStep.detail.push(row)
+      } else {
+        steps.push({ step: 'INFO', name: '前置校验', status: 'success', detail: [row] })
+      }
+      continue
+    }
+
+    // 匹配 FAIL 状态行
+    if (line.includes('[❌ FAIL]')) {
+      const msg = line.substring(line.indexOf('[❌ FAIL]') + 8).trim()
+      const row = { type: 'fail', text: msg }
+      if (currentStep) {
+        currentStep.status = 'failed'
+        currentStep.detail.push(row)
+      } else {
+        steps.push({ step: 'ERROR', name: '系统警报', status: 'failed', detail: [row] })
+      }
+      continue
+    }
+
+    // 匹配 WARN 状态行
+    if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
+      const idx = line.indexOf('WARN]') + 5
+      const msg = line.substring(idx).trim()
+      const row = { type: 'warn', text: msg }
+      if (currentStep) {
+        if (currentStep.status !== 'failed') currentStep.status = 'warning'
+        currentStep.detail.push(row)
+      } else {
+        steps.push({ step: 'WARN', name: '系统警告', status: 'warning', detail: [row] })
+      }
+      continue
+    }
+
+    // 匹配压测模拟器启动 INFO 提示
+    const infoMatch = line.match(/^\[.+?\]\s*\[INFO\]\s*(.+)$/)
+    if (infoMatch) {
+      const msg = infoMatch[1]
+      if (currentStep) {
+        currentStep.detail.push({ type: 'info', text: msg })
+      }
+      continue
+    }
+
+    // 匹配压测模拟器启动 WARN 提示
+    const warnMatch = line.match(/^\[.+?\]\s*\[WARN\]\s*(.+)$/)
+    if (warnMatch) {
+      const msg = warnMatch[1]
+      if (currentStep) {
+        if (currentStep.status !== 'failed') currentStep.status = 'warning'
+        currentStep.detail.push({ type: 'warn', text: msg })
+      }
+      continue
+    }
+
+    // 普通日志输出行
+    if (currentStep) {
+      currentStep.detail.push({ type: 'info', text: line })
+    }
+  }
+  
+  if (currentStep) {
+    steps.push(currentStep)
+  }
+  
+  return steps
 })
 
 async function loadData() {
@@ -388,19 +495,19 @@ async function triggerCheck(jobCode) {
     system_benchmark: 'bash scripts/benchmark.sh --duration 15'
   }
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
-  Message.info({ content: '正在调度集群客户端自检脚本，请关注右侧控制台日志输出...', duration: 5000 })
+  Message.info({ content: '正在调度集群客户端自检脚本，请关注左侧自检报告单更新...', duration: 5000 })
 
   try {
     const runRes = await runSystemCheck(jobCode)
-    Message.success({ content: '诊断完成！数据网格和状态报告已就绪。', duration: 4000 })
+    Message.success({ content: '自检完成！最新检测报告单已生成。', duration: 4000 })
     await loadData()
     if (runRes) {
       loadLogsToConsole(runRes)
     }
   } catch (err) {
     console.error(err)
-    Message.error({ content: `脚本运行异常或超时: ${err.message || err}`, duration: 5000 })
-    consoleRawText.value += `\n[ERROR] 脚本执行被拒绝或连接断开: ${err.message || err}`
+    Message.error({ content: `自检脚本运行异常: ${err.message || err}`, duration: 5000 })
+    consoleRawText.value += `\n[ERROR] 脚本执行失败，网关连接超时: ${err.message || err}`
   } finally {
     isExecuting.value = false
   }
@@ -455,7 +562,7 @@ function updateChart() {
     },
     xAxis: {
       type: 'category',
-      data: ['梯度 1', '梯度 2', '梯度 3', '梯度 4'],
+      data: ['阶梯梯度 1', '阶梯梯度 2', '阶梯梯度 3', '阶梯梯度 4'],
       axisLine: { lineStyle: { color: 'rgba(103, 232, 249, 0.15)' } },
       axisLabel: { color: '#64748b', formatter: (value, idx) => `${value}\n(${streamRate[idx]} E/s)` }
     },
@@ -471,7 +578,7 @@ function updateChart() {
       {
         type: 'value',
         name: '延时 (ms)',
-        nameTextStyle: { color: '#fb7185', fontSize: 10 },
+        nameTextStyle: { color: '#64748b', fontSize: 10 },
         splitLine: { show: false },
         axisLine: { lineStyle: { color: 'rgba(251, 113, 133, 0.15)' } },
         axisLabel: { color: '#fb7185' }
@@ -631,7 +738,7 @@ onUnmounted(() => {
 /* 两栏网格 */
 .system-grid {
   display: grid;
-  grid-template-columns: 1.25fr 0.75fr;
+  grid-template-columns: 1.1fr 0.9fr;
   gap: 24px;
 }
 
@@ -685,7 +792,7 @@ onUnmounted(() => {
   100% { transform: scale(0.9); opacity: 0.7; }
 }
 
-/* 健康卡片通栏样式 —— 宽屏下 4 列排布极具张力 */
+/* 健康卡片通栏样式 */
 .health-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -816,132 +923,161 @@ onUnmounted(() => {
   50% { box-shadow: 0 0 10px #f43f5e; opacity: 1; }
 }
 
-/* CRT 复古终端机 */
-.terminal-container {
-  border: 1px solid rgba(34, 211, 238, 0.25);
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+/* 结构化诊断报告单样式设计 */
+.report-details-container {
+  font-family: 'Outfit', 'Inter', sans-serif;
 }
 
-.terminal-header {
-  background: #090d16;
-  padding: 10px 16px;
+.report-executing-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(34, 211, 238, 0.15);
+  justify-content: center;
+  padding: 60px 0;
+  text-align: center;
 }
 
-.mac-buttons {
-  display: flex;
-  gap: 6px;
+.report-executing-state .loading-spinner.large {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+  border-color: #22d3ee;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
 }
 
-.mac-buttons span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
+.loading-text {
+  font-size: 14px;
+  color: #e2e8f0;
+  margin: 16px 0 6px 0;
+  font-weight: bold;
 }
 
-.mac-buttons .close { background: #fb7185; }
-.mac-buttons .minimize { background: #fbbf24; }
-.mac-buttons .maximize { background: #34d399; }
-
-.terminal-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #64748b;
-}
-
-.terminal-title {
-  font-family: monospace;
+.loading-subtext {
   font-size: 11px;
-  letter-spacing: 0.05em;
+  color: #64748b;
+  font-family: monospace;
 }
 
-.terminal-status {
+.report-empty-state {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  height: 100%;
+  min-height: 260px;
+  color: #64748b;
+  text-align: center;
+  font-size: 13px;
+  padding: 0 30px;
+  line-height: 1.6;
+}
+
+.report-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.report-step-card {
+  background: rgba(14, 42, 68, 0.2);
+  border: 1px solid rgba(103, 232, 249, 0.1);
+  border-radius: 4px;
+  padding: 12px;
+  transition: border-color 0.2s;
+}
+
+.step-status-success { border-left: 3px solid #10b981; }
+.step-status-warning { border-left: 3px solid #f59e0b; }
+.step-status-failed { border-left: 3px solid #f43f5e; }
+
+.step-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  padding-bottom: 6px;
+}
+
+.step-badge {
+  background: rgba(34, 211, 238, 0.1);
+  color: #22d3ee;
   font-family: monospace;
   font-size: 10px;
-  color: #10b981;
   font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
 }
 
-.spin {
-  animation: spin-anim 1s linear infinite;
-}
-
-@keyframes spin-anim {
-  to { transform: rotate(360deg); }
-}
-
-.terminal-box {
-  background: #030712;
-  height: 250px;
-  overflow-y: auto;
-  padding: 16px;
-  position: relative;
-}
-
-/* 终端滤镜 */
-.terminal-glow {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  box-shadow: inset 0 0 30px rgba(34, 211, 238, 0.04);
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.terminal-content {
-  position: relative;
-  z-index: 2;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-.terminal-line {
-  margin: 0 0 6px 0;
-  line-height: 1.5;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.line-prompt {
-  color: #38bdf8;
+.step-name {
+  font-size: 13px;
   font-weight: bold;
+  color: #f1f5f9;
 }
 
-.line-type-command { color: #f8fafc; font-weight: bold; }
-.line-type-pass { color: #34d399; }
-.line-type-fail { color: #f43f5e; }
-.line-type-warn { color: #fbbf24; }
-.line-type-info { color: #94a3b8; }
-.line-type-banner { color: #38bdf8; font-weight: bold; }
-
-.status-badge {
-  display: inline-block;
-  padding: 1px 4px;
+.step-status-tag {
+  margin-left: auto;
   font-family: monospace;
   font-size: 9px;
   font-weight: bold;
+  padding: 1px 5px;
   border-radius: 2px;
-  margin-right: 4px;
-  vertical-align: middle;
 }
 
-.status-badge.pass { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.status-badge.fail { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
-.status-badge.warn { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.status-badge.info { background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3); }
+.step-status-tag.success { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.step-status-tag.warning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.step-status-tag.failed { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
 
-/* 审计历史表格美化 */
+.step-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.indicator-icon {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.detail-type-pass .indicator-icon { background: #10b981; box-shadow: 0 0 4px #10b981; }
+.detail-type-fail .indicator-icon { background: #f43f5e; box-shadow: 0 0 4px #f43f5e; }
+.detail-type-warn .indicator-icon { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+.detail-type-info .indicator-icon { background: #64748b; }
+
+.detail-text {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0;
+  font-family: monospace;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0 3px;
+  font-family: monospace;
+  font-size: 8px;
+  font-weight: bold;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.status-badge.pass { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-badge.fail { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+.status-badge.warn { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.status-badge.info { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+
+/* 审计历史表格 */
 .cyber-table {
   border-collapse: collapse;
 }
@@ -1010,21 +1146,25 @@ onUnmounted(() => {
 }
 
 /* 滚动条 */
-.terminal-box::-webkit-scrollbar,
+.report-details-container::-webkit-scrollbar,
 .layer-table-wrap::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.terminal-box::-webkit-scrollbar-thumb,
+.report-details-container::-webkit-scrollbar-thumb,
 .layer-table-wrap::-webkit-scrollbar-thumb {
-  background: rgba(34, 211, 238, 0.2);
+  background: rgba(34, 211, 238, 0.15);
   border-radius: 3px;
 }
 
-.terminal-box::-webkit-scrollbar-thumb:hover,
+.report-details-container::-webkit-scrollbar-thumb:hover,
 .layer-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.3);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 1300px) {

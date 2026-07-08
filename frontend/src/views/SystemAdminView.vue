@@ -11,6 +11,15 @@
       </div>
       <div class="toolbar-actions">
         <button
+          class="cyber-btn cyber-btn-primary"
+          style="background: linear-gradient(135deg, #f59e0b, #ef4444); border-color: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);"
+          :disabled="isExecuting"
+          @click="triggerCheck('system_all_checks')"
+        >
+          <Layers :size="15" />
+          <span>一键全链路诊断</span>
+        </button>
+        <button
           class="cyber-btn cyber-btn-outline"
           :disabled="isExecuting"
           @click="triggerCheck('system_health_check')"
@@ -598,7 +607,8 @@ function loadLogsToConsole(run) {
     system_health_check: 'bash scripts/health_check.sh',
     system_local_checks: 'bash scripts/run_local_checks.sh',
     system_fault_tolerance: 'bash scripts/test_fault_tolerance.sh',
-    system_benchmark: 'bash scripts/benchmark.sh --duration 15'
+    system_benchmark: 'bash scripts/benchmark.sh --duration 15',
+    system_all_checks: 'bash scripts/run_all_checks.sh'
   }
   const cmd = cmdMap[run.job_code] || 'bash script.sh'
   consoleRawText.value = `root@master:~# ${cmd}\n${run.log_summary || '无日志输出'}`
@@ -624,7 +634,8 @@ async function triggerCheck(jobCode) {
     system_health_check: 'bash scripts/health_check.sh',
     system_local_checks: 'bash scripts/run_local_checks.sh',
     system_fault_tolerance: 'bash scripts/test_fault_tolerance.sh',
-    system_benchmark: 'bash scripts/benchmark.sh --duration 15'
+    system_benchmark: 'bash scripts/benchmark.sh --duration 15',
+    system_all_checks: 'bash scripts/run_all_checks.sh'
   }
   currentJobCode.value = jobCode
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`

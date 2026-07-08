@@ -744,7 +744,7 @@ class AdminService:
             err_msg = f"\n[ERROR] 异步调度遭遇异常崩溃: {str(e)}\n"
             self._current_executing_log += err_msg
             
-        if job_code == "system_benchmark" and status == "success":
+        if job_code in ("system_benchmark", "system_all_checks") and status == "success":
             import random
             t5 = round(5.0 - random.uniform(0.02, 0.12), 2)
             t10 = round(10.0 - random.uniform(0.05, 0.32), 2)
@@ -801,7 +801,8 @@ class AdminService:
             "system_health_check": "health_check.sh",
             "system_local_checks": "run_local_checks.sh",
             "system_fault_tolerance": "test_fault_tolerance.sh",
-            "system_benchmark": "benchmark.sh"
+            "system_benchmark": "benchmark.sh",
+            "system_all_checks": "all_checks.sh"
         }
         if job_code not in valid_codes:
             raise ValueError(f"无效的系统自检作业代码: {job_code}")
@@ -817,7 +818,16 @@ class AdminService:
         
         start_time = datetime.now()
         
-        if job_code == "system_benchmark":
+        if job_code == "system_all_checks":
+            exec_cmd = (
+                f"source /etc/profile && cd {project_home} && "
+                f"export BACKEND_HOST=127.0.0.1 && "
+                f"echo '────── [1/4] 集群服务巡检 ──────' && bash scripts/health_check.sh && echo && "
+                f"echo '────── [2/4] 数据链路跑通自检 ──────' && bash scripts/run_local_checks.sh && echo && "
+                f"echo '────── [3/4] 异常容错与限流测试 ──────' && bash scripts/test_fault_tolerance.sh && echo && "
+                f"echo '────── [4/4] 流处理压测评估 ──────' && bash scripts/benchmark.sh --duration 15"
+            )
+        elif job_code == "system_benchmark":
             exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/benchmark.sh --duration 15"
         elif job_code == "system_health_check":
             exec_cmd = f"export BACKEND_HOST=127.0.0.1 && source /etc/profile && cd {project_home} && bash scripts/health_check.sh"
@@ -826,7 +836,15 @@ class AdminService:
             
         cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
         run_id = f"sys_run_{uuid4().hex[:10]}"
-        job_name = "集群服务巡检" if job_code == "system_health_check" else ("数据链路跑通自检" if job_code == "system_local_checks" else ("异常容错与限流测试" if job_code == "system_fault_tolerance" else "流处理压测评估"))
+        
+        job_names = {
+            "system_health_check": "集群服务巡检",
+            "system_local_checks": "数据链路跑通自检",
+            "system_fault_tolerance": "异常容错与限流测试",
+            "system_benchmark": "流处理压测评估",
+            "system_all_checks": "一键全链路诊断"
+        }
+        job_name = job_names.get(job_code, "未知自检")
         
         # 异步线程执行
         t = threading.Thread(

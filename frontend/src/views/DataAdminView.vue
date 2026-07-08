@@ -115,7 +115,6 @@
                       <th>异常拦截行数</th>
                       <th>规则合规率</th>
                       <th>异常样本</th>
-                      <th>快捷治理</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -128,7 +127,6 @@
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
                       <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
-                      <td><a-button type="primary" size="mini" :loading="recleaning[issue.biz_date]" @click="recleanData(issue.biz_date)">按日期重跑清洗</a-button></td>
                     </tr>
                   </tbody>
                 </table>

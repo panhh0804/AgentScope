@@ -74,19 +74,8 @@
       </div>
     </section>
 
-    <!-- 2. 第二通栏：实时链路阶梯压测分析 -->
-    <section class="cyber-panel" style="margin-bottom: 24px;">
-      <div class="panel-title-bar">
-        <span class="glow-tag">PERFORMANCE BENCHMARK</span>
-        <h3>实时链路阶梯压测分析</h3>
-      </div>
-      <div class="chart-container" style="padding: 10px 0;">
-        <div ref="chartRef" style="width: 100%; height: 280px;"></div>
-      </div>
-    </section>
-
-    <!-- 3. 第三通栏：最新诊断报告单（支持结构化和原生终端双模一键切换） -->
-    <section class="cyber-panel" style="margin-bottom: 24px; min-height: 280px; display: flex; flex-direction: column;">
+    <!-- 2. 最新诊断报告单（支持结构化和原生终端双模一键切换） -->
+    <section ref="reportSectionRef" class="cyber-panel" style="margin-bottom: 24px; min-height: 280px; display: flex; flex-direction: column;">
       <div class="panel-title-bar" style="flex-wrap: wrap; gap: 12px;">
         <span class="glow-tag">DIAGNOSTIC REPORT</span>
         <h3>最新诊断报告单</h3>
@@ -117,21 +106,29 @@
       
       <!-- 主内容渲染区 -->
       <div class="report-details-container" style="flex: 1; display: flex; flex-direction: column;">
-        <!-- 空置状态（仅当未执行且无内容时显示） -->
+        <!-- 空置状态 -->
         <div v-if="!consoleRawText && !isExecuting" class="report-empty-state" style="flex: 1;">
           <p>请点击顶部按钮发起实时诊断自检，或在下方审计列表中点击「加载报告」载入历史运行诊断单。</p>
         </div>
 
         <!-- 模式一：结构化卡片清单 -->
-        <div v-else-if="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 380px; padding-right: 6px;">
+        <div v-else-if="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 480px; padding-right: 6px;">
           <!-- 运行中的 loading 进度 -->
           <div v-if="isExecuting" class="report-executing-state">
             <span class="loading-spinner large"></span>
             <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
-            <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
+            <span class="loading-subtext">实时日志正在流式回显，请切换「原生终端」实时查看</span>
           </div>
           
           <div v-else>
+            <!-- 压测时嵌入图表 -->
+            <div v-if="currentJobCode === 'system_benchmark'" class="benchmark-chart-embed">
+              <div class="benchmark-chart-title">
+                <span class="glow-tag" style="font-size: 9px;">PERF CHART</span>
+                <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">阶梯吞吐 &amp; 延迟趋势图</span>
+              </div>
+              <div ref="chartRef" style="width: 100%; height: 240px;"></div>
+            </div>
             <div
               v-for="(step, sIdx) in parsedLogs"
               :key="sIdx"
@@ -155,11 +152,14 @@
                 </div>
               </div>
             </div>
+            <div v-if="!parsedLogs.length" class="report-empty-state" style="min-height: 100px;">
+              <p>暂无可解析的结构化步骤，请切换「原生终端」查看完整日志。</p>
+            </div>
           </div>
         </div>
 
         <!-- 模式二：深蓝配色暗黑终端 -->
-        <div v-else-if="viewMode === 'terminal'" class="terminal-container" style="flex: 1; min-height: 320px; display: flex; flex-direction: column;">
+        <div v-else-if="viewMode === 'terminal'" class="terminal-container">
           <div class="terminal-header">
             <div class="terminal-logo">
               <Terminal :size="12" />
@@ -176,7 +176,7 @@
               <span>IDLE</span>
             </div>
           </div>
-          <div class="terminal-box" ref="terminalRef" style="flex: 1; height: 320px;">
+          <div class="terminal-box" ref="terminalRef">
             <div class="terminal-content">
               <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
                 <p :class="['terminal-line', `line-type-${line.type}`]">
@@ -184,8 +184,8 @@
                   <span v-html="line.html"></span>
                 </p>
               </template>
+              <!-- 执行中：只显示光标，不重复显示 prompt 文字 -->
               <div v-if="isExecuting" class="terminal-prompt-line">
-                <span class="line-prompt">root@master:~# </span>
                 <span class="terminal-cursor"></span>
               </div>
             </div>
@@ -267,8 +267,10 @@ const isExecuting = ref(false)
 const consoleTitle = ref('快照日志')
 const consoleRawText = ref('')
 const viewMode = ref('structured') // 'structured' | 'terminal'
+const currentJobCode = ref('')
 const chartRef = ref(null)
 const terminalRef = ref(null)
+const reportSectionRef = ref(null)
 let chartInstance = null
 let pollTimer = null
 let pollRunningTimer = null
@@ -419,118 +421,146 @@ const formattedConsoleLines = computed(() => {
   })
 })
 
-// 核心自检日志结构化解析器
+// 核心自检日志结构化解析器（支持所有脚本格式）
 const parsedLogs = computed(() => {
   if (!consoleRawText.value) return []
   const lines = consoleRawText.value.split('\n')
   const steps = []
-  
   let currentStep = null
-  
-  for (let line of lines) {
-    line = line.trim()
-    if (!line) continue
-    
-    if (line.startsWith('root@master:')) {
-      continue
-    }
-    
-    const sectionMatch = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
-    if (sectionMatch) {
-      if (currentStep) {
-        steps.push(currentStep)
-      }
-      currentStep = {
-        step: sectionMatch[1],
-        name: sectionMatch[2],
-        status: 'success',
-        detail: []
-      }
-      continue
-    }
 
-    const benchmarkGradeMatch = line.match(/梯度测试:\s*(\d+\s+Events\/s.*?)$/)
-    if (benchmarkGradeMatch) {
-      if (currentStep) {
-        steps.push(currentStep)
-      }
-      currentStep = {
-        step: 'TEST',
-        name: benchmarkGradeMatch[1],
-        status: 'success',
-        detail: []
-      }
-      continue
-    }
-
-    if (line.startsWith('汇总：') || line.includes('汇总：') || line.includes('存在失败项') || line.startsWith('╔══') || line.startsWith('║') || line.startsWith('╚══') || line.startsWith('====') || line.includes('AgentScope 集群健康检查报告') || line.includes('收到 SIG')) {
-      continue
-    }
-    
-    if (line.includes('[✅ PASS]')) {
-      const msg = line.substring(line.indexOf('[✅ PASS]') + 8).trim()
-      const row = { type: 'pass', text: msg }
-      if (currentStep) {
-        currentStep.detail.push(row)
-      } else {
-        steps.push({ step: 'INFO', name: '前置校验', status: 'success', detail: [row] })
-      }
-      continue
-    }
-
-    if (line.includes('[❌ FAIL]')) {
-      const msg = line.substring(line.indexOf('[❌ FAIL]') + 8).trim()
-      const row = { type: 'fail', text: msg }
-      if (currentStep) {
-        currentStep.status = 'failed'
-        currentStep.detail.push(row)
-      } else {
-        steps.push({ step: 'ERROR', name: '系统警报', status: 'failed', detail: [row] })
-      }
-      continue
-    }
-
-    if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
-      const idx = line.indexOf('WARN]') + 5
-      const msg = line.substring(idx).trim()
-      const row = { type: 'warn', text: msg }
-      if (currentStep) {
-        if (currentStep.status !== 'failed') currentStep.status = 'warning'
-        currentStep.detail.push(row)
-      } else {
-        steps.push({ step: 'WARN', name: '系统警告', status: 'warning', detail: [row] })
-      }
-      continue
-    }
-
-    const infoMatch = line.match(/^\[.+?\]\s*\[INFO\]\s*(.+)$/)
-    if (infoMatch) {
-      const msg = infoMatch[1]
-      if (currentStep) {
-        currentStep.detail.push({ type: 'info', text: msg })
-      }
-      continue
-    }
-
-    const warnMatch = line.match(/^\[.+?\]\s*\[WARN\]\s*(.+)$/)
-    if (warnMatch) {
-      const msg = warnMatch[1]
-      if (currentStep) {
-        if (currentStep.status !== 'failed') currentStep.status = 'warning'
-        currentStep.detail.push({ type: 'warn', text: msg })
-      }
-      continue
-    }
-
+  const pushDetail = (row) => {
     if (currentStep) {
+      currentStep.detail.push(row)
+    } else {
+      const s = row.type === 'fail' ? 'failed' : row.type === 'warn' ? 'warning' : 'success'
+      steps.push({ step: 'SYS', name: '前置检查', status: s, detail: [row] })
+    }
+  }
+
+  for (let raw of lines) {
+    const line = raw.trim()
+    if (!line) continue
+    if (line.startsWith('root@master:') || line.startsWith('root@visualization:')) continue
+
+    // Format 1: health_check.sh ────── N/M Name ──────
+    const m1 = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
+    if (m1) {
+      if (currentStep) steps.push(currentStep)
+      currentStep = { step: m1[1], name: m1[2], status: 'success', detail: [] }
+      continue
+    }
+
+    // Format 2: run_local_checks.sh / test_fault_tolerance.sh  [N/M] Step
+    const m2 = line.match(/\[(\d+\/\d+)\]\s+(.+)$/)
+    if (m2) {
+      if (currentStep) steps.push(currentStep)
+      const name = m2[2].replace(/\.\.\.?$/, '').replace(/[^\u0000-\u007F\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g, '').trim()
+      currentStep = { step: m2[1], name: name || m2[2], status: 'success', detail: [] }
+      continue
+    }
+
+    // Format 3: benchmark.sh 启动模拟器标识新梯度
+    const m3 = line.match(/启动模拟器[\uff0c,]\s*速率:\s*(.+)/)
+    if (m3) {
+      if (currentStep) steps.push(currentStep)
+      currentStep = { step: 'GRAD', name: `梯度压测 ${m3[1]}`, status: 'success', detail: [] }
+      continue
+    }
+
+    // 跳过装饰线 / 汇总框
+    if (
+      line.startsWith('\u2554') || line.startsWith('\u2551') || line.startsWith('\u255a') ||
+      line.startsWith('====') || line.startsWith('────') ||
+      (line.includes('AgentScope') && line.includes('\u62a5\u544a')) ||
+      line.includes('\u6536\u5230 SIG') || /^=+$/.test(line)
+    ) continue
+
+    // PASS 标记
+    if (line.includes('[✅ PASS]') || line.includes('✅')) {
+      const msg = line.includes('[✅ PASS]')
+        ? line.substring(line.indexOf('[✅ PASS]') + 8).trim()
+        : line.replace('✅', '').trim()
+      if (msg) pushDetail({ type: 'pass', text: msg })
+      continue
+    }
+    // 梯度压测完成行
+    const mComplete = line.match(/梯度\s+(.+?)\s+测试完成/)
+    if (mComplete && currentStep) {
+      currentStep.detail.push({ type: 'pass', text: `梯度 ${mComplete[1]} 压测完成 ✓` })
+      continue
+    }
+
+    // FAIL 标记
+    if (line.includes('[❌ FAIL]') || (line.includes('❌') && !line.includes('✅'))) {
+      const msg = line.includes('[❌ FAIL]')
+        ? line.substring(line.indexOf('[❌ FAIL]') + 8).trim()
+        : line.replace('❌', '').trim()
+      if (currentStep) currentStep.status = 'failed'
+      if (msg) pushDetail({ type: 'fail', text: msg })
+      continue
+    }
+
+    // WARN（带括号）
+    if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
+      const msg = line.substring(line.indexOf('WARN]') + 5).trim()
+      if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
+      pushDetail({ type: 'warn', text: msg })
+      continue
+    }
+    // WARN（无括号裸行）
+    if (/^WARN[:\s]/.test(line) || /^\[WARN\]/.test(line)) {
+      const msg = line.replace(/^(WARN:?|\[WARN\])\s*/, '').trim()
+      if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
+      pushDetail({ type: 'warn', text: msg })
+      continue
+    }
+
+    // ACTION（benchmark 操作提示）
+    if (line.startsWith('[ACTION]')) {
+      pushDetail({ type: 'action', text: line.replace('[ACTION]', '').trim() })
+      continue
+    }
+    // benchmark ACTION 的后续命令行
+    if (currentStep && currentStep.step === 'GRAD') {
+      if (line.startsWith('/usr/local/') || line.startsWith('redis-cli') || line.startsWith('--')) {
+        const last = currentStep.detail[currentStep.detail.length - 1]
+        if (last && last.type === 'action') {
+          last.text += `<br><code>${line}</code>`
+        } else {
+          pushDetail({ type: 'action', text: `<code>${line}</code>` })
+        }
+        continue
+      }
+    }
+
+    // INFO
+    const mInfo = line.match(/^\[.+?\]\s*\[INFO\]\s*(.+)$/)
+    if (mInfo) { pushDetail({ type: 'info', text: mInfo[1] }); continue }
+    if (line.startsWith('[INFO]')) { pushDetail({ type: 'info', text: line.replace('[INFO]', '').trim() }); continue }
+
+    // WARN with bracket
+    const mWarn2 = line.match(/^\[.+?\]\s*\[WARN\]\s*(.+)$/)
+    if (mWarn2) {
+      if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
+      pushDetail({ type: 'warn', text: mWarn2[1] })
+      continue
+    }
+
+    // ERROR
+    if (line.includes('[ERROR]') || /^ERROR[:\s]/.test(line)) {
+      const msg = line.replace(/\[ERROR\]|^ERROR:?\s*/, '').trim()
+      if (currentStep) currentStep.status = 'failed'
+      pushDetail({ type: 'fail', text: msg })
+      continue
+    }
+
+    // 其他有意义行归入当前 step
+    if (currentStep && line.length > 0 && line.length < 300 && !/^[-=*]+$/.test(line)) {
       currentStep.detail.push({ type: 'info', text: line })
     }
   }
-  
-  if (currentStep) {
-    steps.push(currentStep)
-  }
-  
+
+  if (currentStep) steps.push(currentStep)
   return steps
 })
 
@@ -548,7 +578,9 @@ async function loadData() {
 }
 
 function loadLogsToConsole(run) {
+  currentJobCode.value = run.job_code
   consoleTitle.value = `${run.job_name} (${run.run_id})`
+  viewMode.value = 'structured'  // 自动切到结构化报告
   const cmdMap = {
     system_health_check: 'bash scripts/health_check.sh',
     system_local_checks: 'bash scripts/run_local_checks.sh',
@@ -557,10 +589,15 @@ function loadLogsToConsole(run) {
   }
   const cmd = cmdMap[run.job_code] || 'bash script.sh'
   consoleRawText.value = `root@master:~# ${cmd}\n${run.log_summary || '无日志输出'}`
-  
+
   nextTick(() => {
-    if (terminalRef.value) {
-      terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+    // 平滑滚动到诊断报告单区域
+    if (reportSectionRef.value) {
+      reportSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    // 压测报告才初始化图表
+    if (run.job_code === 'system_benchmark') {
+      setTimeout(() => { initChart(); updateChart() }, 150)
     }
   })
 }
@@ -576,10 +613,9 @@ async function triggerCheck(jobCode) {
     system_fault_tolerance: 'bash scripts/test_fault_tolerance.sh',
     system_benchmark: 'bash scripts/benchmark.sh --duration 15'
   }
+  currentJobCode.value = jobCode
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
-  Message.info({ content: '正在远程调度系统诊断指令，正在实时回显终端输出...', duration: 5000 })
-  
-  // 运行开始时自动切回“原生终端”，满足用户“实时看到终端输出”的需求
+  Message.info({ content: '正在远程调度系统诊断指令，实时回显终端输出...', duration: 5000 })
   viewMode.value = 'terminal'
 
   try {
@@ -1202,10 +1238,25 @@ onUnmounted(() => {
 .detail-type-fail .indicator-icon { background: #f43f5e; box-shadow: 0 0 4px #f43f5e; }
 .detail-type-warn .indicator-icon { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
 .detail-type-info .indicator-icon { background: #64748b; }
+.detail-type-action .indicator-icon { background: #38bdf8; box-shadow: 0 0 4px #38bdf8; }
+.detail-type-action .detail-text { color: #38bdf8 !important; font-weight: bold; }
+
+.benchmark-chart-embed {
+  background: rgba(6, 18, 36, 0.4);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.benchmark-chart-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
 
 .detail-text {
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.6;
   color: #94a3b8;
   margin: 0;
   font-family: monospace;
@@ -1233,6 +1284,9 @@ onUnmounted(() => {
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.06);
   background: rgba(4, 14, 30, 0.98);
+  height: 380px;
+  display: flex;
+  flex-direction: column;
 }
 
 .terminal-header {
@@ -1311,10 +1365,13 @@ onUnmounted(() => {
 
 .terminal-box {
   background: rgba(4, 12, 26, 0.98);
+  flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
   position: relative;
   font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+  /* 固定高度，不随内容撑高 */
+  min-height: 0;
 }
 
 .terminal-content {
@@ -1325,7 +1382,7 @@ onUnmounted(() => {
 .terminal-line {
   margin: 0 0 6px 0;
   line-height: 1.6;
-  font-size: 12px;
+  font-size: 14px;
   white-space: pre-wrap;
   word-break: break-all;
 }

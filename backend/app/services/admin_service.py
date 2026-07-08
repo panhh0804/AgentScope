@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 import subprocess
+import os
+import json
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -25,18 +27,40 @@ class AdminService:
         self.repo = MySQLAnalyticsRepository()
         self._job_runs = self._seed_job_runs()
         self._audit_logs = self._seed_audit_logs()
-        self._system_check_runs = [
-            {
-                "run_id": "sys_run_initial_hc",
-                "job_code": "system_health_check",
-                "job_name": "集群服务巡检",
-                "status": "success",
-                "start_time": (datetime.now() - timedelta(hours=1)).isoformat(timespec="seconds"),
-                "end_time": (datetime.now() - timedelta(minutes=58)).isoformat(timespec="seconds"),
-                "duration_seconds": 12,
-                "log_summary": "[✅ PASS] HDFS NameNode 正常，Live DataNode: 2\n[✅ PASS] YARN ResourceManager 正常，Active NodeManager: 2\n[✅ PASS] YARN ResourceManager UI 正常（master:8088），RUNNING Applications: 1\n[✅ PASS] Kafka Broker 正常，Topic 'agent-events' 存在\n[✅ PASS] ZooKeeper 正常（middleware:2181）\n[✅ PASS] Redis 正常（PONG），当前 Key 数量: 14\n[✅ PASS] MySQL Source 库正常（agentscope_source，数据量: 2368 条）\n[✅ PASS] MySQL Analytics 库正常（agentscope_analytics）\n[✅ PASS] FastAPI 后端正常：{\"status\":\"ok\"}"
-            }
-        ]
+        import os
+        import json
+        
+        self.log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.runs_file = os.path.join(self.log_dir, "system_check_runs.json")
+        
+        self._system_check_runs = []
+        if os.path.exists(self.runs_file):
+            try:
+                with open(self.runs_file, "r", encoding="utf-8") as f:
+                    self._system_check_runs = json.load(f)
+            except Exception:
+                pass
+                
+        if not self._system_check_runs:
+            self._system_check_runs = [
+                {
+                    "run_id": "sys_run_initial_hc",
+                    "job_code": "system_health_check",
+                    "job_name": "集群服务巡检",
+                    "status": "success",
+                    "start_time": (datetime.now() - timedelta(hours=1)).isoformat(timespec="seconds"),
+                    "end_time": (datetime.now() - timedelta(minutes=58)).isoformat(timespec="seconds"),
+                    "duration_seconds": 12,
+                    "log_summary": "[✅ PASS] HDFS NameNode 正常，Live DataNode: 2\n[✅ PASS] YARN ResourceManager 正常，Active NodeManager: 2\n[✅ PASS] YARN ResourceManager UI 正常（master:8088），RUNNING Applications: 1\n[✅ PASS] Kafka Broker 正常，Topic 'agent-events' 存在\n[✅ PASS] ZooKeeper 正常（middleware:2181）\n[✅ PASS] Redis 正常（PONG），当前 Key 数量: 14\n[✅ PASS] MySQL Source 库正常（agentscope_source，数据量: 2368 条）\n[✅ PASS] MySQL Analytics 库正常（agentscope_analytics）\n[✅ PASS] FastAPI 后端正常：{\"status\":\"ok\"}"
+                }
+            ]
+            try:
+                with open(self.runs_file, "w", encoding="utf-8") as f:
+                    json.dump(self._system_check_runs, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                import sys
+                print(f"[ERROR] system_check_runs.json load/save error in init: {e}", file=sys.stderr)
         
         # Async memory caches populated by daemon thread
         self._hdfs_storage_cache = {
@@ -785,6 +809,22 @@ class AdminService:
         if not hasattr(self, "_system_check_runs"):
             self._system_check_runs = []
         self._system_check_runs.insert(0, run)
+        
+        # 保存到本地 JSON 文件持久化
+        try:
+            with open(self.runs_file, "w", encoding="utf-8") as f:
+                json.dump(self._system_check_runs, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            import sys
+            import traceback
+            err_details = f"[{datetime.now().isoformat()}] JSON Save Error: {e}\n{traceback.format_exc()}\n"
+            print(f"[ERROR] {err_details}", file=sys.stderr)
+            try:
+                with open(os.path.join(self.log_dir, "system_check_error.log"), "a", encoding="utf-8") as fe:
+                    fe.write(err_details)
+            except Exception:
+                pass
+            
         self._audit_logs.insert(0, self._audit("admin", "system_check", "check", job_code, status))
         self._is_executing = False
 

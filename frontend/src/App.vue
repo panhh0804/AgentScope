@@ -34,7 +34,7 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { Activity, BarChart2, Database, FileText, LayoutDashboard, Server } from '@lucide/vue'
+import { Activity, BarChart2, Database, FileText, LayoutDashboard, Server, Settings } from '@lucide/vue'
 
 const route = useRoute()
 const navItems = [
@@ -42,6 +42,7 @@ const navItems = [
   { path: '/data-assets', label: '数据资产', icon: Server },
   { path: '/data-jobs', label: '数据任务', icon: Activity },
   { path: '/statistics', label: '数据统计', icon: BarChart2 },
-  { path: '/reports', label: 'AI 报告', icon: FileText }
+  { path: '/reports', label: 'AI 报告', icon: FileText },
+  { path: '/system-admin', label: '系统管理', icon: Settings }
 ]
 </script>

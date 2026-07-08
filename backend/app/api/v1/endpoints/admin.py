@@ -162,3 +162,16 @@ def update_quality_rule(rule_id: str, rule: QualityRuleUpdate):
     if not res:
         raise HTTPException(status_code=400, detail="Failed to update quality rule")
     return ok({"message": "Rule updated successfully"})
+
+
+@router.post("/system/run-check")
+def run_system_check(job_code: str = Query(...)):
+    try:
+        return ok(service.execute_system_check(job_code))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/system/check-runs")
+def get_system_check_runs():
+    return ok(service.get_system_check_runs())

@@ -17,3 +17,5 @@ export const generateReport = (payload) => postData('/reports/generate', payload
 export const fetchReports = () => getData('/reports')
 export const fetchReportDetail = (reportId) => getData(`/reports/${reportId}`)
 
+export const fetchSystemCheckRuns = () => getData('/admin/system/check-runs')
+export const runSystemCheck = (jobCode) => postData(`/admin/system/run-check?job_code=${jobCode}`, {})

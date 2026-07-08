@@ -25,6 +25,18 @@ class AdminService:
         self.repo = MySQLAnalyticsRepository()
         self._job_runs = self._seed_job_runs()
         self._audit_logs = self._seed_audit_logs()
+        self._system_check_runs = [
+            {
+                "run_id": "sys_run_initial_hc",
+                "job_code": "system_health_check",
+                "job_name": "集群自检",
+                "status": "success",
+                "start_time": (datetime.now() - timedelta(hours=1)).isoformat(timespec="seconds"),
+                "end_time": (datetime.now() - timedelta(minutes=58)).isoformat(timespec="seconds"),
+                "duration_seconds": 12,
+                "log_summary": "[✅ PASS] HDFS NameNode 正常，Live DataNode: 2\n[✅ PASS] YARN ResourceManager 正常，Active NodeManager: 2\n[✅ PASS] YARN ResourceManager UI 正常（master:8088），RUNNING Applications: 1\n[✅ PASS] Kafka Broker 正常，Topic 'agent-events' 存在\n[✅ PASS] ZooKeeper 正常（middleware:2181）\n[✅ PASS] Redis 正常（PONG），当前 Key 数量: 14\n[✅ PASS] MySQL Source 库正常（agentscope_source，数据量: 2368 条）\n[✅ PASS] MySQL Analytics 库正常（agentscope_analytics）\n[✅ PASS] FastAPI 后端正常：{\"status\":\"ok\"}"
+            }
+        ]
         
         # Async memory caches populated by daemon thread
         self._hdfs_storage_cache = {
@@ -700,3 +712,76 @@ class AdminService:
 
     def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
         return self.repo.update_quality_rule(rule_id, is_active)
+
+    def get_system_check_runs(self) -> List[Dict[str, Any]]:
+        if not hasattr(self, "_system_check_runs"):
+            self._system_check_runs = []
+        return self._system_check_runs
+
+    def execute_system_check(self, job_code: str) -> Dict[str, Any]:
+        import os
+        import subprocess
+        from datetime import datetime
+        from uuid import uuid4
+        
+        valid_codes = {
+            "system_health_check": "health_check.sh",
+            "system_local_checks": "run_local_checks.sh",
+            "system_fault_tolerance": "test_fault_tolerance.sh",
+            "system_benchmark": "benchmark.sh"
+        }
+        if job_code not in valid_codes:
+            raise ValueError(f"无效的系统自检作业代码: {job_code}")
+            
+        script_name = valid_codes[job_code]
+        ssh_user = os.getenv("SSH_USER", "root")
+        ssh_host = os.getenv("SSH_HOST", "master")
+        ssh_dest = f"{ssh_user}@{ssh_host}"
+        ssh_opts_str = os.getenv("SSH_OPTS", "-o StrictHostKeyChecking=no")
+        import shlex
+        ssh_opts = shlex.split(ssh_opts_str)
+        project_home = os.getenv("PROJECT_HOME", "/root/agentscope")
+        
+        start_time = datetime.now()
+        status = "success"
+        log_summary = ""
+        
+        if job_code == "system_benchmark":
+            exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/benchmark.sh --duration 15"
+        else:
+            exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/{script_name}"
+            
+        cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
+        
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if res.returncode != 0:
+                status = "failed"
+                log_summary = res.stderr or res.stdout
+            else:
+                log_summary = res.stdout
+        except subprocess.TimeoutExpired as te:
+            status = "failed"
+            log_summary = f"Job execution timed out. Output captured so far:\n{te.stdout or ''}\nErrors:\n{te.stderr or ''}"
+        except Exception as e:
+            status = "failed"
+            log_summary = f"Execution system error: {str(e)}"
+            
+        duration = int((datetime.now() - start_time).total_seconds())
+        
+        run = {
+            "run_id": f"sys_run_{uuid4().hex[:10]}",
+            "job_code": job_code,
+            "job_name": "集群自检" if job_code == "system_health_check" else ("综合自检" if job_code == "system_local_checks" else ("容错测试" if job_code == "system_fault_tolerance" else "压力测试")),
+            "status": status,
+            "start_time": start_time.isoformat(timespec="seconds"),
+            "end_time": datetime.now().isoformat(timespec="seconds"),
+            "duration_seconds": duration,
+            "log_summary": log_summary,
+        }
+        
+        if not hasattr(self, "_system_check_runs"):
+            self._system_check_runs = []
+        self._system_check_runs.insert(0, run)
+        self._audit_logs.insert(0, self._audit("admin", "system_check", "check", job_code, status))
+        return run

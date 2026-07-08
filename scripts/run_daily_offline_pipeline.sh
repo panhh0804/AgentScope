@@ -77,6 +77,19 @@ log_info "============================================================"
 # ─────────────────────────────────────────────
 # 阶段 1/3：DataX 导入 (MySQL Source -> HDFS Raw)
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# 阶段 0/3：自动生成模拟数据 (MySQL Source)
+# ─────────────────────────────────────────────
+log_info "────── 阶段 0/3：自动生成模拟数据 ──────"
+STAGE_START=$(timer_start)
+
+# 自动激活虚拟环境或直接使用全局环境运行模拟器数据生成
+if python3 "${PROJECT_ROOT}/simulator/main.py" --mode offline --start-date "${BIZ_DATE}" --end-date "${BIZ_DATE}" --count 50; then
+  log_info "阶段 0 完成 ✓  模拟数据自动生成成功 (耗时: $(timer_elapsed ${STAGE_START})s)"
+else
+  log_warn "阶段 0 警告 ⚠️  自动生成模拟数据返回异常，将尝试继续接入已有数据..."
+fi
+
 log_info "────── 阶段 1/3：DataX 数据导入 ──────"
 STAGE_START=$(timer_start)
 

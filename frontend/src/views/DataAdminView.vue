@@ -727,37 +727,7 @@
             </div>
           </section>
 
-          <section class="screen-panel" style="margin-top: 16px;">
-            <div class="screen-panel-head">
-              <h3>操作审计</h3>
-              <span>{{ auditLogs.length }} records</span>
-            </div>
-            <div class="screen-table-wrap">
-              <table class="data-table screen-native-table">
-                <thead>
-                  <tr>
-                    <th style="width: 110px;">operator</th>
-                    <th style="width: 135px;">operation_type</th>
-                    <th style="width: 120px;">resource_type</th>
-                    <th style="width: 135px;">resource_id</th>
-                    <th style="width: 90px;">operation_result</th>
-                    <th style="width: 160px;">created_at</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="log in auditLogs" :key="log.audit_id">
-                    <td>{{ log.operator }}</td>
-                    <td>{{ log.operation_type }}</td>
-                    <td>{{ log.resource_type }}</td>
-                    <td>{{ log.resource_id }}</td>
-                    <td><span :class="['tag', log.operation_result]">{{ log.operation_result }}</span></td>
-                    <td>{{ log.created_at }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </a-tab-pane>
+         </a-tab-pane>
       </a-tabs>
     </div>
 

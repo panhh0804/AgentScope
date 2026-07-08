@@ -130,8 +130,8 @@
           </div>
           
           <div v-else>
-            <!-- 压测时嵌入图表 -->
-            <div v-if="currentJobCode === 'system_benchmark'" class="benchmark-chart-embed">
+            <!-- 压测或一键诊断时嵌入图表 -->
+            <div v-if="currentJobCode === 'system_benchmark' || currentJobCode === 'system_all_checks'" class="benchmark-chart-embed">
               <div class="benchmark-chart-title">
                 <span class="glow-tag" style="font-size: 9px;">PERF CHART</span>
                 <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">阶梯吞吐 &amp; 延迟趋势图</span>
@@ -141,23 +141,34 @@
             <div
               v-for="(step, sIdx) in parsedLogs"
               :key="sIdx"
-              :class="['report-step-card', `step-status-${step.status}`]"
             >
-              <div class="step-card-header">
-                <span class="step-badge">{{ step.step }}</span>
-                <span class="step-name">{{ step.name }}</span>
-                <span :class="['step-status-tag', step.status]">
-                  {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
-                </span>
+              <!-- 大步骤的标题栏（大字号，特色胶囊微标） -->
+              <div v-if="step.isStage" class="report-stage-header-card">
+                <div class="stage-card-header-content">
+                  <span class="stage-glow-badge">STAGE {{ step.step.split('/')[0] }}</span>
+                  <h4 class="stage-title-text">{{ step.name }}</h4>
+                  <span class="stage-decor-line"></span>
+                </div>
               </div>
-              <div class="step-card-body">
-                <div
-                  v-for="(detail, dIdx) in step.detail"
-                  :key="dIdx"
-                  :class="['step-detail-row', `detail-type-${detail.type}`]"
-                >
-                  <span class="indicator-icon"></span>
-                  <p class="detail-text" v-html="detail.text"></p>
+
+              <!-- 原有内部小步骤卡片 -->
+              <div v-else :class="['report-step-card', `step-status-${step.status}`]">
+                <div class="step-card-header">
+                  <span class="step-badge">{{ step.step }}</span>
+                  <span class="step-name">{{ step.name }}</span>
+                  <span :class="['step-status-tag', step.status]">
+                    {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
+                  </span>
+                </div>
+                <div class="step-card-body">
+                  <div
+                    v-for="(detail, dIdx) in step.detail"
+                    :key="dIdx"
+                    :class="['step-detail-row', `detail-type-${detail.type}`]"
+                  >
+                    <span class="indicator-icon"></span>
+                    <p class="detail-text" v-html="detail.text"></p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -639,6 +650,14 @@ const parsedLogs = computed(() => {
   }
 
   if (currentStep) steps.push(currentStep)
+  
+  // 智能标记大步骤，分母为 4 的全部标为 isStage
+  steps.forEach(s => {
+    if (s.step && String(s.step).endsWith('/4')) {
+      s.isStage = true
+    }
+  })
+  
   return steps
 })
 
@@ -1685,6 +1704,54 @@ onUnmounted(() => {
   color: #06b6d4;
   border: 1px solid rgba(6, 182, 212, 0.2);
   border-radius: 3px;
+}
+
+/* 诊断大步骤特殊标题卡片 */
+.report-stage-header-card {
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.1) 0%, rgba(59, 130, 246, 0.03) 100%);
+  border-left: 4px solid #06b6d4;
+  border-top: 1px solid rgba(6, 182, 212, 0.15);
+  border-bottom: 1px solid rgba(6, 182, 212, 0.15);
+  border-right: 1px solid rgba(6, 182, 212, 0.05);
+  padding: 12px 18px;
+  margin: 20px 0 10px 0;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.05);
+}
+
+.stage-card-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.stage-glow-badge {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 800;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  text-shadow: 0 0 5px rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.1);
+}
+
+.stage-title-text {
+  font-size: 14px;
+  font-weight: bold;
+  color: #e0f7fa;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.stage-decor-line {
+  flex-grow: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.3) 0%, rgba(6, 182, 212, 0) 100%);
+  margin-left: 20px;
 }
 </style>
 

@@ -175,3 +175,8 @@ def run_system_check(job_code: str = Query(...)):
 @router.get("/system/check-runs")
 def get_system_check_runs():
     return ok(service.get_system_check_runs())
+
+
+@router.get("/system/running-log")
+def get_system_running_log():
+    return ok(service.get_system_running_log())

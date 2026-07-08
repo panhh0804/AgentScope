@@ -117,60 +117,66 @@
       
       <!-- 主内容渲染区 -->
       <div class="report-details-container" style="flex: 1; display: flex; flex-direction: column;">
-        <!-- 运行中状态 -->
-        <div v-if="isExecuting" class="report-executing-state" style="flex: 1;">
-          <span class="loading-spinner large"></span>
-          <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
-          <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
-        </div>
-
-        <!-- 空置状态 -->
-        <div v-else-if="!consoleRawText" class="report-empty-state" style="flex: 1;">
+        <!-- 空置状态（仅当未执行且无内容时显示） -->
+        <div v-if="!consoleRawText && !isExecuting" class="report-empty-state" style="flex: 1;">
           <p>请点击顶部按钮发起实时诊断自检，或在下方审计列表中点击「加载报告」载入历史运行诊断单。</p>
         </div>
 
         <!-- 模式一：结构化卡片清单 -->
         <div v-else-if="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 380px; padding-right: 6px;">
-          <div
-            v-for="(step, sIdx) in parsedLogs"
-            :key="sIdx"
-            :class="['report-step-card', `step-status-${step.status}`]"
-          >
-            <div class="step-card-header">
-              <span class="step-badge">{{ step.step }}</span>
-              <span class="step-name">{{ step.name }}</span>
-              <span :class="['step-status-tag', step.status]">
-                {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
-              </span>
-            </div>
-            <div class="step-card-body">
-              <div
-                v-for="(detail, dIdx) in step.detail"
-                :key="dIdx"
-                :class="['step-detail-row', `detail-type-${detail.type}`]"
-              >
-                <span class="indicator-icon"></span>
-                <p class="detail-text" v-html="detail.text"></p>
+          <!-- 运行中的 loading 进度 -->
+          <div v-if="isExecuting" class="report-executing-state">
+            <span class="loading-spinner large"></span>
+            <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
+            <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
+          </div>
+          
+          <div v-else>
+            <div
+              v-for="(step, sIdx) in parsedLogs"
+              :key="sIdx"
+              :class="['report-step-card', `step-status-${step.status}`]"
+            >
+              <div class="step-card-header">
+                <span class="step-badge">{{ step.step }}</span>
+                <span class="step-name">{{ step.name }}</span>
+                <span :class="['step-status-tag', step.status]">
+                  {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
+                </span>
+              </div>
+              <div class="step-card-body">
+                <div
+                  v-for="(detail, dIdx) in step.detail"
+                  :key="dIdx"
+                  :class="['step-detail-row', `detail-type-${detail.type}`]"
+                >
+                  <span class="indicator-icon"></span>
+                  <p class="detail-text" v-html="detail.text"></p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 模式二：复古 CRT 黑客终端 (满足深度查看 Shell 原始输出需求) -->
+        <!-- 模式二：深蓝配色暗黑终端 -->
         <div v-else-if="viewMode === 'terminal'" class="terminal-container" style="flex: 1; min-height: 320px; display: flex; flex-direction: column;">
           <div class="terminal-header">
-            <div class="mac-buttons">
-              <span class="close"></span>
-              <span class="minimize"></span>
-              <span class="maximize"></span>
-            </div>
             <div class="terminal-logo">
               <Terminal :size="12" />
-              <span class="terminal-title">SHELL OUTPUT SNAPSHOT</span>
+              <span class="terminal-title">SHELL OUTPUT</span>
+            </div>
+            <div class="terminal-header-center">
+              <span class="terminal-path">root@master ~ {{ consoleTitle }}</span>
+            </div>
+            <div class="terminal-running-badge" v-if="isExecuting">
+              <RefreshCw class="spin" :size="11" />
+              <span>STREAMING</span>
+            </div>
+            <div class="terminal-idle-badge" v-else>
+              <span>IDLE</span>
             </div>
           </div>
           <div class="terminal-box" ref="terminalRef" style="flex: 1; height: 320px;">
-            <div class="terminal-glow"></div>
             <div class="terminal-content">
               <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
                 <p :class="['terminal-line', `line-type-${line.type}`]">
@@ -178,6 +184,10 @@
                   <span v-html="line.html"></span>
                 </p>
               </template>
+              <div v-if="isExecuting" class="terminal-prompt-line">
+                <span class="line-prompt">root@master:~# </span>
+                <span class="terminal-cursor"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -250,17 +260,18 @@ import {
 } from '@lucide/vue'
 import { Message } from '@arco-design/web-vue'
 import * as echarts from 'echarts'
-import { fetchSystemCheckRuns, runSystemCheck } from '../api/dashboard'
+import { fetchSystemCheckRuns, runSystemCheck, fetchSystemRunningLog } from '../api/dashboard'
 
 const runs = ref([])
 const isExecuting = ref(false)
 const consoleTitle = ref('快照日志')
 const consoleRawText = ref('')
-const viewMode = ref('structured') // 'structured' | 'terminal'双模一键切换
+const viewMode = ref('structured') // 'structured' | 'terminal'
 const chartRef = ref(null)
 const terminalRef = ref(null)
 let chartInstance = null
 let pollTimer = null
+let pollRunningTimer = null
 
 // 服务网格项
 const serviceGridItems = computed(() => {
@@ -387,8 +398,10 @@ const formattedConsoleLines = computed(() => {
       type = 'fail'
       html = line.replace('[❌ FAIL]', '<span class="status-badge fail">FAIL</span>')
     } else if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
+      const idx = line.indexOf('WARN]') + 5
+      const content = line.substring(idx).trim()
       type = 'warn'
-      html = line.replace(/\[⚠️\s*WARN\]/, '<span class="status-badge warn">WARN</span>')
+      html = `<span class="status-badge warn">WARN</span> ${content}`
     } else if (line.includes('[INFO]')) {
       type = 'info'
       html = line.replace('[INFO]', '<span class="status-badge info">INFO</span>')
@@ -552,6 +565,7 @@ function loadLogsToConsole(run) {
   })
 }
 
+// 调度异步任务并进行高频短轮询，实现真正实时的日志回显
 async function triggerCheck(jobCode) {
   if (isExecuting.value) return
   isExecuting.value = true
@@ -563,21 +577,52 @@ async function triggerCheck(jobCode) {
     system_benchmark: 'bash scripts/benchmark.sh --duration 15'
   }
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
-  Message.info({ content: '正在远程调度系统诊断指令，请关注检测报告单更新...', duration: 5000 })
+  Message.info({ content: '正在远程调度系统诊断指令，正在实时回显终端输出...', duration: 5000 })
+  
+  // 运行开始时自动切回“原生终端”，满足用户“实时看到终端输出”的需求
+  viewMode.value = 'terminal'
 
   try {
-    const runRes = await runSystemCheck(jobCode)
-    Message.success({ content: '诊断任务执行完成！最新报告单已生成。', duration: 4000 })
-    await loadData()
-    if (runRes) {
-      loadLogsToConsole(runRes)
-    }
+    // 异步接口，POST 瞬间返回 running 状态及分配的 run_id
+    await runSystemCheck(jobCode)
+    
+    if (pollRunningTimer) clearInterval(pollRunningTimer)
+    pollRunningTimer = setInterval(async () => {
+      try {
+        const res = await fetchSystemRunningLog()
+        if (res) {
+          consoleRawText.value = res.log || ''
+          
+          // 实时自动滚动到底部
+          nextTick(() => {
+            if (terminalRef.value) {
+              terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+            }
+          })
+          
+          // 当后台任务标志 is_executing 变为 false 时，代表跑批结束
+          if (!res.is_executing) {
+            clearInterval(pollRunningTimer)
+            pollRunningTimer = null
+            isExecuting.value = false
+            
+            // 重新刷新历史列表和指标图表
+            await loadData()
+            
+            // 运行完成，自动切回结构化报告单，呈现最终结论
+            viewMode.value = 'structured'
+            Message.success({ content: '诊断任务已完成！最新检测报告单已载入。', duration: 4000 })
+          }
+        }
+      } catch (err) {
+        console.error('轮询实时日志失败:', err)
+      }
+    }, 500) // 500ms 高帧率短轮询，回显极其顺滑
   } catch (err) {
     console.error(err)
-    Message.error({ content: `诊断指令运行异常: ${err.message || err}`, duration: 5000 })
-    consoleRawText.value += `\n[ERROR] 脚本执行失败，网关连接超时: ${err.message || err}`
-  } finally {
     isExecuting.value = false
+    Message.error({ content: `诊断指令调度失败: ${err.message || err}`, duration: 5000 })
+    consoleRawText.value += `\n[ERROR] 调度网关连接超时: ${err.message || err}`
   }
 }
 
@@ -708,6 +753,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   if (chartInstance) chartInstance.dispose()
   if (pollTimer) clearInterval(pollTimer)
+  if (pollRunningTimer) clearInterval(pollRunningTimer)
 })
 </script>
 
@@ -758,18 +804,26 @@ onUnmounted(() => {
   margin: 2px 0 0 0;
 }
 
+/* 按钮行 */
+.toolbar-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 /* 极客感按钮 */
 .cyber-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
-  height: 36px;
+  padding: 0 18px;
+  height: 38px;
   border-radius: 4px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
 }
 
 .cyber-btn-primary {
@@ -1172,95 +1226,155 @@ onUnmounted(() => {
 .status-badge.warn { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
 .status-badge.info { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
 
-/* CRT 复古终端机 */
+/* 深蓝系配色终端（与页面同色调） */
 .terminal-container {
-  border: 1px solid rgba(34, 211, 238, 0.25);
+  border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.06);
+  background: rgba(4, 14, 30, 0.98);
 }
 
 .terminal-header {
-  background: #090d16;
-  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(6, 20, 42, 0.95) 0%, rgba(4, 14, 30, 0.98) 100%);
+  padding: 8px 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(34, 211, 238, 0.15);
+  gap: 12px;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.12);
 }
-
-.mac-buttons {
-  display: flex;
-  gap: 6px;
-}
-
-.mac-buttons span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.mac-buttons .close { background: #fb7185; }
-.mac-buttons .minimize { background: #fbbf24; }
-.mac-buttons .maximize { background: #34d399; }
 
 .terminal-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #64748b;
+  gap: 6px;
+  color: #22d3ee;
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
 }
 
 .terminal-title {
   font-family: monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #22d3ee;
+}
+
+.terminal-header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.terminal-path {
+  font-family: monospace;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  color: #64748b;
+  letter-spacing: 0.02em;
+}
+
+.terminal-running-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: monospace;
+  font-size: 9px;
+  color: #22d3ee;
+  font-weight: bold;
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+
+.terminal-idle-badge {
+  display: flex;
+  align-items: center;
+  font-family: monospace;
+  font-size: 9px;
+  color: #475569;
+  background: rgba(71, 85, 105, 0.1);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+
+.spin {
+  animation: spin-anim 1s linear infinite;
+}
+
+@keyframes spin-anim {
+  to { transform: rotate(360deg); }
 }
 
 .terminal-box {
-  background: #030712;
+  background: rgba(4, 12, 26, 0.98);
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 20px;
   position: relative;
-}
-
-/* 终端滤镜 */
-.terminal-glow {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  box-shadow: inset 0 0 30px rgba(34, 211, 238, 0.04);
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 10;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
 }
 
 .terminal-content {
   position: relative;
   z-index: 2;
-  font-family: 'Courier New', Courier, monospace;
 }
 
 .terminal-line {
   margin: 0 0 6px 0;
-  line-height: 1.5;
+  line-height: 1.6;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
 }
 
 .line-prompt {
-  color: #38bdf8;
+  color: #22d3ee;
   font-weight: bold;
 }
 
-.line-type-command { color: #f8fafc; font-weight: bold; }
+.line-type-command { color: #e2e8f0; font-weight: bold; }
 .line-type-pass { color: #34d399; }
-.line-type-fail { color: #f43f5e; }
+.line-type-fail { color: #fb7185; }
 .line-type-warn { color: #fbbf24; }
-.line-type-info { color: #94a3b8; }
-.line-type-banner { color: #38bdf8; font-weight: bold; }
+.line-type-info { color: #7dd3fc; }
+.line-type-banner { color: #22d3ee; font-weight: bold; }
+
+.status-badge {
+  display: inline-block;
+  padding: 0px 4px;
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: bold;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.status-badge.pass { background: rgba(86, 211, 100, 0.15); color: #56d364; border: 1px solid rgba(86, 211, 100, 0.25); }
+.status-badge.fail { background: rgba(255, 123, 114, 0.15); color: #ff7b72; border: 1px solid rgba(255, 123, 114, 0.25); }
+.status-badge.warn { background: rgba(210, 153, 34, 0.15); color: #d29922; border: 1px solid rgba(210, 153, 34, 0.25); }
+.status-badge.info { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+
+/* 闪烁的打字机光标 */
+.terminal-prompt-line {
+  display: flex;
+  align-items: center;
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background: #c9d1d9;
+  margin-left: 2px;
+  animation: blink-anim 0.8s steps(2, start) infinite;
+}
+
+@keyframes blink-anim {
+  to { visibility: hidden; }
+}
 
 /* 审计历史表格 */
 .cyber-table {
@@ -1332,20 +1446,23 @@ onUnmounted(() => {
 
 /* 滚动条 */
 .report-details-container::-webkit-scrollbar,
-.layer-table-wrap::-webkit-scrollbar {
+.layer-table-wrap::-webkit-scrollbar,
+.terminal-box::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 .report-details-container::-webkit-scrollbar-thumb,
-.layer-table-wrap::-webkit-scrollbar-thumb {
-  background: rgba(34, 211, 238, 0.15);
+.layer-table-wrap::-webkit-scrollbar-thumb,
+.terminal-box::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 
 .report-details-container::-webkit-scrollbar-thumb:hover,
-.layer-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 211, 238, 0.3);
+.layer-table-wrap::-webkit-scrollbar-thumb:hover,
+.terminal-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 @keyframes spin {

@@ -718,12 +718,64 @@ class AdminService:
             self._system_check_runs = []
         return self._system_check_runs
 
-    def execute_system_check(self, job_code: str) -> Dict[str, Any]:
-        import os
+    def get_system_running_log(self) -> Dict[str, Any]:
+        return {
+            "log": getattr(self, "_current_executing_log", ""),
+            "is_executing": getattr(self, "_is_executing", False)
+        }
+
+    def _async_run(self, cmd, run_id, job_code, job_name, start_time):
         import subprocess
         from datetime import datetime
-        from uuid import uuid4
+        self._current_executing_log = f"root@master:~# {cmd[-1]}\n"
+        self._is_executing = True
         
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            # 实时按行读取命令输出并追加
+            for line in iter(process.stdout.readline, ''):
+                self._current_executing_log += line
+            process.stdout.close()
+            process.wait()
+            
+            status = "success" if process.returncode == 0 else "failed"
+        except Exception as e:
+            status = "failed"
+            err_msg = f"\n[ERROR] 异步调度遭遇异常崩溃: {str(e)}\n"
+            self._current_executing_log += err_msg
+            
+        duration = int((datetime.now() - start_time).total_seconds())
+        # 去掉第一行命令行前缀，作为纯净 log_summary 保存
+        summary_log = self._current_executing_log
+        if summary_log.startswith("root@master:~#"):
+            summary_log = summary_log[summary_log.find("\n")+1:]
+            
+        run = {
+            "run_id": run_id,
+            "job_code": job_code,
+            "job_name": job_name,
+            "status": status,
+            "start_time": start_time.isoformat(timespec="seconds"),
+            "end_time": datetime.now().isoformat(timespec="seconds"),
+            "duration_seconds": duration,
+            "log_summary": summary_log,
+        }
+        
+        if not hasattr(self, "_system_check_runs"):
+            self._system_check_runs = []
+        self._system_check_runs.insert(0, run)
+        self._audit_logs.insert(0, self._audit("admin", "system_check", "check", job_code, status))
+        self._is_executing = False
+
+    def execute_system_check(self, job_code: str) -> Dict[str, Any]:
+        import os
+        from datetime import datetime
+        from uuid import uuid4
+        import threading
+        
+        if getattr(self, "_is_executing", False):
+            raise ValueError("当前有诊断作业正在执行中，请勿重复发起。")
+            
         valid_codes = {
             "system_health_check": "health_check.sh",
             "system_local_checks": "run_local_checks.sh",
@@ -743,8 +795,6 @@ class AdminService:
         project_home = os.getenv("PROJECT_HOME", "/root/agentscope")
         
         start_time = datetime.now()
-        status = "success"
-        log_summary = ""
         
         if job_code == "system_benchmark":
             exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/benchmark.sh --duration 15"
@@ -754,36 +804,21 @@ class AdminService:
             exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/{script_name}"
             
         cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
+        run_id = f"sys_run_{uuid4().hex[:10]}"
+        job_name = "集群服务巡检" if job_code == "system_health_check" else ("数据链路跑通自检" if job_code == "system_local_checks" else ("异常容错与限流测试" if job_code == "system_fault_tolerance" else "流处理压测评估"))
         
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if res.returncode != 0:
-                status = "failed"
-                log_summary = res.stderr or res.stdout
-            else:
-                log_summary = res.stdout
-        except subprocess.TimeoutExpired as te:
-            status = "failed"
-            log_summary = f"Job execution timed out. Output captured so far:\n{te.stdout or ''}\nErrors:\n{te.stderr or ''}"
-        except Exception as e:
-            status = "failed"
-            log_summary = f"Execution system error: {str(e)}"
-            
-        duration = int((datetime.now() - start_time).total_seconds())
+        # 异步线程执行
+        t = threading.Thread(
+            target=self._async_run,
+            args=(cmd, run_id, job_code, job_name, start_time)
+        )
+        t.daemon = True
+        t.start()
         
-        run = {
-            "run_id": f"sys_run_{uuid4().hex[:10]}",
+        return {
+            "status": "running",
+            "run_id": run_id,
             "job_code": job_code,
-            "job_name": "集群服务巡检" if job_code == "system_health_check" else ("数据链路跑通自检" if job_code == "system_local_checks" else ("异常容错与限流测试" if job_code == "system_fault_tolerance" else "流处理压测评估")),
-            "status": status,
+            "job_name": job_name,
             "start_time": start_time.isoformat(timespec="seconds"),
-            "end_time": datetime.now().isoformat(timespec="seconds"),
-            "duration_seconds": duration,
-            "log_summary": log_summary,
         }
-        
-        if not hasattr(self, "_system_check_runs"):
-            self._system_check_runs = []
-        self._system_check_runs.insert(0, run)
-        self._audit_logs.insert(0, self._audit("admin", "system_check", "check", job_code, status))
-        return run

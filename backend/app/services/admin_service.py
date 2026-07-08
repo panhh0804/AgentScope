@@ -29,7 +29,7 @@ class AdminService:
             {
                 "run_id": "sys_run_initial_hc",
                 "job_code": "system_health_check",
-                "job_name": "集群自检",
+                "job_name": "集群服务巡检",
                 "status": "success",
                 "start_time": (datetime.now() - timedelta(hours=1)).isoformat(timespec="seconds"),
                 "end_time": (datetime.now() - timedelta(minutes=58)).isoformat(timespec="seconds"),
@@ -774,7 +774,7 @@ class AdminService:
         run = {
             "run_id": f"sys_run_{uuid4().hex[:10]}",
             "job_code": job_code,
-            "job_name": "集群自检" if job_code == "system_health_check" else ("综合自检" if job_code == "system_local_checks" else ("容错测试" if job_code == "system_fault_tolerance" else "压力测试")),
+            "job_name": "集群服务巡检" if job_code == "system_health_check" else ("数据链路跑通自检" if job_code == "system_local_checks" else ("异常容错与限流测试" if job_code == "system_fault_tolerance" else "流处理压测评估")),
             "status": status,
             "start_time": start_time.isoformat(timespec="seconds"),
             "end_time": datetime.now().isoformat(timespec="seconds"),

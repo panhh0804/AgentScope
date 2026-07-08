@@ -16,7 +16,7 @@
           @click="triggerCheck('system_health_check')"
         >
           <Activity :size="15" />
-          <span>集群体检</span>
+          <span>集群服务巡检</span>
         </button>
         <button
           class="cyber-btn cyber-btn-outline"
@@ -24,7 +24,7 @@
           @click="triggerCheck('system_local_checks')"
         >
           <ShieldAlert :size="15" />
-          <span>运行自检</span>
+          <span>数据链路跑通自检</span>
         </button>
         <button
           class="cyber-btn cyber-btn-outline"
@@ -32,7 +32,7 @@
           @click="triggerCheck('system_fault_tolerance')"
         >
           <AlertOctagon :size="15" />
-          <span>容错测试</span>
+          <span>异常容错与限流测试</span>
         </button>
         <button
           class="cyber-btn cyber-btn-primary"
@@ -40,7 +40,7 @@
           @click="triggerCheck('system_benchmark')"
         >
           <Zap :size="15" />
-          <span>压力测试</span>
+          <span>流处理压测评估</span>
         </button>
       </div>
     </div>
@@ -479,18 +479,18 @@ async function triggerCheck(jobCode) {
     system_benchmark: 'bash scripts/benchmark.sh --duration 15'
   }
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
-  Message.info({ content: '正在调度集群客户端自检脚本，请关注检测报告单更新...', duration: 5000 })
+  Message.info({ content: '正在远程调度系统诊断指令，请关注检测报告单更新...', duration: 5000 })
 
   try {
     const runRes = await runSystemCheck(jobCode)
-    Message.success({ content: '自检完成！最新检测报告单已生成。', duration: 4000 })
+    Message.success({ content: '诊断任务执行完成！最新报告单已生成。', duration: 4000 })
     await loadData()
     if (runRes) {
       loadLogsToConsole(runRes)
     }
   } catch (err) {
     console.error(err)
-    Message.error({ content: `自检脚本运行异常: ${err.message || err}`, duration: 5000 })
+    Message.error({ content: `诊断指令运行异常: ${err.message || err}`, duration: 5000 })
     consoleRawText.value += `\n[ERROR] 脚本执行失败，网关连接超时: ${err.message || err}`
   } finally {
     isExecuting.value = false

@@ -730,9 +730,9 @@ async function triggerCheck(jobCode) {
             
             // 重新刷新历史列表和指标图表
             await loadData()
-            
-            // 运行完成，自动切回结构化报告单，呈现最终结论
-            viewMode.value = 'structured'
+            if (runs.value.length > 0) {
+              loadLogsToConsole(runs.value[0])
+            }
             Message.success({ content: '诊断任务已完成！最新检测报告单已载入。', duration: 4000 })
           }
         }

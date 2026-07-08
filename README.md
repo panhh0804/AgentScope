@@ -63,10 +63,11 @@ graph LR
     subgraph BatchPipeline["离线数仓计算"]
         MySQL_Src[("MySQL Source<br/>业务源库")]:::sourceDb
         DataX["DataX<br/>同步管道"]:::batch
-        HDFS_Raw["HDFS ODS<br/>原始数据层"]:::batch
-        SparkClean["Spark DWD<br/>数据清洗层"]:::batch
-        SparkBatch["Spark DWS<br/>汇总计算层"]:::batch
-        MySQL_Ana[("MySQL Analytics<br/>分析数据库")]:::analyticsDb
+        HDFS_Raw["HDFS ODS<br/>原始数据贴源层"]:::batch
+        SparkClean["Spark DWD<br/>数据明细清洗层"]:::batch
+        SparkBatch["Spark DWS<br/>公共汇总计算层"]:::batch
+        SparkADS["Spark ADS<br/>应用服务定制层"]:::batch
+        MySQL_Ana[("MySQL Analytics<br/>分析与应用库")]:::analyticsDb
     end
 
     subgraph Serving["微服务与展示"]
@@ -88,7 +89,9 @@ graph LR
     DataX -->|"HDFS Write"| HDFS_Raw
     HDFS_Raw -->|"CleanJob · Scala"| SparkClean
     SparkClean -->|"Parquet"| SparkBatch
-    SparkBatch -->|"JDBC Write"| MySQL_Ana
+    SparkClean -->|"异常与拓扑"| SparkADS
+    SparkBatch -->|"公共汇总 ➔ DWS表"| MySQL_Ana
+    SparkADS -->|"定制视图 ➔ ADS表"| MySQL_Ana
 
     %% 服务与展示
     Redis -->|"实时数据读取"| FastAPI
@@ -288,20 +291,22 @@ npm run dev -- --host 0.0.0.0 --port 5173
   ```bash
   python simulator/main.py --mode realtime --kafka-bootstrap middleware:9092 --rate 15
   ```
-* **离线数据手工生成**：
-  您可以通过数据管理前端（`/admin`）的 **「数据任务管理」**，在日期选择器选定日期后，点击 **「生成所选日期模拟数据」** 按钮，系统将自动远程调用集群模拟脚本，将测试数据写入 MySQL Source 库。
+* **离线数据生成与自动调度**：
+  * **定时自动运行**：生产环境中，系统配置了 **Crontab 定时任务，每天凌晨 02:00** 自动触发离线数据生成与计算 Pipeline：
+    ```cron
+    0 2 * * * cd /root/agentscope && bash scripts/run_daily_offline_pipeline.sh >> logs/daily_pipeline.log 2>&1
+    ```
+  * **手工回刷/调试**：若需手工回刷或补数，您可以通过数据管理端（`/admin`）的 **「数据任务管理」**，在日期选择器选定特定日期后，点击 **「生成所选日期模拟数据」**，系统将自动向业务库源表注入所选日期的事件。
 
 ### 2. 离线数仓 Pipeline 执行
-执行离线总控脚本，流水线将自动完成 ODS ➔ DWD ➔ DWS 数据流转（包含 DataX 同步、Spark 清洗及指标统计）：
+执行离线总控脚本，流水线将自动完成 ODS ➔ DWD ➔ DWS ➔ ADS 数据流转（包含 DataX 同步、Spark 清洗及指标统计）：
 ```bash
-bash scripts/run_daily_offline_pipeline.sh 2026-06-30
+bash scripts/run_daily_offline_pipeline.sh [业务日期, 格式 YYYY-MM-DD]
 ```
-在执行过程中，数据管理端的**运行卡片将呈现亮眼的青色霓虹发光动效**，指示当前作业在数仓中的流转状态。
-
-* **质量规则与重跑关系**
-  * 在数据管理页新增或启用质量规则，只会更新规则配置，不会自动重跑历史数据。
-  * 如果规则口径变化影响了历史结果，需要针对受影响的业务日期手动重跑清洗，必要时再继续重跑下游指标与报告。
-  * 推荐的 crontab 入口是 `0 2 * * * cd /root/agentscope && bash scripts/run_daily_offline_pipeline.sh >> logs/daily_pipeline.log 2>&1`。
+> [!TIP]
+> * **日期参数说明**：如果您执行时不传入日期参数，脚本将默认以**当前系统当天日期**运行分析。例如要手动回刷/测试 `2026-06-30` 的历史数据，请显式传入该日期：`bash scripts/run_daily_offline_pipeline.sh 2026-06-30`。
+> * **工作流状态指示**：在执行过程中，数据管理端的数据任务看板将通过高亮状态动画实时指示当前作业在数仓各个阶段（DataX、Spark Clean、Spark Batch）中的流转运行状态。
+> * **质量规则与重跑关系**：在数据管理页启用或禁用质量规则只会更新规则配置，不会自动重跑历史数据。如果规则口径变化影响了历史结果，需要针对受影响的业务日期手动重跑清洗。
 
 ---
 
@@ -310,7 +315,7 @@ bash scripts/run_daily_offline_pipeline.sh 2026-06-30
 系统后端内置了数据源回退的保护机制，支持通过环境变量 `DATA_MODE` 显式控制运行模式，并在所有响应中返回数据源元信息（`data_source`, `fallback`, `reason`）：
 
 *   **`DATA_MODE=demo`（默认演示模式）**：
-    *   为了在汇报和答辩现场表现更稳健，当 Redis/MySQL 连接超时或目标表为空无数据时，系统将**自动降级（fallback）并返回预置的高质量 Mock 数据**，并输出元信息 `"data_source": "mock", "fallback": true`。
+    *   为了在网络环境不佳或中间件连接不稳定时保证系统的服务可用性，当 Redis/MySQL 连接超时或目标表为空无数据时，系统将**自动降级（fallback）并返回预置的高质量 Mock 数据**，并输出元信息 `"data_source": "mock", "fallback": true`。
 *   **`DATA_MODE=strict`（真实生产验证模式）**：
     *   **严格禁止数据回退/伪造**。当底层 Hadoop/YARN/Redis 真实链路中无数据或连接失败时，系统将直接返回空数组、空对象或返回 HTTPException 错误，用于严格评估大数据计算链路的吞吐量、实时计算延迟和真实数仓质量。
 
@@ -320,7 +325,7 @@ bash scripts/run_daily_offline_pipeline.sh 2026-06-30
 
 ## 📊 核心指标口径与统计规约
 
-为了确保系统汇报与答辩的技术真实性，平台底层 Spark 离线与流式计算任务严格区分了 **「事件级日志 (Event-level Log)」** 与 **「运行级指标 (Run-level Metric)」**，定义如下：
+为了确保系统分析指标的工程真实性与口径严谨度，平台底层 Spark 离线与流式计算任务严格区分了 **「事件级日志 (Event-level Log)」** 与 **「运行级指标 (Run-level Metric)」**，定义如下：
 
 1.  **事件 (Event)**：多 Agent 协作交互的微观日志（如 `agent_start`, `llm_request`, `llm_response`, `tool_call`, `agent_complete` 等）。单个 Agent 运行流程中会产生多条连续的事件。
 2.  **执行 (Run / Task)**：一个 Agent 的完整生命周期流程，对应唯一的 `run_id`。

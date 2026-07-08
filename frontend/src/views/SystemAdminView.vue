@@ -85,31 +85,52 @@
       </div>
     </section>
 
-    <!-- 3. 第三通栏：最新诊断报告单 -->
+    <!-- 3. 第三通栏：最新诊断报告单（支持结构化和原生终端双模一键切换） -->
     <section class="cyber-panel" style="margin-bottom: 24px; min-height: 280px; display: flex; flex-direction: column;">
-      <div class="panel-title-bar">
+      <div class="panel-title-bar" style="flex-wrap: wrap; gap: 12px;">
         <span class="glow-tag">DIAGNOSTIC REPORT</span>
         <h3>最新诊断报告单</h3>
-        <span class="muted" style="margin-left: auto; font-family: monospace; font-size: 11px;">
+        <span class="muted-title-info" style="font-family: monospace; font-size: 11px; color: #64748b;">
           {{ consoleTitle }}
         </span>
+        
+        <!-- 双模切换开关 -->
+        <div class="view-mode-toggle" style="margin-left: auto;">
+          <button
+            :class="['toggle-btn', { active: viewMode === 'structured' }]"
+            @click="viewMode = 'structured'"
+            title="查看精简规整的诊断条目"
+          >
+            <FileText :size="13" />
+            <span>结构化报告</span>
+          </button>
+          <button
+            :class="['toggle-btn', { active: viewMode === 'terminal' }]"
+            @click="viewMode = 'terminal'"
+            title="查看后台完整 Shell 终端输出"
+          >
+            <Terminal :size="13" />
+            <span>原生终端</span>
+          </button>
+        </div>
       </div>
       
-      <div class="report-details-container" ref="terminalRef" style="flex: 1; overflow-y: auto; padding-right: 6px; max-height: 380px;">
+      <!-- 主内容渲染区 -->
+      <div class="report-details-container" style="flex: 1; display: flex; flex-direction: column;">
         <!-- 运行中状态 -->
-        <div v-if="isExecuting" class="report-executing-state">
+        <div v-if="isExecuting" class="report-executing-state" style="flex: 1;">
           <span class="loading-spinner large"></span>
           <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
           <span class="loading-subtext">正在抓取 HDFS、YARN ResourceManager 状态及交互吞吐指标，请稍候 10~15 秒</span>
         </div>
 
         <!-- 空置状态 -->
-        <div v-else-if="parsedLogs.length === 0" class="report-empty-state">
+        <div v-else-if="!consoleRawText" class="report-empty-state" style="flex: 1;">
           <p>请点击顶部按钮发起实时诊断自检，或在下方审计列表中点击「加载报告」载入历史运行诊断单。</p>
         </div>
 
-        <!-- 结构化报告条目 -->
-        <div v-else class="report-steps-list">
+        <!-- 模式一：结构化卡片清单 -->
+        <div v-else-if="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 380px; padding-right: 6px;">
           <div
             v-for="(step, sIdx) in parsedLogs"
             :key="sIdx"
@@ -131,6 +152,32 @@
                 <span class="indicator-icon"></span>
                 <p class="detail-text" v-html="detail.text"></p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 模式二：复古 CRT 黑客终端 (满足深度查看 Shell 原始输出需求) -->
+        <div v-else-if="viewMode === 'terminal'" class="terminal-container" style="flex: 1; min-height: 320px; display: flex; flex-direction: column;">
+          <div class="terminal-header">
+            <div class="mac-buttons">
+              <span class="close"></span>
+              <span class="minimize"></span>
+              <span class="maximize"></span>
+            </div>
+            <div class="terminal-logo">
+              <Terminal :size="12" />
+              <span class="terminal-title">SHELL OUTPUT SNAPSHOT</span>
+            </div>
+          </div>
+          <div class="terminal-box" ref="terminalRef" style="flex: 1; height: 320px;">
+            <div class="terminal-glow"></div>
+            <div class="terminal-content">
+              <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
+                <p :class="['terminal-line', `line-type-${line.type}`]">
+                  <span class="line-prompt" v-if="line.type === 'command'">root@master:~# </span>
+                  <span v-html="line.html"></span>
+                </p>
+              </template>
             </div>
           </div>
         </div>
@@ -198,7 +245,8 @@ import {
   Share2,
   Database,
   Terminal,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from '@lucide/vue'
 import { Message } from '@arco-design/web-vue'
 import * as echarts from 'echarts'
@@ -208,6 +256,7 @@ const runs = ref([])
 const isExecuting = ref(false)
 const consoleTitle = ref('快照日志')
 const consoleRawText = ref('')
+const viewMode = ref('structured') // 'structured' | 'terminal'双模一键切换
 const chartRef = ref(null)
 const terminalRef = ref(null)
 let chartInstance = null
@@ -237,7 +286,6 @@ const serviceGridItems = computed(() => {
     else if (log.includes('YARN ResourceManager 不可达') || log.includes('YARN 无 Active NodeManager')) statusMap.yarn = 'failed'
     else if (log.includes('Active NodeManager')) statusMap.yarn = 'warning'
 
-    // 匹配 Spark YARN 模式下的 ResourceManager 探活通过，即 "YARN ResourceManager UI 正常" 或者是 "yarn application 可用"
     if (log.includes('Spark on YARN 正常') || log.includes('Spark Master 运行中') || log.includes('Spark Alive Workers') || log.includes('YARN ResourceManager UI 正常') || log.includes('yarn application 可用')) statusMap.spark = 'success'
     else if (log.includes('Spark Master 未运行') || log.includes('YARN application 列表不可用')) statusMap.spark = 'failed'
     else if (log.includes('Spark Worker 仅')) statusMap.spark = 'warning'
@@ -275,7 +323,7 @@ const serviceGridItems = computed(() => {
       val: statusMap.yarn,
       icon: Cpu,
       text: statusMap.yarn === 'success' ? 'normal' : (statusMap.yarn === 'failed' ? 'error' : statusMap.yarn),
-      desc: '负责多智能体分析 Pipeline 离线计算在各节点上的内存分配。'
+      desc: '负责多智能体 analysis Pipeline 离线计算在各节点上的内存分配。'
     },
     spark: {
       name: 'Spark 引擎',
@@ -320,6 +368,42 @@ const serviceGridItems = computed(() => {
       desc: '处理前端数据资产检索、一键运维控制与大语言模型报告生成。'
     }
   }
+})
+
+// 原生终端行格式化匹配
+const formattedConsoleLines = computed(() => {
+  if (!consoleRawText.value) return []
+  return consoleRawText.value.split('\n').map(line => {
+    let type = 'info'
+    let html = line
+
+    if (line.startsWith('$ ') || line.startsWith('root@master:')) {
+      type = 'command'
+      html = line.substring(line.indexOf('#') + 1).trim()
+    } else if (line.includes('[✅ PASS]')) {
+      type = 'pass'
+      html = line.replace('[✅ PASS]', '<span class="status-badge pass">PASS</span>')
+    } else if (line.includes('[❌ FAIL]')) {
+      type = 'fail'
+      html = line.replace('[❌ FAIL]', '<span class="status-badge fail">FAIL</span>')
+    } else if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
+      type = 'warn'
+      html = line.replace(/\[⚠️\s*WARN\]/, '<span class="status-badge warn">WARN</span>')
+    } else if (line.includes('[INFO]')) {
+      type = 'info'
+      html = line.replace('[INFO]', '<span class="status-badge info">INFO</span>')
+    } else if (line.includes('[ERROR]')) {
+      type = 'fail'
+      html = line.replace('[ERROR]', '<span class="status-badge fail">ERROR</span>')
+    } else if (line.includes('[WARN]')) {
+      type = 'warn'
+      html = line.replace('[WARN]', '<span class="status-badge warn">WARN</span>')
+    } else if (line.startsWith('──────') || line.startsWith('╔══') || line.startsWith('║') || line.startsWith('╚══') || line.startsWith('====')) {
+      type = 'banner'
+    }
+
+    return { type, html }
+  })
 })
 
 // 核心自检日志结构化解析器
@@ -769,6 +853,40 @@ onUnmounted(() => {
   100% { transform: scale(0.9); opacity: 0.7; }
 }
 
+/* 双模切换开关样式 */
+.view-mode-toggle {
+  display: inline-flex;
+  background: rgba(8, 26, 48, 0.6);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  color: #22d3ee;
+}
+
+.toggle-btn.active {
+  background: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  box-shadow: inset 0 0 4px rgba(34, 211, 238, 0.1);
+}
+
 /* 健康卡片通栏样式 */
 .health-grid {
   display: grid;
@@ -1053,6 +1171,96 @@ onUnmounted(() => {
 .status-badge.fail { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
 .status-badge.warn { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
 .status-badge.info { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+
+/* CRT 复古终端机 */
+.terminal-container {
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-header {
+  background: #090d16;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.15);
+}
+
+.mac-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.mac-buttons span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.mac-buttons .close { background: #fb7185; }
+.mac-buttons .minimize { background: #fbbf24; }
+.mac-buttons .maximize { background: #34d399; }
+
+.terminal-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.terminal-title {
+  font-family: monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.terminal-box {
+  background: #030712;
+  overflow-y: auto;
+  padding: 16px;
+  position: relative;
+}
+
+/* 终端滤镜 */
+.terminal-glow {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  box-shadow: inset 0 0 30px rgba(34, 211, 238, 0.04);
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.terminal-content {
+  position: relative;
+  z-index: 2;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.terminal-line {
+  margin: 0 0 6px 0;
+  line-height: 1.5;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.line-prompt {
+  color: #38bdf8;
+  font-weight: bold;
+}
+
+.line-type-command { color: #f8fafc; font-weight: bold; }
+.line-type-pass { color: #34d399; }
+.line-type-fail { color: #f43f5e; }
+.line-type-warn { color: #fbbf24; }
+.line-type-info { color: #94a3b8; }
+.line-type-banner { color: #38bdf8; font-weight: bold; }
 
 /* 审计历史表格 */
 .cyber-table {

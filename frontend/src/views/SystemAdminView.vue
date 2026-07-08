@@ -455,7 +455,7 @@ const parsedLogs = computed(() => {
     if (
       line.includes('Payload:') || line.startsWith('{') || line.endsWith('}') ||
       line.includes('>>') || line.startsWith('>') ||
-      line.match(/^[━─=-*+═╔╗╚╝║╟╢┼\u2550-\u257F\u2500-\u254F]+$/) || 
+      line.match(/^[━─=\-*+═╔╗╚╝║╟╢┼\u2550-\u257F\u2500-\u254F]+$/) || 
       line.includes('发送完成') || line.includes('正在向 Kafka 发送')
     ) {
       continue

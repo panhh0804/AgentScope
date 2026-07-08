@@ -450,12 +450,15 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // Format 2: run_local_checks.sh / test_fault_tolerance.sh  [N/M] Step
-    const m2 = line.match(/\[(\d+\/\d+)\]\s+(.+)$/)
+    // Format 2: run_local_checks.sh / test_fault_tolerance.sh 支持 [N/M] 或 测试 N/M 标题划分
+    const m2 = line.match(/(?:\[(\d+\/\d+)\]|测试\s*(\d+\/\d+))\uff1a?\s*(.+)$/)
     if (m2) {
       if (currentStep) steps.push(currentStep)
-      const name = m2[2].replace(/[^\x20-\x7E\u4e00-\u9fa5\uff0c\u3002\uff1f\uff01]/g, '').replace(/\.\.\.?$/, '').trim()
-      currentStep = { step: m2[1], name: name || m2[2], status: 'success', detail: [] }
+      const stepNum = m2[1] || m2[2]
+      let nameText = m2[3] || ''
+      nameText = nameText.replace(/[^\x20-\x7E\u4e00-\u9fa5\uff0c\u3002\uff1f\uff01]/g, '')
+      nameText = nameText.replace(/^[❌⚠️✅]\s*/g, '').replace(/\.\.\.?$/, '').trim()
+      currentStep = { step: stepNum, name: nameText || m2[3], status: 'success', detail: [] }
       continue
     }
 

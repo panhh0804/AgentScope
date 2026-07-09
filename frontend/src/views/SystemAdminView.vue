@@ -1534,6 +1534,7 @@ onUnmounted(() => {
   font-weight: bold;
   border-radius: 2px;
   margin-right: 4px;
+  white-space: nowrap;
 }
 
 .status-badge.pass { background: rgba(86, 211, 100, 0.15); color: #56d364; border: 1px solid rgba(86, 211, 100, 0.25); }
@@ -1590,11 +1591,13 @@ onUnmounted(() => {
 
 .tag-neon {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 2px 10px;
   font-family: monospace;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: bold;
-  border-radius: 3px;
+  border-radius: 4px;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .neon-success {

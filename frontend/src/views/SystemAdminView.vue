@@ -940,6 +940,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.toolbar-title {
+  flex-shrink: 0;
 }
 
 .rotate-slow {
@@ -971,7 +978,9 @@ onUnmounted(() => {
 .toolbar-actions {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  flex-shrink: 1;
 }
 
 /* 极客感按钮 */
@@ -987,6 +996,7 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cyber-btn-primary {

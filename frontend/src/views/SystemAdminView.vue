@@ -88,7 +88,7 @@
       <div class="panel-title-bar" style="flex-wrap: wrap; gap: 12px;">
         <span class="glow-tag">DIAGNOSTIC REPORT</span>
         <h3>最新诊断报告单</h3>
-        <span class="muted-title-info" style="font-family: monospace; font-size: 11px; color: #64748b;">
+        <span class="muted-title-info" style="font-family: monospace; font-size: 14px; color: #64748b;">
           {{ consoleTitle }}
         </span>
         
@@ -234,7 +234,7 @@
             </button>
           </div>
         </div>
-        <button class="cyber-btn-outline" size="mini" style="padding: 2px 10px; font-size: 11px;" @click="loadData">
+        <button class="cyber-btn-outline" size="mini" style="padding: 2px 10px; font-size: 13px;" @click="loadData">
           <RefreshCw :size="10" style="margin-right: 4px;" />刷新
         </button>
       </div>
@@ -923,6 +923,7 @@ onUnmounted(() => {
 /* 全局自研暗黑赛博面板样式 */
 .system-admin-view {
   padding: 24px;
+  font-size: 14px;
   background: radial-gradient(circle at 50% 0%, rgba(9, 27, 54, 0.5) 0%, rgba(5, 12, 28, 0.95) 100%);
   min-height: calc(100vh - 64px);
   color: #e2e8f0;
@@ -959,7 +960,7 @@ onUnmounted(() => {
 }
 
 .cyber-header .subtitle {
-  font-size: 10px;
+  font-size: 15px;
   font-family: monospace;
   color: #0ea5e9;
   letter-spacing: 0.1em;
@@ -982,7 +983,7 @@ onUnmounted(() => {
   height: 38px;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
@@ -1042,7 +1043,7 @@ onUnmounted(() => {
   border: 1px solid rgba(34, 211, 238, 0.4);
   color: #22d3ee;
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   padding: 2px 6px;
   border-radius: 2px;
   letter-spacing: 0.05em;
@@ -1082,7 +1083,7 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   color: #64748b;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 3px;
@@ -1162,7 +1163,7 @@ onUnmounted(() => {
 
 .svc-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
   color: #f1f5f9;
 }
 
@@ -1181,12 +1182,12 @@ onUnmounted(() => {
 
 .status-text {
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: bold;
 }
 
 .svc-desc {
-  font-size: 11px;
+  font-size: 14px;
   color: #64748b;
   line-height: 1.5;
   margin: 0;
@@ -1265,7 +1266,7 @@ onUnmounted(() => {
 }
 
 .loading-subtext {
-  font-size: 11px;
+  font-size: 14px;
   color: #64748b;
   font-family: monospace;
 }
@@ -1278,7 +1279,7 @@ onUnmounted(() => {
   min-height: 260px;
   color: #64748b;
   text-align: center;
-  font-size: 13px;
+  font-size: 15px;
   padding: 0 30px;
   line-height: 1.6;
 }
@@ -1314,7 +1315,7 @@ onUnmounted(() => {
   background: rgba(34, 211, 238, 0.1);
   color: #22d3ee;
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: bold;
   padding: 1px 6px;
   border-radius: 3px;
@@ -1322,7 +1323,7 @@ onUnmounted(() => {
 }
 
 .step-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: bold;
   color: #f1f5f9;
 }
@@ -1330,7 +1331,7 @@ onUnmounted(() => {
 .step-status-tag {
   margin-left: auto;
   font-family: monospace;
-  font-size: 9px;
+  font-size: 14px;
   font-weight: bold;
   padding: 1px 5px;
   border-radius: 2px;
@@ -1381,7 +1382,7 @@ onUnmounted(() => {
 }
 
 .detail-text {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
   color: #94a3b8;
   margin: 0;
@@ -1392,7 +1393,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 0 3px;
   font-family: monospace;
-  font-size: 8px;
+  font-size: 14px;
   font-weight: bold;
   border-radius: 2px;
   margin-right: 4px;
@@ -1430,14 +1431,14 @@ onUnmounted(() => {
   gap: 6px;
   color: #22d3ee;
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: bold;
   letter-spacing: 0.08em;
 }
 
 .terminal-title {
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: #22d3ee;
@@ -1450,7 +1451,7 @@ onUnmounted(() => {
 
 .terminal-path {
   font-family: monospace;
-  font-size: 11px;
+  font-size: 14px;
   color: #64748b;
   letter-spacing: 0.02em;
 }
@@ -1460,7 +1461,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   font-family: monospace;
-  font-size: 9px;
+  font-size: 14px;
   color: #22d3ee;
   font-weight: bold;
   background: rgba(34, 211, 238, 0.1);
@@ -1473,7 +1474,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   font-family: monospace;
-  font-size: 9px;
+  font-size: 14px;
   color: #475569;
   background: rgba(71, 85, 105, 0.1);
   border: 1px solid rgba(71, 85, 105, 0.2);
@@ -1529,7 +1530,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 0px 4px;
   font-family: monospace;
-  font-size: 9px;
+  font-size: 14px;
   font-weight: bold;
   border-radius: 2px;
   margin-right: 4px;
@@ -1579,7 +1580,7 @@ onUnmounted(() => {
 .time-col {
   font-family: monospace;
   color: #64748b;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .dur-col {
@@ -1591,7 +1592,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 1px 6px;
   font-family: monospace;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: bold;
   border-radius: 3px;
 }
@@ -1616,7 +1617,7 @@ onUnmounted(() => {
   color: #22d3ee;
   border-radius: 3px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -1671,7 +1672,7 @@ onUnmounted(() => {
   border: 1px solid rgba(34, 211, 238, 0.15);
   color: #8ec5fc;
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: 14px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.25s ease;
@@ -1698,7 +1699,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 2px 8px;
   font-family: monospace;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 500;
   background: rgba(6, 182, 212, 0.1);
   color: #06b6d4;
@@ -1728,7 +1729,7 @@ onUnmounted(() => {
 
 .stage-glow-badge {
   font-family: monospace;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   color: #06b6d4;
   background: rgba(6, 182, 212, 0.15);

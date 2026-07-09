@@ -945,6 +945,9 @@ onUnmounted(() => {
 }
 
 .toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
 }
 

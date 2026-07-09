@@ -25,8 +25,8 @@ class MySQLAnalyticsRepository:
             return pymysql.connect(
                 host=os.getenv("MYSQL_HOST", "middleware"),
                 port=int(os.getenv("MYSQL_PORT", "3306")),
-                user=os.getenv("MYSQL_USER", "agentscope"),
-                password=os.getenv("MYSQL_PASSWORD", "agentscope_pass"),
+                user=os.getenv("MYSQL_USER", "root"),
+                password=os.getenv("MYSQL_PASSWORD", "hadoop2026123aa"),
                 database=os.getenv("MYSQL_ANALYTICS_DB", "agentscope_analytics"),
                 charset="utf8mb4",
                 cursorclass=pymysql.cursors.DictCursor,
@@ -341,69 +341,6 @@ class MySQLAnalyticsRepository:
                 "sample_data_json": missing_fields
             })
             
-        if not issues:
-            issues = [
-                {
-                    "rule_code": "required_fields",
-                    "rule_name": "关键字段缺失",
-                    "dataset_code": "agent_clean_events",
-                    "biz_date": metric_date.isoformat(),
-                    "total_count": total_cnt,
-                    "failed_count": 18,
-                    "pass_rate": round(1 - 18 / total_cnt, 4),
-                    "sample_data_json": [
-                        {"event_id": None, "trace_id": "trace_demo_102", "agent_id": "planner_agent"},
-                        {"event_id": "", "trace_id": "trace_demo_108", "agent_id": None},
-                        {"event_id": "evt_bad_001", "trace_id": None, "agent_id": "writer_agent"},
-                        {"event_id": None, "trace_id": "", "agent_id": "search_agent"},
-                        {"event_id": "evt_bad_002", "trace_id": "trace_demo_115", "agent_id": ""}
-                    ]
-                },
-                {
-                    "rule_code": "duplicate_event_id",
-                    "rule_name": "重复 event_id",
-                    "dataset_code": "agent_raw_events",
-                    "biz_date": metric_date.isoformat(),
-                    "total_count": total_cnt,
-                    "failed_count": 7,
-                    "pass_rate": round(1 - 7 / total_cnt, 4),
-                    "sample_data_json": [
-                        {"event_id": "evt_dup_001", "count": 3, "agent_id": "planner_agent"},
-                        {"event_id": "evt_dup_002", "count": 2, "agent_id": "search_agent"},
-                        {"event_id": "evt_dup_003", "count": 2, "agent_id": "analysis_agent"}
-                    ]
-                },
-                {
-                    "rule_code": "token_mismatch",
-                    "rule_name": "Token 不一致",
-                    "dataset_code": "agent_clean_events",
-                    "biz_date": metric_date.isoformat(),
-                    "total_count": total_cnt,
-                    "failed_count": 11,
-                    "pass_rate": round(1 - 11 / total_cnt, 4),
-                    "sample_data_json": [
-                        {"event_id": "evt_tok_001", "prompt_tokens": 1200, "completion_tokens": 900, "total_tokens": 2198},
-                        {"event_id": "evt_tok_002", "prompt_tokens": 800, "completion_tokens": 600, "total_tokens": 1500},
-                        {"event_id": "evt_tok_003", "prompt_tokens": 450, "completion_tokens": 380, "total_tokens": 900},
-                        {"event_id": "evt_tok_004", "prompt_tokens": 2100, "completion_tokens": 1800, "total_tokens": 3999},
-                        {"event_id": "evt_tok_005", "prompt_tokens": 310, "completion_tokens": 290, "total_tokens": 601}
-                    ]
-                },
-                {
-                    "rule_code": "negative_latency",
-                    "rule_name": "负数时延",
-                    "dataset_code": "agent_source_events",
-                    "biz_date": metric_date.isoformat(),
-                    "total_count": total_cnt,
-                    "failed_count": 3,
-                    "pass_rate": round(1 - 3 / total_cnt, 4),
-                    "sample_data_json": [
-                        {"event_id": "evt_bad_latency_001", "latency_ms": -42, "agent_id": "writer_agent"},
-                        {"event_id": "evt_bad_latency_002", "latency_ms": -7, "agent_id": "search_agent"},
-                        {"event_id": "evt_bad_latency_003", "latency_ms": -128, "agent_id": "reviewer_agent"}
-                    ]
-                }
-            ]
         return issues
 
     def get_source_total_count(self) -> int:

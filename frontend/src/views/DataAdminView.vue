@@ -126,7 +126,7 @@
                       <td>{{ formatNumber(issue.total_count) }}</td>
                       <td><span :class="{ 'tag failed': issue.failed_count > 0 }">{{ issue.failed_count }}</span></td>
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
-                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json, `异常样本预览 (总异常行数: ${issue.failed_count} 行，此处仅展示最新 5 条样本)`)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
+                      <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json, issue.failed_count > 5 ? `异常样本预览 (总异常行数: ${issue.failed_count} 行，此处仅展示最新 5 条样本)` : `异常样本预览 (共 ${issue.failed_count} 行，已全部展示)`)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
                     </tr>
                   </tbody>
                 </table>

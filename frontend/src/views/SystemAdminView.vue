@@ -119,93 +119,96 @@
           <p>请点击顶部按钮发起实时诊断自检，或在下方审计列表中点击「加载报告」载入历史运行诊断单。</p>
         </div>
 
-        <!-- 模式一：结构化卡片清单 -->
-        <div v-else-if="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 480px; padding-right: 6px;">
-          <!-- 运行中的 loading 进度 -->
-          <div v-if="isExecuting" class="report-executing-state">
-            <span class="loading-spinner large"></span>
-            <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
-            <span class="loading-subtext">实时日志正在流式回显，请切换「原生终端」实时查看</span>
-          </div>
-          
-          <div v-else>
-            <!-- 压测或一键诊断时嵌入图表 -->
-            <div v-if="currentJobCode === 'system_benchmark' || currentJobCode === 'system_all_checks'" class="benchmark-chart-embed">
-              <div class="benchmark-chart-title">
-                <span class="glow-tag" style="font-size: 9px;">PERF CHART</span>
-                <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">阶梯吞吐 &amp; 延迟趋势图</span>
-              </div>
-              <div ref="chartRef" style="width: 100%; height: 240px;"></div>
+        <!-- 已有日志数据或执行中 -->
+        <div v-else style="flex: 1; display: flex; flex-direction: column;">
+          <!-- 模式一：结构化卡片清单 -->
+          <div v-show="viewMode === 'structured'" class="report-steps-list" style="overflow-y: auto; max-height: 480px; padding-right: 6px;">
+            <!-- 运行中的 loading 进度 -->
+            <div v-if="isExecuting" class="report-executing-state">
+              <span class="loading-spinner large"></span>
+              <p class="loading-text">正在远程向集群 Master 调度检测脚本...</p>
+              <span class="loading-subtext">实时日志正在流式回显，请切换「原生终端」实时查看</span>
             </div>
-            <div
-              v-for="(step, sIdx) in parsedLogs"
-              :key="sIdx"
-            >
-              <!-- 大步骤的标题栏（大字号，特色胶囊微标） -->
-              <div v-if="step.isStage" class="report-stage-header-card">
-                <div class="stage-card-header-content">
-                  <span class="stage-glow-badge">STAGE {{ step.step.split('/')[0] }}</span>
-                  <h4 class="stage-title-text">{{ step.name }}</h4>
-                  <span class="stage-decor-line"></span>
+            
+            <div v-else>
+              <!-- 压测或一键诊断时嵌入图表 -->
+              <div v-if="currentJobCode === 'system_benchmark' || currentJobCode === 'system_all_checks'" class="benchmark-chart-embed">
+                <div class="benchmark-chart-title">
+                  <span class="glow-tag" style="font-size: 9px;">PERF CHART</span>
+                  <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">阶梯吞吐 &amp; 延迟趋势图</span>
                 </div>
+                <div ref="chartRef" style="width: 100%; height: 240px;"></div>
               </div>
-
-              <!-- 原有内部小步骤卡片 -->
-              <div v-else :class="['report-step-card', `step-status-${step.status}`]">
-                <div class="step-card-header">
-                  <span class="step-badge">{{ step.step }}</span>
-                  <span class="step-name">{{ step.name }}</span>
-                  <span :class="['step-status-tag', step.status]">
-                    {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
-                  </span>
+              <div
+                v-for="(step, sIdx) in parsedLogs"
+                :key="sIdx"
+              >
+                <!-- 大步骤的标题栏（大字号，特色胶囊微标） -->
+                <div v-if="step.isStage" class="report-stage-header-card">
+                  <div class="stage-card-header-content">
+                    <span class="stage-glow-badge">STAGE {{ step.step.split('/')[0] }}</span>
+                    <h4 class="stage-title-text">{{ step.name }}</h4>
+                    <span class="stage-decor-line"></span>
+                  </div>
                 </div>
-                <div class="step-card-body">
-                  <div
-                    v-for="(detail, dIdx) in step.detail"
-                    :key="dIdx"
-                    :class="['step-detail-row', `detail-type-${detail.type}`]"
-                  >
-                    <span class="indicator-icon"></span>
-                    <p class="detail-text" v-html="detail.text"></p>
+
+                <!-- 原有内部小步骤卡片 -->
+                <div v-else :class="['report-step-card', `step-status-${step.status}`]">
+                  <div class="step-card-header">
+                    <span class="step-badge">{{ step.step }}</span>
+                    <span class="step-name">{{ step.name }}</span>
+                    <span :class="['step-status-tag', step.status]">
+                      {{ step.status === 'success' ? 'PASS' : (step.status === 'warning' ? 'WARN' : 'FAIL') }}
+                    </span>
+                  </div>
+                  <div class="step-card-body">
+                    <div
+                      v-for="(detail, dIdx) in step.detail"
+                      :key="dIdx"
+                      :class="['step-detail-row', `detail-type-${detail.type}`]"
+                    >
+                      <span class="indicator-icon"></span>
+                      <p class="detail-text" v-html="detail.text"></p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div v-if="!parsedLogs.length" class="report-empty-state" style="min-height: 100px;">
-              <p>暂无可解析的结构化步骤，请切换「原生终端」查看完整日志。</p>
+              <div v-if="!parsedLogs.length" class="report-empty-state" style="min-height: 100px;">
+                <p>暂无可解析的结构化步骤，请切换「原生终端」查看完整日志。</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- 模式二：深蓝配色暗黑终端 -->
-        <div v-else-if="viewMode === 'terminal'" class="terminal-container">
-          <div class="terminal-header">
-            <div class="terminal-logo">
-              <Terminal :size="12" />
-              <span class="terminal-title">SHELL OUTPUT</span>
+          <!-- 模式二：深蓝配色暗黑终端 -->
+          <div v-show="viewMode === 'terminal'" class="terminal-container">
+            <div class="terminal-header">
+              <div class="terminal-logo">
+                <Terminal :size="12" />
+                <span class="terminal-title">SHELL OUTPUT</span>
+              </div>
+              <div class="terminal-header-center">
+                <span class="terminal-path">root@master ~ {{ consoleTitle }}</span>
+              </div>
+              <div class="terminal-running-badge" v-if="isExecuting">
+                <RefreshCw class="spin" :size="11" />
+                <span>STREAMING</span>
+              </div>
+              <div class="terminal-idle-badge" v-else>
+                <span>IDLE</span>
+              </div>
             </div>
-            <div class="terminal-header-center">
-              <span class="terminal-path">root@master ~ {{ consoleTitle }}</span>
-            </div>
-            <div class="terminal-running-badge" v-if="isExecuting">
-              <RefreshCw class="spin" :size="11" />
-              <span>STREAMING</span>
-            </div>
-            <div class="terminal-idle-badge" v-else>
-              <span>IDLE</span>
-            </div>
-          </div>
-          <div class="terminal-box" ref="terminalRef">
-            <div class="terminal-content">
-              <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
-                <p :class="['terminal-line', `line-type-${line.type}`]">
-                  <span class="line-prompt" v-if="line.type === 'command'">root@master:~# </span>
-                  <span v-html="line.html"></span>
-                </p>
-              </template>
-              <!-- 执行中：只显示光标，不重复显示 prompt 文字 -->
-              <div v-if="isExecuting" class="terminal-prompt-line">
-                <span class="terminal-cursor"></span>
+            <div class="terminal-box" ref="terminalRef">
+              <div class="terminal-content">
+                <template v-for="(line, idx) in formattedConsoleLines" :key="idx">
+                  <p :class="['terminal-line', `line-type-${line.type}`]">
+                    <span class="line-prompt" v-if="line.type === 'command'">root@master:~# </span>
+                    <span v-html="line.html"></span>
+                  </p>
+                </template>
+                <!-- 执行中：只显示光标，不重复显示 prompt 文字 -->
+                <div v-if="isExecuting" class="terminal-prompt-line">
+                  <span class="terminal-cursor"></span>
+                </div>
               </div>
             </div>
           </div>
@@ -313,7 +316,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import {
   Settings,
   Activity,
@@ -902,6 +905,18 @@ function updateChart() {
 function handleResize() {
   if (chartInstance) chartInstance.resize()
 }
+
+watch(viewMode, (newVal) => {
+  if (newVal === 'structured') {
+    nextTick(() => {
+      if (chartInstance) {
+        chartInstance.resize()
+      } else {
+        initChart()
+      }
+    })
+  }
+})
 
 onMounted(async () => {
   await loadData()

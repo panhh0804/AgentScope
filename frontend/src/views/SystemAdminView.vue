@@ -6,7 +6,6 @@
         <Settings class="header-icon rotate-slow" :size="22" />
         <div>
           <h2>系统诊断与运维中心</h2>
-          <p class="subtitle">CLUSTER HEALTH DIAGNOSTIC & BENCHMARKING SERVICES</p>
         </div>
       </div>
       <div class="toolbar-actions">

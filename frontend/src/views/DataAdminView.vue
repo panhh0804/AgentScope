@@ -128,6 +128,11 @@
                       <td><strong>{{ percent2(issue.pass_rate) }}</strong></td>
                       <td><a-button type="text" size="mini" @click="showJson(issue.sample_data_json, issue.failed_count > 5 ? `异常样本预览 (总异常行数: ${issue.failed_count} 行，此处仅展示最新 5 条样本)` : `异常样本预览 (共 ${issue.failed_count} 行，已全部展示)`)" :disabled="!issue.sample_data_json">查看样本</a-button></td>
                     </tr>
+                    <tr v-if="!qualityIssues.length">
+                      <td colspan="8" class="empty-cell" style="text-align: center; color: #94a3b8; padding: 32px; font-style: italic;">
+                        暂无数据质量异常（所有规则检测合规率 100%）
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

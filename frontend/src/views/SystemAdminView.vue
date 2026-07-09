@@ -960,7 +960,7 @@ onUnmounted(() => {
 
 .cyber-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 24px;
   letter-spacing: 0.05em;
   color: #f1f5f9;
 }

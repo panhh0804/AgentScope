@@ -891,7 +891,7 @@ class AdminService:
         if job_code == "system_all_checks":
             exec_cmd = (
                 f"source /etc/profile && cd {project_home} && "
-                f"export BACKEND_HOST=127.0.0.1 && "
+                f"export BACKEND_HOST=visualization && export BACKEND_PORT=80 && "
                 f"echo '────── [1/4] 集群服务巡检 ──────' && bash scripts/health_check.sh && echo && "
                 f"echo '────── [2/4] 数据链路跑通自检 ──────' && bash scripts/run_local_checks.sh && echo && "
                 f"echo '────── [3/4] 异常容错与限流测试 ──────' && bash scripts/test_fault_tolerance.sh && echo && "
@@ -900,7 +900,7 @@ class AdminService:
         elif job_code == "system_benchmark":
             exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/benchmark.sh --duration 15"
         elif job_code == "system_health_check":
-            exec_cmd = f"export BACKEND_HOST=127.0.0.1 && source /etc/profile && cd {project_home} && bash scripts/health_check.sh"
+            exec_cmd = f"export BACKEND_HOST=visualization && export BACKEND_PORT=80 && source /etc/profile && cd {project_home} && bash scripts/health_check.sh"
         else:
             exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/{script_name}"
             

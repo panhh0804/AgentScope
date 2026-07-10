@@ -510,7 +510,7 @@ h2 {
   gap: 12px;
   margin-bottom: 12px;
   padding-top: 8px;
-  margin-top: -8px;
+  margin-top: 4px;
 }
 
 .screen-metric,
@@ -3248,8 +3248,12 @@ tr:nth-child(3) .rank-badge {
 }
 
 /* Prevent Arco tabs from clipping hover transformations and box-shadows */
+.admin-tabs,
 .admin-tabs .arco-tabs-content,
 .admin-tabs .arco-tabs-content-list,
-.admin-tabs .arco-tabs-pane {
+.admin-tabs .arco-tabs-pane,
+.admin-tabs .arco-tabs-tabpane,
+.admin-tabs .arco-tabs-pane-wrapper,
+.admin-tabs .arco-tabs-content-wrapper {
   overflow: visible !important;
 }

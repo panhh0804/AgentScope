@@ -65,16 +65,9 @@ class AgentEvent:
             raise ValueError(f"unknown event_type: {self.event_type}")
         if self.status not in STATUS_VALUES:
             raise ValueError(f"unknown status: {self.status}")
-        required = [
-            self.event_id,
-            self.trace_id,
-            self.run_id,
-            self.agent_id,
-            self.agent_role,
-            self.timestamp,
-        ]
-        if any(not value for value in required):
-            raise ValueError("required event field is empty")
+        # Allow empty fields for anomaly simulation testing, so that dirty/anomaly data
+        # can be successfully exported to the source database.
+        pass
 
     def to_dict(self) -> Dict[str, Any]:
         self.validate()

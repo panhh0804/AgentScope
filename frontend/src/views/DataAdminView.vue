@@ -1114,8 +1114,7 @@ async function runJob(jobCode) {
     Message.error({ content: `作业调度系统异常: ${err.message || err}`, duration: 5000 })
   } finally {
     runningJobs.value[jobCode] = false
-    await loadJobs()
-    auditLogs.value = await fetchAuditLogs()
+    await loadAll()
   }
 }
 
@@ -1140,7 +1139,6 @@ async function runFullPipeline() {
         break
       } finally {
         runningJobs.value[job.job_code] = false
-        await loadJobs()
       }
     }
     if (!failed) {
@@ -1150,7 +1148,7 @@ async function runFullPipeline() {
     Message.error({ content: `流水线运行系统异常: ${err.message || err}` })
   } finally {
     pipelineRunning.value = false
-    auditLogs.value = await fetchAuditLogs()
+    await loadAll()
   }
 }
 
@@ -1166,8 +1164,7 @@ async function retryRun(runId) {
   } catch (err) {
     Message.error({ content: `重试失败: ${err.message || err}` })
   } finally {
-    await loadJobs()
-    auditLogs.value = await fetchAuditLogs()
+    await loadAll()
   }
 }
 

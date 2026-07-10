@@ -593,7 +593,8 @@
                       size="small" 
                       type="outline" 
                       :loading="runningJobs[job.job_code]" 
-                      :disabled="anyJobRunning" 
+                      :disabled="anyJobRunning && !runningJobs[job.job_code]" 
+                      :class="{ 'btn-running': runningJobs[job.job_code] }"
                       @click="runJob(job.job_code)"
                     >
                       {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
@@ -621,7 +622,8 @@
                       size="small" 
                       type="outline" 
                       :loading="runningJobs[job.job_code]" 
-                      :disabled="anyJobRunning" 
+                      :disabled="anyJobRunning && !runningJobs[job.job_code]" 
+                      :class="{ 'btn-running': runningJobs[job.job_code] }"
                       @click="runJob(job.job_code)"
                     >
                       {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
@@ -649,7 +651,8 @@
                       size="small" 
                       type="outline" 
                       :loading="runningJobs[job.job_code]" 
-                      :disabled="anyJobRunning" 
+                      :disabled="anyJobRunning && !runningJobs[job.job_code]" 
+                      :class="{ 'btn-running': runningJobs[job.job_code] }"
                       @click="runJob(job.job_code)"
                     >
                       {{ runningJobs[job.job_code] ? '运行中' : '执行' }}
@@ -677,7 +680,8 @@
                       size="small" 
                       type="outline" 
                       :loading="runningJobs[job.job_code]" 
-                      :disabled="anyJobRunning" 
+                      :disabled="anyJobRunning && !runningJobs[job.job_code]" 
+                      :class="{ 'btn-running': runningJobs[job.job_code] }"
                       @click="runJob(job.job_code)"
                     >
                       {{ runningJobs[job.job_code] ? '运行中' : '执行' }}

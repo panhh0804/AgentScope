@@ -3234,3 +3234,13 @@ tr:nth-child(3) .rank-badge {
   border-radius: 8px;
   margin: 8px 0;
 }
+
+/* Custom class for executing/running buttons in pipeline stage cards */
+.arco-btn.btn-running {
+  background: rgba(34, 211, 238, 0.22) !important;
+  border-color: #22d3ee !important;
+  color: #22d3ee !important;
+  opacity: 1 !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.4) !important;
+}

@@ -102,7 +102,27 @@ class MySQLAnalyticsRepository:
             (start_date, end_date),
         )
 
-    def get_error_distribution(self, limit: int = 10) -> Optional[List[Dict]]:
+    def get_error_distribution(
+        self,
+        limit: int = 10,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Optional[List[Dict]]:
+        if start_date and end_date:
+            return self._query(
+                """
+                SELECT
+                    error_type,
+                    SUM(error_count) AS total_count,
+                    SUM(error_count) / NULLIF((SELECT SUM(error_count) FROM error_distribution WHERE metric_date BETWEEN %s AND %s), 0) AS percentage
+                FROM error_distribution
+                WHERE metric_date BETWEEN %s AND %s
+                GROUP BY error_type
+                ORDER BY total_count DESC
+                LIMIT %s
+                """,
+                (start_date, end_date, start_date, end_date, limit),
+            )
         return self._query(
             """
             SELECT

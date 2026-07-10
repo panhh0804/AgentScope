@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.repositories.mysql_repo import MySQLAnalyticsRepository
 from app.services import mock_data
@@ -15,23 +15,31 @@ class StatisticsService:
         self.repo = MySQLAnalyticsRepository()
 
     def _data_mode(self) -> str:
-        return os.getenv("DATA_MODE", "demo").lower()
+        return os.getenv("DATA_MODE", "normal")
+
+    def _normalize_row(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        return {k: float(v) if isinstance(v, Decimal) else v for k, v in row.items()}
 
     def trend(self) -> Dict[str, Any]:
         end = date.today()
         start = end - timedelta(days=29)
-        rows = self.repo.analytics_trend(start, end)
+        rows = self.repo.get_daily_metrics(start, end)
         if rows:
             data = [self._normalize_row(row) for row in rows]
             return {"data": data, "data_source": "mysql", "fallback": False, "reason": None}
         if self._data_mode() == "strict":
             return {"data": [], "data_source": "mysql", "fallback": False, "reason": "MySQL empty or unavailable"}
-        mock_rows = mock_data.daily_metrics(start, end)
+        mock_rows = mock_data.trend()
         data = [self._normalize_row(row) for row in mock_rows]
         return {"data": data, "data_source": "mock", "fallback": True, "reason": "MySQL empty or unavailable"}
 
-    def errors(self, limit: int = 10) -> Dict[str, Any]:
-        rows = self.repo.get_error_distribution(limit)
+    def errors(
+        self,
+        limit: int = 10,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> Dict[str, Any]:
+        rows = self.repo.get_error_distribution(limit, start_date, end_date)
         if rows:
             total = sum(int(row.get("total_count") or row.get("error_count") or 0) for row in rows)
             normalized = []

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Query
 
 from app.schemas.common import ok
@@ -15,8 +18,12 @@ def trend():
 
 
 @router.get("/errors")
-def errors(limit: int = Query(10, ge=1, le=50)):
-    return ok(service.errors(limit))
+def errors(
+    limit: int = Query(10, ge=1, le=50),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None)
+):
+    return ok(service.errors(limit, start_date, end_date))
 
 
 @router.get("/agent-stats")

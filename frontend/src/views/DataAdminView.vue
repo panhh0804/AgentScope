@@ -1026,8 +1026,16 @@ async function loadLayerData() {
   }
   if (selectedLayer.value === 'ads') {
     if (adsSelectedTable.value === 'error_distribution') {
+      const adsParams = compactParams({
+        start_date: normalizeDateValue(adsFilters.value.start_date),
+        end_date: normalizeDateValue(adsFilters.value.end_date)
+      })
+      if (adsParams.start_date && adsParams.end_date && adsParams.start_date > adsParams.end_date) {
+        Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
+        return
+      }
       try {
-        const res = await fetchAnalyticsErrors()
+        const res = await fetchAnalyticsErrors({ limit: 50, ...adsParams })
         adsDataList.value = (res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []))
       } catch (err) {
         Message.error({ content: `ADS 异常分布查询失败: ${err.message || err}`, duration: 5000 })

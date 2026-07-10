@@ -23,7 +23,7 @@ class StatisticsService:
     def trend(self) -> Dict[str, Any]:
         end = date.today()
         start = end - timedelta(days=29)
-        rows = self.repo.get_daily_metrics(start, end)
+        rows = self.repo.analytics_trend(start, end)
         if rows:
             data = [self._normalize_row(row) for row in rows]
             return {"data": data, "data_source": "mysql", "fallback": False, "reason": None}

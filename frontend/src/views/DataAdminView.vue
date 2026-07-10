@@ -832,7 +832,7 @@ const qualityRules = ref([])
 const recleaning = ref({})
 const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
 const agentOptions = ['planner_agent', 'search_agent', 'analysis_agent', 'writer_agent', 'reviewer_agent']
-const eventTypeOptions = ['task_start', 'tool_call', 'llm_call', 'handoff', 'task_finish', 'agent_start', 'agent_complete', 'llm_response']
+const eventTypeOptions = ['agent_start', 'agent_complete', 'agent_failed', 'llm_request', 'llm_response', 'tool_call', 'tool_result', 'retry']
 const statusOptions = ['success', 'failed', 'running']
 
 // Pipeline running states

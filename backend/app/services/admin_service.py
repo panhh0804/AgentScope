@@ -630,7 +630,7 @@ class AdminService:
         now = datetime.now()
         events = []
         agents = ["planner_agent", "search_agent", "analysis_agent", "writer_agent", "reviewer_agent"]
-        types = ["task_start", "tool_call", "llm_call", "handoff", "task_finish"]
+        types = ["agent_start", "llm_request", "llm_response", "tool_call", "tool_result", "agent_complete"]
         for idx in range(18):
             event_time = now - timedelta(minutes=idx * 7)
             status = "failed" if idx in {5, 13} else "success"

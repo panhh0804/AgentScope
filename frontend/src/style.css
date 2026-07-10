@@ -509,6 +509,8 @@ h2 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 12px;
+  padding-top: 8px;
+  margin-top: -8px;
 }
 
 .screen-metric,
@@ -3243,4 +3245,11 @@ tr:nth-child(3) .rank-badge {
   opacity: 1 !important;
   font-weight: bold !important;
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.4) !important;
+}
+
+/* Prevent Arco tabs from clipping hover transformations and box-shadows */
+.admin-tabs .arco-tabs-content,
+.admin-tabs .arco-tabs-content-list,
+.admin-tabs .arco-tabs-pane {
+  overflow: visible !important;
 }

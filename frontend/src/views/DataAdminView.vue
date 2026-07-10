@@ -1124,7 +1124,7 @@ async function runJob(jobCode) {
     input_count: 10000,
     output_count: 0,
     error_count: 0,
-    start_time: new Date().toISOString(),
+    start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString(),
     end_time: null,
     duration_seconds: null,
     log_summary: '正在调度执行中...'
@@ -1165,7 +1165,7 @@ async function runFullPipeline() {
         input_count: 10000,
         output_count: 0,
         error_count: 0,
-        start_time: new Date().toISOString(),
+        start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString(),
         end_time: null,
         duration_seconds: null,
         log_summary: '正在流水线流式调度中...'

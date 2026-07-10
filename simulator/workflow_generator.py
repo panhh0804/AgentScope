@@ -281,10 +281,35 @@ class WorkflowGenerator:
             cost_usd = 0.0
             model_name = None
 
+        evt_id = self.ids.new_id("evt")
+        tr_id = trace_id
+        r_id = run_id
+        lat = latency_ms
+        tot_tok = total_tokens
+
+        # Inject randomized anomalies (1.5% probability each) to simulate data quality issues
+        if self.random.random() < 0.015:
+            # Anomaly 1: Missing critical fields
+            choice = self.random.choice(["event_id", "trace_id", "run_id"])
+            if choice == "event_id":
+                evt_id = ""
+            elif choice == "trace_id":
+                tr_id = ""
+            elif choice == "run_id":
+                r_id = ""
+
+        if self.random.random() < 0.015:
+            # Anomaly 2: Negative latency
+            lat = -self.random.randint(100, 2000)
+
+        if event_type == "llm_response" and self.random.random() < 0.015:
+            # Anomaly 3: Token mismatch
+            tot_tok = prompt_tokens + completion_tokens + self.random.choice([-10, 10, 20])
+
         return AgentEvent(
-            event_id=self.ids.new_id("evt"),
-            trace_id=trace_id,
-            run_id=run_id,
+            event_id=evt_id,
+            trace_id=tr_id,
+            run_id=r_id,
             parent_run_id=parent_run_id,
             agent_id=f"{role}_agent",
             parent_agent_id=parent_agent_id,
@@ -292,10 +317,10 @@ class WorkflowGenerator:
             event_type=event_type,
             status=status,
             timestamp=timestamp.isoformat(),
-            latency_ms=latency_ms,
+            latency_ms=lat,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
+            total_tokens=tot_tok,
             cost_usd=cost_usd,
             model_name=model_name,
             tool_name=tool_name,

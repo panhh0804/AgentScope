@@ -547,7 +547,7 @@
 
           <section class="screen-panel">
             <div class="screen-panel-head">
-              <h3>白名单任务流水线</h3>
+              <h3>任务流水线</h3>
               <div class="header-actions" style="display: flex; gap: 10px;">
                 <a-date-picker
                   v-model="bizDate"
@@ -1113,6 +1113,24 @@ async function loadJobs() {
 async function runJob(jobCode) {
   runningJobs.value[jobCode] = true
   Message.info({ content: `正在调度执行作业: ${jobCode}...`, duration: 3000 })
+  
+  // Insert a temporary running log entry
+  const tempRunId = `run_temp_${Math.random().toString(36).substring(2, 8)}`
+  const tempRun = {
+    run_id: tempRunId,
+    job_code: jobCode,
+    biz_date: bizDate.value,
+    status: 'running',
+    input_count: 10000,
+    output_count: 0,
+    error_count: 0,
+    start_time: new Date().toISOString(),
+    end_time: null,
+    duration_seconds: null,
+    log_summary: '正在调度执行中...'
+  }
+  jobRuns.value.unshift(tempRun)
+  
   try {
     const res = await executeAdminJob(jobCode, bizDate.value)
     if (res.status === 'failed') {
@@ -1136,6 +1154,24 @@ async function runFullPipeline() {
     for (const job of jobs.value) {
       runningJobs.value[job.job_code] = true
       Message.info({ content: `正在执行：${job.job_name}...`, duration: 2500 })
+      
+      // Insert a temporary running log entry
+      const tempRunId = `run_temp_${Math.random().toString(36).substring(2, 8)}`
+      const tempRun = {
+        run_id: tempRunId,
+        job_code: job.job_code,
+        biz_date: bizDate.value,
+        status: 'running',
+        input_count: 10000,
+        output_count: 0,
+        error_count: 0,
+        start_time: new Date().toISOString(),
+        end_time: null,
+        duration_seconds: null,
+        log_summary: '正在流水线流式调度中...'
+      }
+      jobRuns.value.unshift(tempRun)
+      
       try {
         const res = await executeAdminJob(job.job_code, bizDate.value)
         if (res.status === 'failed') {
@@ -1149,6 +1185,7 @@ async function runFullPipeline() {
         break
       } finally {
         runningJobs.value[job.job_code] = false
+        await loadJobs() // refresh intermediate runs live
       }
     }
     if (!failed) {

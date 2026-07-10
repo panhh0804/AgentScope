@@ -405,7 +405,6 @@
                     v-model="adsFilters.start_date"
                     value-format="YYYY-MM-DD"
                     allow-clear
-                    @change="loadLayerData"
                   />
                 </label>
                 <label>
@@ -414,7 +413,6 @@
                     v-model="adsFilters.end_date"
                     value-format="YYYY-MM-DD"
                     allow-clear
-                    @change="loadLayerData"
                   />
                 </label>
                 <a-button type="primary" @click="loadLayerData">查询</a-button>

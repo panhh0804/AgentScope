@@ -701,8 +701,8 @@ function loadLogsToConsole(run) {
     if (reportSectionRef.value) {
       reportSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-    // 压测报告才初始化图表
-    if (run.job_code === 'system_benchmark') {
+    // 压测报告或一键诊断才初始化图表
+    if (run.job_code === 'system_benchmark' || run.job_code === 'system_all_checks') {
       setTimeout(() => { initChart(); updateChart() }, 150)
     }
   })
@@ -778,7 +778,12 @@ function initChart() {
 function updateChart() {
   if (!chartInstance) return
 
-  const benchmarkRun = runs.value.find(r => r.job_code === 'system_benchmark' && r.status === 'success')
+  const benchmarkRun = runs.value.find(r => 
+    (r.job_code === 'system_benchmark' || r.job_code === 'system_all_checks') && 
+    r.status === 'success' && 
+    r.log_summary && 
+    (r.log_summary.includes('梯度') || r.log_summary.includes('测试完成') || r.log_summary.includes('完成'))
+  )
   
   let streamRate = [5, 10, 20, 50]
   let sparkThroughput = [5, 10, 20, 48.2]

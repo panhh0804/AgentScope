@@ -3247,13 +3247,4 @@ tr:nth-child(3) .rank-badge {
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.4) !important;
 }
 
-/* Prevent Arco tabs from clipping hover transformations and box-shadows */
-.admin-tabs,
-.admin-tabs .arco-tabs-content,
-.admin-tabs .arco-tabs-content-list,
-.admin-tabs .arco-tabs-pane,
-.admin-tabs .arco-tabs-tabpane,
-.admin-tabs .arco-tabs-pane-wrapper,
-.admin-tabs .arco-tabs-content-wrapper {
-  overflow: visible !important;
-}
+

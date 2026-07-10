@@ -366,7 +366,12 @@ const serviceGridItems = computed(() => {
     backend: 'unknown'
   }
 
-  const hcRun = runs.value.find(r => r.job_code === 'system_health_check' && r.status === 'success')
+  const hcRun = runs.value.find(r => 
+    (r.job_code === 'system_health_check' || r.job_code === 'system_all_checks') && 
+    r.status === 'success' && 
+    r.log_summary && 
+    (r.log_summary.includes('健康检查') || r.log_summary.includes('服务巡检'))
+  )
   if (hcRun && hcRun.log_summary) {
     const log = hcRun.log_summary
     if (log.includes('HDFS NameNode 正常')) statusMap.hdfs = 'success'

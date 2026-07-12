@@ -1,0 +1,15 @@
+SHELL=/bin/bash
+CRON_TZ=Asia/Shanghai
+
+# AgentScope 离线总控任务
+# 默认每天凌晨 02:00 执行前一天的离线链路：
+#   1) 生成模拟数据
+#   2) DataX 导入
+#   3) Spark 清洗
+#   4) Spark 批量分析
+#
+# 说明：
+# - 该任务依赖 /root/agentscope 目录存在
+# - 该任务依赖 cron 所在机器已经配置好 Hadoop / YARN / Spark / MySQL / Kafka 环境变量
+# - 如果项目根目录不在 /root/agentscope，请把 cd 路径改成实际路径
+0 2 * * * cd /root/agentscope && [ -f deploy/environment ] && set -a && . deploy/environment && set +a; /usr/bin/env bash scripts/run_daily_offline_pipeline.sh >> logs/daily_pipeline.log 2>&1

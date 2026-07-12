@@ -35,16 +35,7 @@ class AdminService:
         self.job_runs_file = os.path.join(self.log_dir, "job_runs.json")
         
         self.repo.ensure_admin_tables()
-        self._job_runs = []
-        persisted_runs = self.repo.get_admin_job_runs()
-        if persisted_runs:
-            self._job_runs = persisted_runs
-        elif os.path.exists(self.job_runs_file):
-            try:
-                with open(self.job_runs_file, "r", encoding="utf-8") as f:
-                    self._job_runs = json.load(f)
-            except Exception:
-                pass
+        self._job_runs = self._load_job_runs()
 
         self._audit_logs = self._seed_audit_logs()
         
@@ -589,11 +580,7 @@ class AdminService:
         
         self._job_runs.insert(0, run)
         self.repo.save_admin_job_run(run)
-        try:
-            with open(self.job_runs_file, "w", encoding="utf-8") as f:
-                json.dump(self._job_runs, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        self._persist_job_runs()
         self._audit_logs.insert(0, self._audit("admin", "task_execute", "job", job_code, status))
         return run
 
@@ -640,6 +627,51 @@ class AdminService:
     def _ensure_job(self, job_code: str) -> None:
         if job_code not in ADMIN_JOB_CODES:
             raise ValueError(f"job_code is not allowed: {job_code}")
+
+    def _load_job_runs(self) -> List[Dict[str, Any]]:
+        file_runs: List[Dict[str, Any]] = []
+        if os.path.exists(self.job_runs_file):
+            try:
+                with open(self.job_runs_file, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, list):
+                        file_runs = [row for row in loaded if isinstance(row, dict)]
+            except Exception:
+                pass
+
+        db_runs = self.repo.get_admin_job_runs() or []
+        if not isinstance(db_runs, list):
+            db_runs = []
+
+        merged: Dict[str, Dict[str, Any]] = {}
+        for row in file_runs + db_runs:
+            run_id = row.get("run_id")
+            if not run_id:
+                continue
+            merged[str(run_id)] = row
+
+        merged_list = list(merged.values())
+        merged_list.sort(key=lambda row: str(row.get("start_time") or ""), reverse=True)
+
+        # If the database is enabled, backfill any file-only history so older
+        # records do not disappear after the first database-backed run.
+        db_run_ids = {str(row.get("run_id")) for row in db_runs if row.get("run_id")}
+        for row in file_runs:
+            run_id = str(row.get("run_id") or "")
+            if run_id and run_id not in db_run_ids:
+                self.repo.save_admin_job_run(row)
+
+        # Keep the file archive aligned with the merged history.
+        self._persist_job_runs(merged_list)
+        return merged_list
+
+    def _persist_job_runs(self, runs: Optional[List[Dict[str, Any]]] = None) -> None:
+        payload = runs if runs is not None else self._job_runs
+        try:
+            with open(self.job_runs_file, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
     def _source_event_count(self, biz_date_str: str) -> int:
         try:

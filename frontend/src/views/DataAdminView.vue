@@ -499,7 +499,7 @@
           <div class="scheduler-banner">
             <div class="banner-content">
               <h4>自动调度与数据补数说明</h4>
-              <p>离线计算流水线在生产环境中由 <strong>Crontab 定时任务（每天凌晨 02:00）</strong> 自动触发运行。此控制台主要用于开发与运维进行历史日期补数（Backfill）或失败作业的手动重试。运行前请确认源数据库（MySQL Source）在所选业务日期是否有数据。</p>
+              <p>离线计算流水线提供 <strong>Crontab 定时任务（每天凌晨 02:00）</strong> 的脚本示例，但是否自动运行取决于生产环境是否已单独部署该调度。此控制台主要用于开发与运维进行历史日期补数（Backfill）或失败作业的手动重试。运行前请确认源数据库（MySQL Source）在所选业务日期是否有数据。</p>
             </div>
           </div>
 

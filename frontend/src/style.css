@@ -1680,39 +1680,59 @@ tr:nth-child(3) .rank-badge {
   }
 }
 
-/* Ant Design Modal Custom Styling */
-.ant-modal-content {
-  background: linear-gradient(180deg, rgba(15, 34, 54, 0.98), rgba(6, 18, 30, 0.98)) !important;
-  border: 1px solid rgba(103, 232, 249, 0.3) !important;
-  box-shadow: 0 0 30px rgba(34, 211, 238, 0.15) !important;
+/* Modal Custom Styling */
+.ant-modal-content,
+.arco-modal-content,
+.deep-blue-modal .arco-modal-content {
+  background: linear-gradient(180deg, rgba(8, 32, 68, 0.99), rgba(3, 10, 22, 0.99)) !important;
+  border: 1px solid rgba(59, 130, 246, 0.36) !important;
+  box-shadow: 0 24px 54px rgba(2, 8, 23, 0.72) !important;
   border-radius: 8px !important;
 }
 
-.ant-modal-header {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(103, 232, 249, 0.15) !important;
+.ant-modal-header,
+.arco-modal-header,
+.deep-blue-modal .arco-modal-header {
+  background: linear-gradient(180deg, rgba(10, 38, 78, 0.98), rgba(7, 20, 38, 0.98)) !important;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.18) !important;
   padding-bottom: 14px !important;
 }
 
-.ant-modal-title {
-  color: #22d3ee !important;
+.ant-modal-title,
+.arco-modal-title,
+.deep-blue-modal .arco-modal-title {
+  color: #93c5fd !important;
   font-weight: bold !important;
   font-size: 16px !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0 !important;
 }
 
-.ant-modal-close {
-  color: #94a3b8 !important;
+.ant-modal-close,
+.arco-modal-close,
+.deep-blue-modal .arco-modal-close {
+  color: #93a4bb !important;
 }
 
-.ant-modal-close:hover {
-  color: #22d3ee !important;
-  background: rgba(34, 211, 238, 0.08) !important;
+.ant-modal-close:hover,
+.arco-modal-close:hover,
+.deep-blue-modal .arco-modal-close:hover {
+  color: #dbeafe !important;
+  background: rgba(59, 130, 246, 0.12) !important;
   border-radius: 4px;
 }
 
-.ant-modal-body {
-  padding: 20px 0 10px 0 !important;
+.ant-modal-body,
+.arco-modal-body,
+.deep-blue-modal .arco-modal-body {
+  padding: 18px 0 12px 0 !important;
+  color: #dbeafe !important;
+  background: linear-gradient(180deg, rgba(4, 15, 30, 0.98), rgba(3, 10, 22, 0.99)) !important;
+}
+
+.arco-modal-mask,
+.ant-modal-mask {
+  background: rgba(1, 6, 17, 0.74) !important;
+  backdrop-filter: blur(6px);
 }
 
 /* LLM Cost Monitor Custom Styling */
@@ -2941,6 +2961,16 @@ tr:nth-child(3) .rank-badge {
   box-shadow: 0 4px 14px rgba(34, 211, 238, 0.15) !important;
 }
 
+.data-admin-page .header-actions .pipeline-toolbar-btn.arco-btn {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 /* Premium Status Tags */
 .tag {
   display: inline-flex;
@@ -3246,5 +3276,3 @@ tr:nth-child(3) .rank-badge {
   font-weight: bold !important;
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.4) !important;
 }
-
-

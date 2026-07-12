@@ -12,12 +12,12 @@ export const fetchDwdEvents = (params = {}) => getData('/admin/dwd-events', para
 export const fetchDwsMetrics = (params = {}) => getData('/admin/dws-metrics', params)
 export const fetchAdminJobs = () => getData('/admin/jobs')
 export const fetchAdminJobRuns = () => getData('/admin/job-runs')
-export const executeAdminJob = (jobCode, bizDate) => {
+export const executeAdminJob = (jobCode, bizDate, payload = {}) => {
   const config = {}
   if (jobCode === 'report_generate') {
     config.timeout = REPORT_TIMEOUT_MS
   }
-  return postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate }, config)
+  return postData(`/admin/jobs/${jobCode}/execute`, { biz_date: bizDate, ...payload }, config)
 }
 export const retryAdminJobRun = (runId) => postData(`/admin/job-runs/${runId}/retry`)
 export const fetchAdminJobLogs = (runId) => getData(`/admin/job-runs/${runId}/logs`)
@@ -27,4 +27,3 @@ export const fetchAuditLogs = () => getData('/admin/audit-logs')
 export const fetchQualityRules = () => getData('/admin/quality/rules')
 export const createQualityRule = (rule) => postData('/admin/quality/rules', rule)
 export const updateQualityRule = (ruleId, payload) => putData(`/admin/quality/rules/${ruleId}`, payload)
-

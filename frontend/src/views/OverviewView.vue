@@ -18,7 +18,7 @@
       <div class="overview-tab-container">
         <!-- Unified States overlay/container -->
         <div v-if="loading" class="state-wrapper">
-          <LoadingState message="正在加载实时与离线指标..." />
+          <LoadingState message="正在加载实时与历史指标..." />
         </div>
         <div v-else-if="error" class="state-wrapper">
           <ErrorState :reason="error" @retry="load" />

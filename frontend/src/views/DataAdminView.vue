@@ -555,11 +555,43 @@
                   size="large"
                   :disabled-date="disableFutureBizDate"
                 />
+                <a-tooltip content="控制模拟器生成的任务轨迹数量；每条轨迹会拆分出多条事件明细">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #cbd5e1; font-size: 13px; white-space: nowrap;">模拟轨迹数</span>
+                    <a-input-number
+                      v-model="generateCount"
+                      :min="1"
+                      :max="100000"
+                      :step="50"
+                      placeholder="轨迹条数"
+                      size="large"
+                      style="width: 130px;"
+                    />
+                  </div>
+                </a-tooltip>
+                <a-tooltip content="只影响一键完整链路；单独点击生成数据时始终会生成并追加">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #cbd5e1; font-size: 13px; white-space: nowrap;">一键生成策略</span>
+                    <a-select
+                      v-model="pipelineGenerateMode"
+                      size="large"
+                      style="width: 150px;"
+                  >
+                    <a-option value="append">重新生成并追加</a-option>
+                    <a-option value="skip">跳过生成</a-option>
+                  </a-select>
+                </div>
+                </a-tooltip>
+                <a-button class="pipeline-toolbar-btn" type="outline" size="large" @click="diagramModalOpen = true" style="height: 40px; min-height: 40px; padding: 0 16px; box-sizing: border-box;">
+                  层次示意
+                </a-button>
                 <a-button 
+                  class="pipeline-toolbar-btn"
                   type="outline" 
                   :loading="runningJobs['offline_generate']" 
                   :disabled="anyJobRunning" 
                   @click="runJob('offline_generate')"
+                  style="height: 40px; min-height: 40px; padding: 0 16px; box-sizing: border-box;"
                 >
                   {{ runningJobs['offline_generate'] ? '数据生成中...' : '生成所选日期模拟数据' }}
                 </a-button>
@@ -568,6 +600,7 @@
                   :loading="pipelineRunning" 
                   :disabled="anyJobRunning" 
                   @click="runFullPipeline"
+                  style="height: 40px; min-height: 40px; padding: 0 16px; box-sizing: border-box;"
                 >
                   {{ pipelineRunning ? '整条链路执行中...' : '一键执行完整离线链路' }}
                 </a-button>
@@ -738,8 +771,60 @@
       </a-tabs>
     </div>
 
-    <a-modal v-model:visible="jsonModalOpen" :title="jsonModalTitle" width="760px" :footer="false">
+    <a-modal v-model:visible="jsonModalOpen" class="deep-blue-modal" :title="jsonModalTitle" width="760px" :footer="false">
       <pre class="json-pre">{{ jsonPreview }}</pre>
+    </a-modal>
+
+    <a-modal v-model:visible="diagramModalOpen" class="deep-blue-modal" title="模拟轨迹层次示意" width="1040px" :footer="false">
+      <div style="padding: 4px 2px 2px; max-height: 72vh; overflow: auto;">
+        <div style="display: flex; justify-content: center; margin-bottom: 14px;">
+          <div style="padding: 8px 18px; border-radius: 999px; background: rgba(12, 74, 110, 0.62); border: 1px solid rgba(56, 189, 248, 0.38); color: #e0f2fe; font-weight: 700;">
+            trace / workflow
+          </div>
+        </div>
+
+        <div style="position: relative; padding: 8px 0 4px; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+          <div style="width: 100%; overflow-x: auto; padding-bottom: 6px;">
+            <div style="display: flex; flex-wrap: nowrap; gap: 14px; align-items: flex-start; min-width: max-content; padding: 4px 2px;">
+              <div
+                v-for="node in diagramTree"
+                :key="node.agent"
+                style="flex: 0 0 180px; width: 180px; padding: 14px 14px 12px; border-radius: 10px; background: rgba(8, 47, 73, 0.28); border: 1px solid rgba(56, 189, 248, 0.14);"
+              >
+                <div style="display: flex; justify-content: center; margin-bottom: 10px;">
+                  <div style="padding: 7px 12px; border-radius: 999px; background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(56, 189, 248, 0.22); color: #e0f2fe; font-size: 13px; font-weight: 700;">{{ node.agent }}</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div v-for="event in node.events" :key="`${node.agent}-${event.label}`" style="display: inline-flex; align-items: center; gap: 8px; min-height: 22px;">
+                    <span
+                      :style="{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '999px',
+                        background: event.solid ? '#38bdf8' : 'transparent',
+                        border: event.solid ? 'none' : '1.2px solid #7dd3fc',
+                        flex: '0 0 auto'
+                      }"
+                    ></span>
+                    <span
+                      :style="{
+                        padding: '5px 10px',
+                        borderRadius: '999px',
+                        background: 'rgba(15, 23, 42, 0.66)',
+                        border: event.solid ? '1px solid rgba(56, 189, 248, 0.18)' : '1px dashed rgba(125, 211, 252, 0.30)',
+                        color: '#e0f2fe',
+                        fontSize: '12px',
+                        lineHeight: '1',
+                        whiteSpace: 'nowrap'
+                      }"
+                    >{{ event.label }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </a-modal>
 
 
@@ -810,6 +895,62 @@ watch(
   { immediate: true }
 )
 const bizDate = ref(todayString())
+const generateCount = ref(50)
+const pipelineGenerateMode = ref('append')
+const diagramModalOpen = ref(false)
+const diagramTree = [
+  {
+    agent: 'planner',
+    events: [
+      { label: 'agent_start', solid: true },
+      { label: 'llm_request', solid: true },
+      { label: 'llm_response', solid: true },
+      { label: 'agent_complete', solid: true }
+    ]
+  },
+  {
+    agent: 'search',
+    events: [
+      { label: 'agent_start', solid: true },
+      { label: 'llm_request', solid: true },
+      { label: 'llm_response', solid: true },
+      { label: 'tool_call', solid: false },
+      { label: 'tool_result', solid: false },
+      { label: 'agent_complete', solid: true }
+    ]
+  },
+  {
+    agent: 'analysis',
+    events: [
+      { label: 'agent_start', solid: true },
+      { label: 'llm_request', solid: true },
+      { label: 'llm_response', solid: true },
+      { label: 'agent_complete', solid: true }
+    ]
+  },
+  {
+    agent: 'writer',
+    events: [
+      { label: 'agent_start', solid: true },
+      { label: 'llm_request', solid: true },
+      { label: 'llm_response', solid: true },
+      { label: 'agent_complete', solid: true },
+      { label: 'retry', solid: false },
+      { label: 'agent_failed', solid: false }
+    ]
+  },
+  {
+    agent: 'reviewer',
+    events: [
+      { label: 'agent_start', solid: true },
+      { label: 'llm_request', solid: true },
+      { label: 'llm_response', solid: true },
+      { label: 'agent_complete', solid: true },
+      { label: 'retry', solid: false },
+      { label: 'agent_failed', solid: false }
+    ]
+  }
+]
 
 const overview = ref({})
 const trend = ref([])
@@ -1113,26 +1254,12 @@ async function loadJobs() {
 async function runJob(jobCode) {
   runningJobs.value[jobCode] = true
   Message.info({ content: `正在调度执行作业: ${jobCode}...`, duration: 3000 })
-  
-  // Insert a temporary running log entry
-  const tempRunId = `run_temp_${Math.random().toString(36).substring(2, 8)}`
-  const tempRun = {
-    run_id: tempRunId,
-    job_code: jobCode,
-    biz_date: bizDate.value,
-    status: 'running',
-    input_count: 10000,
-    output_count: 0,
-    error_count: 0,
-    start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString(),
-    end_time: null,
-    duration_seconds: null,
-    log_summary: '正在调度执行中...'
-  }
-  jobRuns.value.unshift(tempRun)
-  
+
   try {
-    const res = await executeAdminJob(jobCode, bizDate.value)
+    const payload = jobCode === 'offline_generate'
+      ? { count: Number(generateCount.value || 50) }
+      : {}
+    const res = await executeAdminJob(jobCode, bizDate.value, payload)
     if (res.status === 'failed') {
       Message.error({ content: `作业 ${jobCode} 运行失败，请在下方列表查看详细日志！`, duration: 6000 })
     } else {
@@ -1152,28 +1279,18 @@ async function runFullPipeline() {
   try {
     let failed = false
     for (const job of jobs.value) {
+      if (job.job_code === 'offline_generate' && pipelineGenerateMode.value === 'skip') {
+        Message.info({ content: '一键链路已跳过模拟数据生成，直接处理当前 Source 数据。', duration: 3000 })
+        continue
+      }
       runningJobs.value[job.job_code] = true
       Message.info({ content: `正在执行：${job.job_name}...`, duration: 2500 })
-      
-      // Insert a temporary running log entry
-      const tempRunId = `run_temp_${Math.random().toString(36).substring(2, 8)}`
-      const tempRun = {
-        run_id: tempRunId,
-        job_code: job.job_code,
-        biz_date: bizDate.value,
-        status: 'running',
-        input_count: 10000,
-        output_count: 0,
-        error_count: 0,
-        start_time: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString(),
-        end_time: null,
-        duration_seconds: null,
-        log_summary: '正在流水线流式调度中...'
-      }
-      jobRuns.value.unshift(tempRun)
-      
+
       try {
-        const res = await executeAdminJob(job.job_code, bizDate.value)
+        const payload = job.job_code === 'offline_generate'
+          ? { count: Number(generateCount.value || 50) }
+          : {}
+        const res = await executeAdminJob(job.job_code, bizDate.value, payload)
         if (res.status === 'failed') {
           failed = true
           Message.error({ content: `流水线在 [${job.job_name}] 阶段运行失败，已中止后续任务！`, duration: 6000 })

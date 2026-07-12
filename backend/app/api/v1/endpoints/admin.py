@@ -16,6 +16,7 @@ service = AdminService()
 
 class JobExecuteRequest(BaseModel):
     biz_date: date
+    count: Optional[int] = None
 
 
 @router.get("/data-overview")
@@ -96,7 +97,7 @@ def execute_job(job_code: str, payload: Any = Body(...)):
         if isinstance(payload, str):
             payload = json.loads(payload)
         request = JobExecuteRequest.model_validate(payload)
-        return ok(service.execute_job(job_code, request.biz_date))
+        return ok(service.execute_job(job_code, request.biz_date, request.count))
     except (ValueError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

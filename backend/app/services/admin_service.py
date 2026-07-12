@@ -34,19 +34,15 @@ class AdminService:
         self.runs_file = os.path.join(self.log_dir, "system_check_runs.json")
         self.job_runs_file = os.path.join(self.log_dir, "job_runs.json")
         
+        self.repo.ensure_admin_tables()
         self._job_runs = []
-        if os.path.exists(self.job_runs_file):
+        persisted_runs = self.repo.get_admin_job_runs()
+        if persisted_runs:
+            self._job_runs = persisted_runs
+        elif os.path.exists(self.job_runs_file):
             try:
                 with open(self.job_runs_file, "r", encoding="utf-8") as f:
                     self._job_runs = json.load(f)
-            except Exception:
-                pass
-                
-        if not self._job_runs:
-            self._job_runs = self._seed_job_runs()
-            try:
-                with open(self.job_runs_file, "w", encoding="utf-8") as f:
-                    json.dump(self._job_runs, f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
 
@@ -444,7 +440,7 @@ class AdminService:
     def job_runs(self) -> List[Dict[str, Any]]:
         return self._job_runs
 
-    def execute_job(self, job_code: str, biz_date: date) -> Dict[str, Any]:
+    def execute_job(self, job_code: str, biz_date: date, count: Optional[int] = None) -> Dict[str, Any]:
         import os
         ssh_user = os.getenv("SSH_USER", "root")
         ssh_host = os.getenv("SSH_HOST", "master")
@@ -456,19 +452,24 @@ class AdminService:
         self._ensure_job(job_code)
         if biz_date > date.today():
             raise ValueError("业务日期不能晚于今天")
+        generate_count = int(count or 50)
+        if generate_count < 1 or generate_count > 100000:
+            raise ValueError("生成数量必须在 1 到 100000 之间")
         
         status = "success"
         log_summary = f"{job_code} executed successfully."
         error_count = 0
         input_count = 10000
         output_count = 9650 if job_code == "spark_clean" else 120
+        source_events_before = 0
         
         start_time = datetime.now()
         
         try:
             if job_code == "offline_generate":
+                source_events_before = self._source_event_count(biz_date.isoformat())
                 # Execute simulator on master node via passwordless SSH to populate MySQL source db
-                exec_cmd = f"source /etc/profile && cd {project_home}/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count 50"
+                exec_cmd = f"source /etc/profile && cd {project_home}/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count {generate_count}"
                 cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if res.returncode != 0:
@@ -477,7 +478,6 @@ class AdminService:
                     error_count = 1
                 else:
                     log_summary = f"Mock Data Generation completed successfully:\n{res.stdout}"
-                    output_count = 1126
             
             elif job_code == "datax_import":
                 # Execute DataX script on master node via passwordless SSH
@@ -560,7 +560,18 @@ class AdminService:
         duration = int((datetime.now() - start_time).total_seconds())
         
         if status == "success":
-            input_count, output_count = self._calculate_real_counts(job_code, biz_date.isoformat())
+            if job_code == "offline_generate":
+                source_events_after = self._source_event_count(biz_date.isoformat())
+                input_count = generate_count
+                output_count = max(0, source_events_after - source_events_before)
+                log_summary = (
+                    f"{log_summary}\n"
+                    f"Requested traces: {generate_count}; "
+                    f"new events: {output_count}; "
+                    f"daily source events: {source_events_after}"
+                )
+            else:
+                input_count, output_count = self._calculate_real_counts(job_code, biz_date.isoformat())
             
         run = {
             "run_id": f"run_{uuid4().hex[:10]}",
@@ -577,6 +588,7 @@ class AdminService:
         }
         
         self._job_runs.insert(0, run)
+        self.repo.save_admin_job_run(run)
         try:
             with open(self.job_runs_file, "w", encoding="utf-8") as f:
                 json.dump(self._job_runs, f, ensure_ascii=False, indent=2)
@@ -628,6 +640,18 @@ class AdminService:
     def _ensure_job(self, job_code: str) -> None:
         if job_code not in ADMIN_JOB_CODES:
             raise ValueError(f"job_code is not allowed: {job_code}")
+
+    def _source_event_count(self, biz_date_str: str) -> int:
+        try:
+            res = self.repo._query(
+                "SELECT COUNT(*) AS cnt FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s",
+                (biz_date_str,),
+            )
+            if res:
+                return int(res[0].get("cnt") or 0)
+        except Exception:
+            pass
+        return 0
 
     def _seed_events(self) -> List[Dict[str, Any]]:
         now = datetime.now()
@@ -701,11 +725,11 @@ class AdminService:
                 return total_source_events, clean_events
                 
             elif job_code == "daily_metric":
-                metric_cnt = query_db(
-                    "SELECT COUNT(*) FROM agentscope_analytics.daily_metrics WHERE metric_date = %s",
+                task_count = query_db(
+                    "SELECT task_count FROM agentscope_analytics.daily_metrics WHERE metric_date = %s",
                     (biz_date_str,)
                 )
-                return clean_events, metric_cnt if metric_cnt > 0 else 5
+                return clean_events, task_count
                 
             elif job_code == "agent_ranking":
                 ranking_cnt = query_db(

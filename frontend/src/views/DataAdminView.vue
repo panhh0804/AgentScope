@@ -1335,7 +1335,10 @@ async function retryRun(runId) {
 function renderFunnel() {
   try {
     if (!funnelChartRef.value) return
-    funnelChart ||= echarts.init(funnelChartRef.value)
+    if (!funnelChart || funnelChart.getDom?.() !== funnelChartRef.value) {
+      funnelChart?.dispose()
+      funnelChart = echarts.init(funnelChartRef.value)
+    }
 
     const rawFunnel = Array.isArray(overview.value.funnel) && overview.value.funnel.length
       ? overview.value.funnel
@@ -1409,7 +1412,10 @@ function renderFunnel() {
 function renderLineage() {
   try {
     if (!lineageChartRef.value) return
-    lineageChart ||= echarts.init(lineageChartRef.value)
+    if (!lineageChart || lineageChart.getDom?.() !== lineageChartRef.value) {
+      lineageChart?.dispose()
+      lineageChart = echarts.init(lineageChartRef.value)
+    }
 
     const sourceLineage = Array.isArray(lineage.value.nodes) && lineage.value.nodes.length
       ? lineage.value
@@ -1494,7 +1500,10 @@ function renderLineage() {
 function renderTrend() {
   try {
     if (!trendChartRef.value) return
-    trendChart ||= echarts.init(trendChartRef.value)
+    if (!trendChart || trendChart.getDom?.() !== trendChartRef.value) {
+      trendChart?.dispose()
+      trendChart = echarts.init(trendChartRef.value)
+    }
     const sourceTrend = Array.isArray(trend.value) && trend.value.length ? trend.value : getDefaultTrend()
     const option = lineOption('Raw / Clean 数据量趋势', sourceTrend.map((item) => formatTrendDate(item.biz_date)), [
       { name: 'Raw', type: 'line', smooth: true, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
@@ -1512,7 +1521,10 @@ function renderTrend() {
 function renderStorageChart() {
   try {
     if (!storageChartRef.value) return
-    storageChart ||= echarts.init(storageChartRef.value)
+    if (!storageChart || storageChart.getDom?.() !== storageChartRef.value) {
+      storageChart?.dispose()
+      storageChart = echarts.init(storageChartRef.value)
+    }
     const hdfs = overview.value.hdfs_storage || defaultHdfsStorage
     const usedBytes = Number(hdfs.used_bytes || 0)
     const limitBytes = Number(hdfs.limit_bytes || defaultHdfsStorage.limit_bytes || 1)
@@ -1541,7 +1553,10 @@ function renderStorageChart() {
 function renderPerfChart() {
   try {
     if (!perfChartRef.value) return
-    perfChart ||= echarts.init(perfChartRef.value)
+    if (!perfChart || perfChart.getDom?.() !== perfChartRef.value) {
+      perfChart?.dispose()
+      perfChart = echarts.init(perfChartRef.value)
+    }
     const rawPerfData = Array.isArray(overview.value.compute_perf) && overview.value.compute_perf.length
       ? overview.value.compute_perf
       : defaultComputePerf
@@ -1596,6 +1611,10 @@ function resizeCharts() {
   perfChart?.resize()
 }
 
+function waitForFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
 function renderAllVisibleCharts() {
   if (activeTab.value === 'overview') {
     renderTrend()
@@ -1610,10 +1629,10 @@ function renderAllVisibleCharts() {
 
 async function scheduleVisibleChartRender() {
   await nextTick()
-  setTimeout(() => {
-    renderAllVisibleCharts()
-    resizeCharts()
-  }, 100)
+  await waitForFrame()
+  renderAllVisibleCharts()
+  await waitForFrame()
+  resizeCharts()
 }
 
 async function loadAll() {
@@ -1665,7 +1684,7 @@ onMounted(async () => {
 
 watch(activeTab, () => {
   scheduleVisibleChartRender()
-})
+}, { flush: 'post' })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)

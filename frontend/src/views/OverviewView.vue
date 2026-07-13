@@ -288,7 +288,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Cpu, Search, Compass, FileText, ShieldAlert, AlertTriangle, AlertCircle, Info } from '@lucide/vue'
@@ -624,8 +624,14 @@ function setLineOption(chart, title, xData, series) {
 
 function renderRealtimeCharts() {
   if (!throughputChart.value || !latencyChart.value) return
-  throughputInstance ||= echarts.init(throughputChart.value)
-  latencyInstance ||= echarts.init(latencyChart.value)
+  if (!throughputInstance || throughputInstance.getDom?.() !== throughputChart.value) {
+    throughputInstance?.dispose()
+    throughputInstance = echarts.init(throughputChart.value)
+  }
+  if (!latencyInstance || latencyInstance.getDom?.() !== latencyChart.value) {
+    latencyInstance?.dispose()
+    latencyInstance = echarts.init(latencyChart.value)
+  }
 
   const xRealtime = realtimeTrend.value.map((item) => String(item.time || '').slice(11, 19))
   throughputInstance.setOption({
@@ -696,7 +702,10 @@ function renderRealtimeCharts() {
 function renderCharts() {
   renderRealtimeCharts()
   if (!relationChart.value) return
-  relationInstance ||= echarts.init(relationChart.value)
+  if (!relationInstance || relationInstance.getDom?.() !== relationChart.value) {
+    relationInstance?.dispose()
+    relationInstance = echarts.init(relationChart.value)
+  }
 
   const relationOption = graphOption(relationGraph.value)
   const relationSeries = relationOption.series?.[0]
@@ -743,6 +752,10 @@ function resizeCharts() {
   throughputInstance?.resize()
   latencyInstance?.resize()
   relationInstance?.resize()
+}
+
+function waitForFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
 
 function scrollToHistory() {
@@ -811,7 +824,10 @@ async function load() {
 
     loading.value = false
     await nextTick()
+    await waitForFrame()
     renderCharts()
+    await waitForFrame()
+    resizeCharts()
   } catch (err) {
     console.error('Failed to load overview data', err)
     error.value = err.message || '网络连接或后端服务异常'
@@ -864,6 +880,15 @@ onMounted(async () => {
   
   window.addEventListener('resize', resizeCharts)
 })
+
+watch(activeSubTab, async (tab) => {
+  if (tab !== 'realtime') return
+  await nextTick()
+  await waitForFrame()
+  renderCharts()
+  await waitForFrame()
+  resizeCharts()
+}, { flush: 'post' })
 
 onBeforeUnmount(() => {
   clearInterval(logTimer)

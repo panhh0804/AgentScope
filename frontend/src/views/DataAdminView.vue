@@ -1615,6 +1615,20 @@ function waitForFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function ensureChartContainer(elRef, attempts = 8) {
+  for (let i = 0; i < attempts; i += 1) {
+    const el = elRef.value
+    if (el && el.clientWidth > 0 && el.clientHeight > 0) return el
+    await wait(80)
+    await waitForFrame()
+  }
+  return elRef.value
+}
+
 function renderAllVisibleCharts() {
   if (activeTab.value === 'overview') {
     renderTrend()
@@ -1629,7 +1643,7 @@ function renderAllVisibleCharts() {
 
 async function scheduleVisibleChartRender() {
   await nextTick()
-  await waitForFrame()
+  await ensureChartContainer(activeTab.value === 'overview' ? trendChartRef : lineageChartRef)
   renderAllVisibleCharts()
   await waitForFrame()
   resizeCharts()

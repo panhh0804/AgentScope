@@ -758,6 +758,20 @@ function waitForFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function ensureChartContainer(elRef, attempts = 10) {
+  for (let i = 0; i < attempts; i += 1) {
+    const el = elRef.value
+    if (el && el.clientWidth > 0 && el.clientHeight > 0) return el
+    await wait(80)
+    await waitForFrame()
+  }
+  return elRef.value
+}
+
 function scrollToHistory() {
   historyChartsRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -824,7 +838,7 @@ async function load() {
 
     loading.value = false
     await nextTick()
-    await waitForFrame()
+    await ensureChartContainer(throughputChart)
     renderCharts()
     await waitForFrame()
     resizeCharts()
@@ -884,7 +898,7 @@ onMounted(async () => {
 watch(activeSubTab, async (tab) => {
   if (tab !== 'realtime') return
   await nextTick()
-  await waitForFrame()
+  await ensureChartContainer(throughputChart)
   renderCharts()
   await waitForFrame()
   resizeCharts()

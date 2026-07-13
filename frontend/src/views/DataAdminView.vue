@@ -39,7 +39,7 @@
                 <h3>Source -> Raw -> Clean -> Metric 漏斗 (当日批处理新增)</h3>
                 <span>{{ overview.recent_failed_task ? `最近失败 ${overview.recent_failed_task}` : 'pipeline' }}</span>
               </div>
-              <div ref="funnelChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
+              <div :key="`funnel-${overviewChartRenderKey}`" ref="funnelChartRef" class="screen-chart" style="height: 240px; margin-top: 10px;"></div>
             </article>
 
             <article class="screen-panel">
@@ -47,7 +47,7 @@
                 <h3>最近 7 天数据量趋势</h3>
                 <span>Raw / Clean</span>
               </div>
-              <div ref="trendChartRef" class="screen-chart"></div>
+              <div :key="`trend-${overviewChartRenderKey}`" ref="trendChartRef" class="screen-chart"></div>
             </article>
 
             <article class="screen-panel">
@@ -875,6 +875,7 @@ const openScreen = () => {
 
 const activeTab = ref('overview')
 const overviewDirty = ref(false)
+const overviewChartRenderKey = ref(0)
 let activeLoadCount = 0
 const moduleRequests = new Map()
 const requestCache = new Map()
@@ -1222,6 +1223,14 @@ async function runModuleLoad(moduleKey, loader, options = {}) {
       moduleRequests.delete(moduleKey)
       endLoading()
       if (options.render !== false) {
+        if (didSucceed && options.replayOverview === true) {
+          await nextTick()
+          overviewChartRenderKey.value += 1
+          if (import.meta.env.DEV) {
+            console.log('[data-overview] replay chart animation', overviewChartRenderKey.value)
+          }
+          await nextTick()
+        }
         await scheduleVisibleChartRender({ replayOverview: didSucceed && options.replayOverview === true })
       }
     })
@@ -1505,8 +1514,8 @@ function renderFunnel(options = {}) {
     funnelChart.setOption({
       backgroundColor: 'transparent',
       animation: true,
-      animationDuration: 800,
-      animationDurationUpdate: 800,
+      animationDuration: 1200,
+      animationDurationUpdate: 1200,
       animationEasing: 'cubicOut',
       animationEasingUpdate: 'cubicOut',
       tooltip: {
@@ -1522,9 +1531,10 @@ function renderFunnel(options = {}) {
           name: '数据生命周期漏斗',
           type: 'funnel',
           animation: true,
-          animationDuration: 800,
-          animationDurationUpdate: 800,
+          animationDuration: 1200,
+          animationDurationUpdate: 1200,
           animationEasing: 'cubicOut',
+          animationDelay: (idx) => idx * 80,
           left: '20%',
           width: '60%',
           top: 20,
@@ -1663,12 +1673,12 @@ function renderTrend(options = {}) {
     if (options.replay) trendChart.clear()
     const sourceTrend = Array.isArray(trend.value) && trend.value.length ? trend.value : getDefaultTrend()
     const option = lineOption('Raw / Clean 数据量趋势', sourceTrend.map((item) => formatTrendDate(item.biz_date)), [
-      { name: 'Raw', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 800, animationDurationUpdate: 800, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
-      { name: 'Clean', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 800, animationDurationUpdate: 800, data: sourceTrend.map((item) => Number(item.clean_count || 0)), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
+      { name: 'Raw', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 1200, animationDurationUpdate: 1200, animationEasing: 'cubicOut', animationDelay: (idx) => idx * 80, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
+      { name: 'Clean', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 1200, animationDurationUpdate: 1200, animationEasing: 'cubicOut', animationDelay: (idx) => idx * 80, data: sourceTrend.map((item) => Number(item.clean_count || 0)), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
     ])
     option.animation = true
-    option.animationDuration = 800
-    option.animationDurationUpdate = 800
+    option.animationDuration = 1200
+    option.animationDurationUpdate = 1200
     option.animationEasing = 'cubicOut'
     option.animationEasingUpdate = 'cubicOut'
     option.grid = { ...option.grid, right: 42, bottom: 30, containLabel: true }
@@ -1813,6 +1823,7 @@ async function scheduleVisibleChartRender(options = {}) {
 
 async function loadOverviewData(options = {}) {
   const force = options.force === true
+  const replay = options.replay === true
   return runModuleLoad('overview', async () => {
     const results = await Promise.allSettled([
       cachedRequest('admin:data-overview', fetchAdminOverview, { force }),
@@ -1833,7 +1844,7 @@ async function loadOverviewData(options = {}) {
     if (successCount === 0 && !hasLoaded.value) {
       throw new Error('数据总览接口暂不可用')
     }
-  }, { replayOverview: force })
+  }, { replayOverview: replay })
 }
 
 async function loadAssetsData(options = {}) {
@@ -1869,7 +1880,7 @@ async function loadAll(options = {}) {
   if (activeTab.value === 'overview') {
     const shouldForce = force || overviewDirty.value
     overviewDirty.value = false
-    return loadOverviewData({ force: shouldForce })
+    return loadOverviewData({ force: shouldForce, replay: force })
   }
   if (activeTab.value === 'assets') return loadAssetsData({ force })
   if (activeTab.value === 'jobs') return loadJobsData({ force })

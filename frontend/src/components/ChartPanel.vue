@@ -10,7 +10,9 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   option: { type: Object, required: true },
-  refreshKey: { type: [String, Number], default: 0 }
+  refreshKey: { type: [String, Number], default: 0 },
+  title: { type: String, default: '' },
+  name: { type: String, default: '' }
 })
 
 const el = ref(null)
@@ -45,6 +47,9 @@ function resize() {
 }
 
 onMounted(() => {
+  if (import.meta.env.DEV) {
+    console.log('[chart] mounted', props.title || props.name || 'ChartPanel')
+  }
   render()
   window.addEventListener('resize', resize)
 })
@@ -55,7 +60,10 @@ watch(() => props.refreshKey, () => render({ replay: true }))
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
-  if (chart) chart.dispose()
+  if (chart) {
+    chart.dispose()
+    chart = null
+  }
 })
 </script>
 

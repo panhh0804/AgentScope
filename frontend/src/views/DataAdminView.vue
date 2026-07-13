@@ -8,22 +8,22 @@
         </div>
         <div class="screen-tools">
           <a-button type="outline" size="large" @click="openScreen" style="color: #22d3ee; border-color: rgba(34, 211, 238, 0.45); margin-right: 8px;">进入实时大屏 ↗</a-button>
-          <a-button type="primary" size="large" @click="loadAll">刷新</a-button>
+          <a-button type="primary" size="large" :loading="loading" :disabled="loading" @click="loadAll({ force: true })">刷新</a-button>
         </div>
       </header>
 
       <!-- Unified States overlay/container -->
-      <div v-if="loading" class="state-wrapper">
+      <div v-if="loading && !hasLoaded" class="state-wrapper">
         <LoadingState message="正在加载数仓治理与任务运维指标..." />
       </div>
-      <div v-else-if="error" class="state-wrapper">
+      <div v-else-if="error && !hasLoaded" class="state-wrapper">
         <ErrorState :reason="error" @retry="loadAll" />
       </div>
-      <div v-else-if="isEmpty" class="state-wrapper">
+      <div v-else-if="isEmpty && !hasLoaded" class="state-wrapper">
         <EmptyState />
       </div>
 
-      <a-tabs v-else v-model:active-key="activeTab" class="admin-tabs">
+      <a-tabs v-show="hasLoaded || (!loading && !error && !isEmpty)" v-model:active-key="activeTab" class="admin-tabs">
         <a-tab-pane key="overview" title="数据总览">
           <section class="screen-metrics admin-metrics">
             <article v-for="metric in overviewMetrics" :key="metric.label" class="screen-metric">
@@ -843,6 +843,7 @@ import ErrorState from '../components/ErrorState.vue'
 const loading = ref(true)
 const error = ref('')
 const isEmpty = ref(false)
+const hasLoaded = ref(false)
 import {
   executeAdminJob,
   fetchAdminEvents,
@@ -850,7 +851,6 @@ import {
   fetchAdminJobRuns,
   fetchAdminJobs,
   fetchAdminOverview,
-  fetchAuditLogs,
   fetchDataLineage,
   fetchDataVolumeTrend,
   fetchDatasets,
@@ -874,6 +874,12 @@ const openScreen = () => {
 }
 
 const activeTab = ref('overview')
+const overviewDirty = ref(false)
+let activeLoadCount = 0
+const moduleRequests = new Map()
+const requestCache = new Map()
+const CACHE_TTL_MS = 8000
+
 const pageTitle = computed(() => {
   if (route.path === '/data-overview') return '数据总览'
   if (route.path === '/data-assets') return '数据资产'
@@ -970,7 +976,6 @@ const jobs = ref([])
 const jobRuns = ref([])
 const qualityOverview = ref({})
 const qualityIssues = ref([])
-const auditLogs = ref([])
 const qualityRules = ref([])
 const recleaning = ref({})
 const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
@@ -1130,22 +1135,119 @@ function setDwsDate(field, value) {
   dwsFilters.value[field] = normalizeDateValue(value)
 }
 
-async function loadEvents() {
+function beginLoading() {
+  activeLoadCount += 1
+  loading.value = true
+}
+
+function endLoading() {
+  activeLoadCount = Math.max(0, activeLoadCount - 1)
+  loading.value = activeLoadCount > 0
+}
+
+function cachedRequest(key, fetcher, options = {}) {
+  const force = options.force === true
+  const ttl = options.ttl ?? CACHE_TTL_MS
+  const entry = requestCache.get(key)
+  const currentTime = Date.now()
+
+  if (entry?.pending) return entry.pending
+  if (!force && entry && currentTime - entry.time < ttl) {
+    return Promise.resolve(entry.data)
+  }
+
+  const pending = Promise.resolve()
+    .then(fetcher)
+    .then((data) => {
+      requestCache.set(key, { data, time: Date.now() })
+      return data
+    })
+    .finally(() => {
+      const latest = requestCache.get(key)
+      if (latest?.pending === pending) {
+        delete latest.pending
+      }
+    })
+
+  requestCache.set(key, {
+    data: entry?.data,
+    time: entry?.time || 0,
+    pending
+  })
+  return pending
+}
+
+function invalidateAdminCache(prefixes = []) {
+  for (const key of requestCache.keys()) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      requestCache.delete(key)
+    }
+  }
+}
+
+function applySettled(result, apply, label) {
+  if (result.status === 'fulfilled') {
+    apply(result.value)
+    return true
+  }
+  console.warn(`Failed to refresh ${label}`, result.reason)
+  if (hasLoaded.value) {
+    Message.warning({ content: `${label} 刷新失败，已保留旧数据`, duration: 3000 })
+  }
+  return false
+}
+
+async function runModuleLoad(moduleKey, loader, options = {}) {
+  if (moduleRequests.has(moduleKey)) return moduleRequests.get(moduleKey)
+  error.value = ''
+  isEmpty.value = false
+  beginLoading()
+
+  const request = Promise.resolve()
+    .then(loader)
+    .then(() => {
+      hasLoaded.value = true
+    })
+    .catch((err) => {
+      console.error(`Failed to load ${moduleKey}`, err)
+      if (!hasLoaded.value) {
+        error.value = err.message || '网络连接或后端服务异常'
+      } else {
+        Message.warning({ content: '刷新失败，已保留当前数据', duration: 3000 })
+      }
+    })
+    .finally(async () => {
+      moduleRequests.delete(moduleKey)
+      endLoading()
+      if (options.render !== false) {
+        await scheduleVisibleChartRender()
+      }
+    })
+
+  moduleRequests.set(moduleKey, request)
+  return request
+}
+
+async function loadEvents(options = {}) {
+  const force = options.force !== false
+  const params = compactParams(eventFilters.value)
   try {
-    events.value = await fetchAdminEvents(compactParams(eventFilters.value))
+    events.value = await cachedRequest(`admin:events:${JSON.stringify(params)}`, () => fetchAdminEvents(params), { force })
   } catch (err) {
     Message.error({ content: `ODS 查询失败: ${err.message || err}`, duration: 5000 })
   }
 }
 
-async function loadLayerData() {
+async function loadLayerData(options = {}) {
+  const force = options.force !== false
   if (selectedLayer.value === 'ods') {
-    await loadEvents()
+    await loadEvents({ force })
     return
   }
   if (selectedLayer.value === 'dwd') {
+    const params = { limit: 50, ...compactParams(dwdFilters.value) }
     try {
-      dwdEvents.value = await fetchDwdEvents({ limit: 50, ...compactParams(dwdFilters.value) })
+      dwdEvents.value = await cachedRequest(`admin:dwd-events:${JSON.stringify(params)}`, () => fetchDwdEvents(params), { force })
     } catch (err) {
       Message.error({ content: `DWD 查询失败: ${err.message || err}`, duration: 5000 })
     }
@@ -1160,8 +1262,9 @@ async function loadLayerData() {
       Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
       return
     }
+    const params = { limit: 50, ...dwsParams }
     try {
-      dwsMetrics.value = await fetchDwsMetrics({ limit: 50, ...dwsParams })
+      dwsMetrics.value = await cachedRequest(`admin:dws-metrics:${JSON.stringify(params)}`, () => fetchDwsMetrics(params), { force })
     } catch (err) {
       Message.error({ content: `DWS 查询失败: ${err.message || err}`, duration: 5000 })
     }
@@ -1177,8 +1280,9 @@ async function loadLayerData() {
         Message.warning({ content: '开始日期不能晚于结束日期', duration: 3000 })
         return
       }
+      const params = { limit: 50, ...adsParams }
       try {
-        const res = await fetchAnalyticsErrors({ limit: 50, ...adsParams })
+        const res = await cachedRequest(`analytics:errors:${JSON.stringify(params)}`, () => fetchAnalyticsErrors(params), { force })
         adsDataList.value = (res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []))
       } catch (err) {
         Message.error({ content: `ADS 异常分布查询失败: ${err.message || err}`, duration: 5000 })
@@ -1186,7 +1290,7 @@ async function loadLayerData() {
     } else if (adsSelectedTable.value === 'historical_alerts') {
       const queryDate = adsFilters.value.end_date || adsFilters.value.start_date || todayString()
       try {
-        const res = await fetchHistoryAlerts(queryDate)
+        const res = await cachedRequest(`alerts:history:${queryDate}`, () => fetchHistoryAlerts(queryDate), { force })
         adsDataList.value = (res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []))
       } catch (err) {
         Message.error({ content: `ADS 历史告警查询失败: ${err.message || err}`, duration: 5000 })
@@ -1203,12 +1307,13 @@ const warehouseDataPanelRef = ref(null)
 
 function selectLayer(layer) {
   selectedLayer.value = layer
-  loadLayerData()
+  loadLayerData({ force: false })
 }
 
-async function loadRules() {
+async function loadRules(options = {}) {
+  const force = options.force === true
   try {
-    qualityRules.value = await fetchQualityRules()
+    qualityRules.value = await cachedRequest('admin:quality-rules', fetchQualityRules, { force, ttl: 10000 })
   } catch (e) {
     console.error('Failed to load quality rules', e)
   }
@@ -1221,9 +1326,34 @@ async function toggleRule(rule) {
     const newStatus = rule.is_active ? 0 : 1
     await updateQualityRule(rule.rule_id, { is_active: newStatus })
     Message.success(`${rule.rule_name}已${newStatus ? '启用' : '禁用'}`)
-    await loadRules()
+    invalidateAdminCache(['admin:quality-rules'])
+    await loadRules({ force: true })
   } catch (e) {
     Message.error('修改规则状态失败')
+  }
+}
+
+function invalidateOverviewCache() {
+  invalidateAdminCache([
+    'admin:data-overview',
+    'admin:data-volume-trend',
+    'admin:pipeline-status',
+    'admin:quality-overview',
+    'admin:quality-issues',
+    'admin:datasets',
+    'admin:data-lineage',
+    'admin:dws-metrics',
+    'analytics:'
+  ])
+  overviewDirty.value = true
+}
+
+async function refreshOverviewAfterJob() {
+  invalidateOverviewCache()
+  await wait(800)
+  if (activeTab.value === 'overview') {
+    overviewDirty.value = false
+    await loadOverviewData({ force: true })
   }
 }
 
@@ -1234,7 +1364,10 @@ async function recleanData(dateVal) {
   try {
     await executeAdminJob('spark_clean', dateVal)
     Message.success({ content: `业务日期 ${dateVal} 的清洗自愈执行成功！`, duration: 4000 })
-    await loadAll()
+    await refreshOverviewAfterJob()
+    if (activeTab.value === 'assets') {
+      await loadLayerData({ force: true })
+    }
   } catch (e) {
     Message.error({ content: `重洗自愈执行失败: ${e.message || '未知错误'}`, duration: 4000 })
   } finally {
@@ -1245,10 +1378,14 @@ async function recleanData(dateVal) {
 
 
 
-async function loadJobs() {
-  const [jobData, runData] = await Promise.all([fetchAdminJobs(), fetchAdminJobRuns()])
-  jobs.value = jobData
-  jobRuns.value = runData
+async function loadJobs(options = {}) {
+  const force = options.force === true
+  const [jobData, runData] = await Promise.allSettled([
+    cachedRequest('admin:jobs', fetchAdminJobs, { force, ttl: 10000 }),
+    cachedRequest('admin:job-runs', fetchAdminJobRuns, { force, ttl: 5000 })
+  ])
+  applySettled(jobData, (data) => { jobs.value = data || [] }, 'jobs')
+  applySettled(runData, (data) => { jobRuns.value = data || [] }, 'job-runs')
 }
 
 async function runJob(jobCode) {
@@ -1269,7 +1406,9 @@ async function runJob(jobCode) {
     Message.error({ content: `作业调度系统异常: ${err.message || err}`, duration: 5000 })
   } finally {
     runningJobs.value[jobCode] = false
-    await loadAll()
+    invalidateAdminCache(['admin:jobs', 'admin:job-runs'])
+    await loadJobsData({ force: true })
+    await refreshOverviewAfterJob()
   }
 }
 
@@ -1302,7 +1441,8 @@ async function runFullPipeline() {
         break
       } finally {
         runningJobs.value[job.job_code] = false
-        await loadJobs() // refresh intermediate runs live
+        invalidateAdminCache(['admin:jobs', 'admin:job-runs'])
+        await loadJobs({ force: true }) // refresh intermediate runs live
       }
     }
     if (!failed) {
@@ -1312,7 +1452,9 @@ async function runFullPipeline() {
     Message.error({ content: `流水线运行系统异常: ${err.message || err}` })
   } finally {
     pipelineRunning.value = false
-    await loadAll()
+    invalidateAdminCache(['admin:jobs', 'admin:job-runs'])
+    await loadJobsData({ force: true })
+    await refreshOverviewAfterJob()
   }
 }
 
@@ -1328,7 +1470,9 @@ async function retryRun(runId) {
   } catch (err) {
     Message.error({ content: `重试失败: ${err.message || err}` })
   } finally {
-    await loadAll()
+    invalidateAdminCache(['admin:jobs', 'admin:job-runs'])
+    await loadJobsData({ force: true })
+    await refreshOverviewAfterJob()
   }
 }
 
@@ -1649,46 +1793,69 @@ async function scheduleVisibleChartRender() {
   resizeCharts()
 }
 
-async function loadAll() {
-  loading.value = true
-  error.value = ''
-  isEmpty.value = false
-  try {
-    const [overviewData, trendData, pipelineData, datasetData, lineageData, qualityOverviewData, qualityIssueData, auditData] = await Promise.all([
-      fetchAdminOverview(),
-      fetchDataVolumeTrend(),
-      fetchPipelineStatus(),
-      fetchDatasets(),
-      fetchDataLineage(),
-      fetchQualityOverview(),
-      fetchQualityIssues(),
-      fetchAuditLogs()
+async function loadOverviewData(options = {}) {
+  const force = options.force === true
+  return runModuleLoad('overview', async () => {
+    const results = await Promise.allSettled([
+      cachedRequest('admin:data-overview', fetchAdminOverview, { force }),
+      cachedRequest('admin:data-volume-trend', fetchDataVolumeTrend, { force }),
+      cachedRequest('admin:pipeline-status', fetchPipelineStatus, { force }),
+      cachedRequest('admin:quality-overview', fetchQualityOverview, { force }),
+      cachedRequest('admin:quality-issues', fetchQualityIssues, { force })
     ])
-    
-    // Check empty dataset condition (strict mode check)
-    if (!overviewData || Object.keys(overviewData).length === 0 || !datasetData || datasetData.length === 0) {
-      isEmpty.value = true
+
+    const successCount = [
+      applySettled(results[0], (data) => { overview.value = data || {} }, 'data-overview'),
+      applySettled(results[1], (data) => { trend.value = data || [] }, 'data-volume-trend'),
+      applySettled(results[2], (data) => { pipeline.value = data || { nodes: [], edges: [] } }, 'pipeline-status'),
+      applySettled(results[3], (data) => { qualityOverview.value = data || { rule_count: 0, issue_count: 0, avg_pass_rate: 1.0, pending_count: 0 } }, 'quality-overview'),
+      applySettled(results[4], (data) => { qualityIssues.value = data || [] }, 'quality-issues')
+    ].filter(Boolean).length
+
+    if (successCount === 0 && !hasLoaded.value) {
+      throw new Error('数据总览接口暂不可用')
     }
-    
-    overview.value = overviewData || {}
-    trend.value = trendData || []
-    pipeline.value = pipelineData || { nodes: [], edges: [] }
-    datasets.value = datasetData || []
-    lineage.value = lineageData || { nodes: [], edges: [] }
-    qualityOverview.value = qualityOverviewData || { rule_count: 0, issue_count: 0, avg_pass_rate: 1.0, pending_count: 0 }
-    qualityIssues.value = qualityIssueData || []
-    auditLogs.value = auditData || []
-    
-    await Promise.all([loadLayerData(), loadJobs(), loadRules()])
-  } catch (err) {
-    console.error('Failed to load admin data', err)
-    error.value = err.message || '网络连接或后端服务异常'
-  } finally {
-    loading.value = false
-    if (!error.value && !isEmpty.value) {
-      scheduleVisibleChartRender()
-    }
+  })
+}
+
+async function loadAssetsData(options = {}) {
+  const force = options.force === true
+  return runModuleLoad('assets', async () => {
+    const results = await Promise.allSettled([
+      cachedRequest('admin:datasets', fetchDatasets, { force, ttl: 10000 }),
+      cachedRequest('admin:data-lineage', fetchDataLineage, { force, ttl: 10000 }),
+      cachedRequest('admin:quality-overview', fetchQualityOverview, { force })
+    ])
+
+    applySettled(results[0], (data) => { datasets.value = data || [] }, 'datasets')
+    applySettled(results[1], (data) => { lineage.value = data || { nodes: [], edges: [] } }, 'data-lineage')
+    applySettled(results[2], (data) => { qualityOverview.value = data || { rule_count: 0, issue_count: 0, avg_pass_rate: 1.0, pending_count: 0 } }, 'quality-overview')
+    await loadLayerData({ force })
+  })
+}
+
+async function loadJobsData(options = {}) {
+  const force = options.force === true
+  return runModuleLoad('jobs', async () => {
+    await Promise.allSettled([
+      loadJobs({ force }),
+      loadRules({ force })
+    ])
+  }, { render: false })
+}
+
+async function loadAll(options = {}) {
+  const force = options?.force === true
+  if (loading.value && moduleRequests.has(activeTab.value)) return moduleRequests.get(activeTab.value)
+
+  if (activeTab.value === 'overview') {
+    const shouldForce = force || overviewDirty.value
+    overviewDirty.value = false
+    return loadOverviewData({ force: shouldForce })
   }
+  if (activeTab.value === 'assets') return loadAssetsData({ force })
+  if (activeTab.value === 'jobs') return loadJobsData({ force })
+  return Promise.resolve()
 }
 
 onMounted(async () => {
@@ -1696,8 +1863,14 @@ onMounted(async () => {
   window.addEventListener('resize', resizeCharts)
 })
 
-watch(activeTab, () => {
-  scheduleVisibleChartRender()
+watch(activeTab, async (tab) => {
+  if (tab === 'overview' && overviewDirty.value) {
+    overviewDirty.value = false
+    await loadOverviewData({ force: true })
+    return
+  }
+  await loadAll()
+  await scheduleVisibleChartRender()
 }, { flush: 'post' })
 
 onBeforeUnmount(() => {

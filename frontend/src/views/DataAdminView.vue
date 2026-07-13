@@ -1201,11 +1201,13 @@ async function runModuleLoad(moduleKey, loader, options = {}) {
   if (moduleRequests.has(moduleKey)) return moduleRequests.get(moduleKey)
   error.value = ''
   isEmpty.value = false
+  let didSucceed = false
   beginLoading()
 
   const request = Promise.resolve()
     .then(loader)
     .then(() => {
+      didSucceed = true
       hasLoaded.value = true
     })
     .catch((err) => {
@@ -1220,7 +1222,7 @@ async function runModuleLoad(moduleKey, loader, options = {}) {
       moduleRequests.delete(moduleKey)
       endLoading()
       if (options.render !== false) {
-        await scheduleVisibleChartRender()
+        await scheduleVisibleChartRender({ replayOverview: didSucceed && options.replayOverview === true })
       }
     })
 
@@ -1476,13 +1478,14 @@ async function retryRun(runId) {
   }
 }
 
-function renderFunnel() {
+function renderFunnel(options = {}) {
   try {
     if (!funnelChartRef.value) return
     if (!funnelChart || funnelChart.getDom?.() !== funnelChartRef.value) {
       funnelChart?.dispose()
       funnelChart = echarts.init(funnelChartRef.value)
     }
+    if (options.replay) funnelChart.clear()
 
     const rawFunnel = Array.isArray(overview.value.funnel) && overview.value.funnel.length
       ? overview.value.funnel
@@ -1501,6 +1504,11 @@ function renderFunnel() {
 
     funnelChart.setOption({
       backgroundColor: 'transparent',
+      animation: true,
+      animationDuration: 800,
+      animationDurationUpdate: 800,
+      animationEasing: 'cubicOut',
+      animationEasingUpdate: 'cubicOut',
       tooltip: {
         trigger: 'item',
         formatter: (params) => {
@@ -1513,6 +1521,10 @@ function renderFunnel() {
         {
           name: '数据生命周期漏斗',
           type: 'funnel',
+          animation: true,
+          animationDuration: 800,
+          animationDurationUpdate: 800,
+          animationEasing: 'cubicOut',
           left: '20%',
           width: '60%',
           top: 20,
@@ -1641,18 +1653,24 @@ function renderLineage() {
   }
 }
 
-function renderTrend() {
+function renderTrend(options = {}) {
   try {
     if (!trendChartRef.value) return
     if (!trendChart || trendChart.getDom?.() !== trendChartRef.value) {
       trendChart?.dispose()
       trendChart = echarts.init(trendChartRef.value)
     }
+    if (options.replay) trendChart.clear()
     const sourceTrend = Array.isArray(trend.value) && trend.value.length ? trend.value : getDefaultTrend()
     const option = lineOption('Raw / Clean 数据量趋势', sourceTrend.map((item) => formatTrendDate(item.biz_date)), [
-      { name: 'Raw', type: 'line', smooth: true, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
-      { name: 'Clean', type: 'line', smooth: true, data: sourceTrend.map((item) => Number(item.clean_count || 0)), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
+      { name: 'Raw', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 800, animationDurationUpdate: 800, data: sourceTrend.map((item) => Number(item.raw_count || 0)), itemStyle: { color: '#22d3ee' }, areaStyle: { color: 'rgba(34, 211, 238, 0.1)' } },
+      { name: 'Clean', type: 'line', smooth: true, showSymbol: false, animation: true, animationDuration: 800, animationDurationUpdate: 800, data: sourceTrend.map((item) => Number(item.clean_count || 0)), itemStyle: { color: '#4ade80' }, areaStyle: { color: 'rgba(74, 222, 128, 0.08)' } }
     ])
+    option.animation = true
+    option.animationDuration = 800
+    option.animationDurationUpdate = 800
+    option.animationEasing = 'cubicOut'
+    option.animationEasingUpdate = 'cubicOut'
     option.grid = { ...option.grid, right: 42, bottom: 30, containLabel: true }
     option.xAxis = { ...option.xAxis, boundaryGap: true }
     trendChart.setOption(option, true)
@@ -1773,10 +1791,10 @@ async function ensureChartContainer(elRef, attempts = 8) {
   return elRef.value
 }
 
-function renderAllVisibleCharts() {
+function renderAllVisibleCharts(options = {}) {
   if (activeTab.value === 'overview') {
-    renderTrend()
-    renderFunnel()
+    renderTrend({ replay: options.replayOverview })
+    renderFunnel({ replay: options.replayOverview })
     renderStorageChart()
     renderPerfChart()
   }
@@ -1785,10 +1803,10 @@ function renderAllVisibleCharts() {
   }
 }
 
-async function scheduleVisibleChartRender() {
+async function scheduleVisibleChartRender(options = {}) {
   await nextTick()
   await ensureChartContainer(activeTab.value === 'overview' ? trendChartRef : lineageChartRef)
-  renderAllVisibleCharts()
+  renderAllVisibleCharts(options)
   await waitForFrame()
   resizeCharts()
 }
@@ -1815,7 +1833,7 @@ async function loadOverviewData(options = {}) {
     if (successCount === 0 && !hasLoaded.value) {
       throw new Error('数据总览接口暂不可用')
     }
-  })
+  }, { replayOverview: force })
 }
 
 async function loadAssetsData(options = {}) {

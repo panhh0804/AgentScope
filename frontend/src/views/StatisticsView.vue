@@ -7,22 +7,22 @@
           <h2>数据统计分析端</h2>
         </div>
         <div class="screen-tools">
-          <a-button type="primary" size="large" :loading="loading" @click="loadAll">刷新</a-button>
+          <a-button type="primary" size="large" :loading="loading" :disabled="loading" @click="loadAll({ force: true })">刷新</a-button>
         </div>
       </header>
 
       <!-- Unified States overlay/container -->
-      <div v-if="loading" class="state-wrapper">
+      <div v-if="loading && !hasLoaded" class="state-wrapper">
         <LoadingState message="正在加载数据统计与分析指标..." />
       </div>
-      <div v-else-if="error" class="state-wrapper">
+      <div v-else-if="error && !hasLoaded" class="state-wrapper">
         <ErrorState :reason="error" @retry="loadAll" />
       </div>
-      <div v-else-if="isEmpty" class="state-wrapper">
+      <div v-else-if="isEmpty && !hasLoaded" class="state-wrapper">
         <EmptyState />
       </div>
 
-      <template v-else>
+      <template v-if="hasLoaded || (!loading && !error && !isEmpty)">
         <section class="screen-metrics statistics-metrics">
         <article v-for="metric in summaryMetrics" :key="metric.label" class="screen-metric">
           <span>{{ metric.label }}</span>
@@ -87,7 +87,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
 import ChartPanel from '../components/ChartPanel.vue'
@@ -105,6 +105,8 @@ import { barOption, lineOption } from '../charts/options'
 const loading = ref(true)
 const error = ref('')
 const isEmpty = ref(false)
+const hasLoaded = ref(false)
+let loadPromise = null
 const trend = ref([])
 const errors = ref([])
 const agentStats = ref([])
@@ -340,12 +342,52 @@ function baseChartOption() {
   }
 }
 
+function emptyGraphic(text = '暂无数据') {
+  return {
+    type: 'text',
+    left: 'center',
+    top: 'middle',
+    style: {
+      text,
+      fill: '#9bc7d9',
+      fontSize: 14,
+      fontWeight: 500
+    }
+  }
+}
+
+function waitForFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function ensureChartContainer(elRef, attempts = 8) {
+  for (let i = 0; i < attempts; i += 1) {
+    const el = elRef.value
+    if (el && el.clientWidth > 0 && el.clientHeight > 0) return el
+    await wait(60)
+    await waitForFrame()
+  }
+  return elRef.value
+}
+
+function ensureChart(elRef, currentChart) {
+  const el = elRef.value
+  if (!el || el.clientWidth === 0 || el.clientHeight === 0) return currentChart
+  return currentChart || echarts.init(el)
+}
+
 function renderTrend() {
   if (!trendChartRef.value) return
-  trendChart ||= echarts.init(trendChartRef.value)
+  trendChart = ensureChart(trendChartRef, trendChart)
+  if (!trendChart) return
   const dates = trend.value.map((item) => item.metric_date)
   trendChart.setOption({
     ...baseChartOption(),
+    graphic: trend.value.length ? [] : emptyGraphic('暂无每日指标数据'),
     tooltip: { ...baseChartOption().tooltip, trigger: 'axis' },
     xAxis: { ...baseChartOption().xAxis, data: dates },
     yAxis: [
@@ -395,9 +437,11 @@ function renderTrend() {
 
 function renderToken() {
   if (!tokenChartRef.value) return
-  tokenChart ||= echarts.init(tokenChartRef.value)
+  tokenChart = ensureChart(tokenChartRef, tokenChart)
+  if (!tokenChart) return
   tokenChart.setOption({
     backgroundColor: 'transparent',
+    graphic: agentStats.value.length ? [] : emptyGraphic('暂无 Agent 消耗数据'),
     tooltip: {
       trigger: 'item',
       backgroundColor: 'rgba(2, 8, 16, 0.92)',
@@ -442,10 +486,12 @@ function renderToken() {
 
 function renderErrors() {
   if (!errorChartRef.value) return
-  errorChart ||= echarts.init(errorChartRef.value)
+  errorChart = ensureChart(errorChartRef, errorChart)
+  if (!errorChart) return
   const sorted = [...errors.value].sort((a, b) => Number(a.total_count || 0) - Number(b.total_count || 0))
   errorChart.setOption({
     ...baseChartOption(),
+    graphic: sorted.length ? [] : emptyGraphic('暂无异常数据'),
     tooltip: {
       ...baseChartOption().tooltip,
       trigger: 'axis',
@@ -483,10 +529,12 @@ function renderErrors() {
 
 function renderLatency() {
   if (!latencyChartRef.value) return
-  latencyChart ||= echarts.init(latencyChartRef.value)
+  latencyChart = ensureChart(latencyChartRef, latencyChart)
+  if (!latencyChart) return
   const names = agentStats.value.map((item) => item.agent_role || item.agent_id)
   latencyChart.setOption({
     ...baseChartOption(),
+    graphic: agentStats.value.length ? [] : emptyGraphic('暂无时延数据'),
     xAxis: { ...baseChartOption().xAxis, data: names },
     yAxis: { ...baseChartOption().yAxis, name: 'ms' },
     series: [
@@ -570,54 +618,94 @@ function resizeCharts() {
 
 async function scheduleChartRender() {
   await nextTick()
-  setTimeout(() => {
-    renderCharts()
-    resizeCharts()
-  }, 100)
+  await Promise.all([
+    ensureChartContainer(trendChartRef),
+    ensureChartContainer(tokenChartRef),
+    ensureChartContainer(errorChartRef),
+    ensureChartContainer(latencyChartRef)
+  ])
+  await waitForFrame()
+  renderCharts()
+  resizeCharts()
 }
 
-async function loadAll() {
+function updateArrayIfUseful(result, target, label) {
+  if (result.status !== 'fulfilled') {
+    console.warn(`Failed to load ${label}`, result.reason)
+    return false
+  }
+  if (!Array.isArray(result.value)) {
+    console.warn(`Unexpected ${label} payload`, result.value)
+    return false
+  }
+  if (result.value.length === 0 && target.value.length > 0) {
+    console.info(`${label} returned empty data, keeping previous chart data`)
+    return false
+  }
+  target.value = result.value
+  return true
+}
+
+async function loadAll(options = {}) {
+  if (loadPromise) return loadPromise
   loading.value = true
   error.value = ''
   isEmpty.value = false
   showLoading()
-  try {
+  loadPromise = (async () => {
     const endDate = getTodayString()
-    const [trendData, errorData, agentData, dailyData, rankingData] = await Promise.all([
+    const results = await Promise.allSettled([
       fetchAnalyticsTrend(),
       fetchAnalyticsErrors(),
       fetchAnalyticsAgentStats(),
       fetchDailyMetrics('2026-06-01', endDate),
       fetchAgentRankings(endDate)
     ])
-    
-    // Check if empty dataset (strict mode verification)
-    if (!trendData || trendData.length === 0 || !agentData || agentData.length === 0) {
+
+    const changed = [
+      updateArrayIfUseful(results[0], trend, 'analytics trend'),
+      updateArrayIfUseful(results[1], errors, 'error distribution'),
+      updateArrayIfUseful(results[2], agentStats, 'agent statistics'),
+      updateArrayIfUseful(results[3], dailyMetrics, 'daily metrics'),
+      updateArrayIfUseful(results[4], historyRankings, 'agent rankings')
+    ].some(Boolean)
+
+    if (!trend.value.length && !agentStats.value.length && !hasLoaded.value) {
       isEmpty.value = true
     }
-    
-    trend.value = trendData || []
-    errors.value = errorData || []
-    agentStats.value = agentData || []
-    dailyMetrics.value = dailyData || []
-    historyRankings.value = rankingData || []
-  } catch (err) {
+
+    hasLoaded.value = true
+    if (!changed && hasLoaded.value && !isEmpty.value && options.force) {
+      Message.info({ content: '统计数据暂无更新，已保留当前图表', duration: 2500 })
+    }
+  })().catch((err) => {
     console.error('Failed to load statistics', err)
-    error.value = err.message || '网络连接或后端服务异常'
-  } finally {
+    if (!hasLoaded.value) {
+      error.value = err.message || '网络连接或后端服务异常'
+    } else {
+      Message.warning({ content: '刷新失败，已保留当前统计图表', duration: 3000 })
+    }
+  }).finally(async () => {
     hideLoading()
     loading.value = false
-    if (!error.value && !isEmpty.value) {
-      scheduleChartRender()
+    loadPromise = null
+    if (!error.value && (!isEmpty.value || hasLoaded.value)) {
+      await scheduleChartRender()
     }
-  }
+  })
+  return loadPromise
 }
 
 onMounted(async () => {
   await nextTick()
-  renderCharts()
   await loadAll()
   window.addEventListener('resize', resizeCharts)
+})
+
+onActivated(async () => {
+  await nextTick()
+  await waitForFrame()
+  resizeCharts()
 })
 
 onBeforeUnmount(() => {

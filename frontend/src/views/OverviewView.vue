@@ -465,7 +465,7 @@ const metrics = computed(() => [
   { label: '运行任务', value: realtimeOverview.value.running_tasks ?? '-', hint: '实时处理中的任务' },
   { label: '活跃 Agent', value: realtimeOverview.value.active_agents ?? '-', hint: '当前在线角色数' },
   { label: '事件吞吐 / 分钟', value: realtimeOverview.value.events_per_minute ?? '-', hint: '实时事件输入速率' },
-  { label: '实时成功率', value: percent(realtimeOverview.value.success_rate), hint: `错误率 ${percent(realtimeOverview.value.error_rate)}` },
+  { label: '实时成功率', value: realtimeSuccessRateText.value, hint: `错误率 ${percent(realtimeOverview.value.error_rate)}` },
   { label: '平均时延', value: `${Math.round(realtimeOverview.value.avg_latency_ms || 0)} ms`, hint: '实时窗口统计' },
 ])
 
@@ -474,12 +474,27 @@ const realtimeMetrics = computed(() => [
   { label: '运行任务', value: realtimeOverview.value.running_tasks ?? '-', hint: '运行任务数' },
   { label: '活跃 Agent', value: realtimeOverview.value.active_agents ?? '-', hint: '在线角色' },
   { label: '事件吞吐', value: `${realtimeOverview.value.events_per_minute ?? '-'} /min`, hint: '实时输入' },
-  { label: '实时成功率', value: percent(realtimeOverview.value.success_rate), hint: `错误率 ${percent(realtimeOverview.value.error_rate)}` },
+  { label: '实时成功率', value: realtimeSuccessRateText.value, hint: `错误率 ${percent(realtimeOverview.value.error_rate)}` },
   { label: '平均时延', value: `${Math.round(realtimeOverview.value.avg_latency_ms || 0)} ms`, hint: '时延窗口' },
   { label: '5m Token 消耗', value: formatNumber(realtimeOverview.value.token_total_5m), hint: '近 5 分钟' },
   { label: '5m 估算成本', value: `$${Number(realtimeOverview.value.estimated_cost_5m || 0).toFixed(4)}`, hint: '近 5 分钟' },
   { label: '告警数', value: realtimeAlerts.value.length, hint: '未处理告警' }
 ])
+
+const realtimeSuccessRate = computed(() => {
+  const overview = realtimeOverview.value || {}
+  const directRate = Number(overview.success_rate)
+  if (Number.isFinite(directRate)) return directRate
+
+  const successCount = Number(overview.success_count)
+  const failedCount = Number(overview.failed_count)
+  if (!Number.isFinite(successCount) || !Number.isFinite(failedCount)) return null
+
+  const totalFinished = successCount + failedCount
+  return totalFinished > 0 ? successCount / totalFinished : null
+})
+
+const realtimeSuccessRateText = computed(() => percent(realtimeSuccessRate.value))
 
 const historyTaskOption = computed(() => historyLineOption('每日任务量', [
   { name: '任务数', type: 'line', smooth: true, data: dailyMetrics.value.map((item) => item.task_count), itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3 }, areaStyle: { color: 'rgba(59, 130, 246, 0.08)' } }
@@ -561,7 +576,8 @@ function getLatencyLevel(ms) {
 }
 
 function percent(value) {
-  return `${Number((value || 0) * 100).toFixed(1)}%`
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? `${(numeric * 100).toFixed(1)}%` : '--'
 }
 
 function formatNumber(value) {

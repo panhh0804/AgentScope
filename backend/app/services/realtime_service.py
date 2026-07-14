@@ -48,6 +48,20 @@ class RealtimeService:
     def _data_mode(self) -> str:
         return os.getenv("DATA_MODE", "demo").lower()
 
+    def _with_success_rate(self, overview: Dict[str, Any]) -> Dict[str, Any]:
+        if overview.get("success_rate") is not None:
+            return overview
+        try:
+            success_count = int(overview.get("success_count") or 0)
+            failed_count = int(overview.get("failed_count") or 0)
+        except (TypeError, ValueError):
+            overview["success_rate"] = None
+            return overview
+
+        total_finished = success_count + failed_count
+        overview["success_rate"] = success_count / total_finished if total_finished > 0 else None
+        return overview
+
     def _middleware_host(self) -> str:
         return os.getenv("MIDDLEWARE_HOST", "middleware")
 
@@ -341,11 +355,13 @@ class RealtimeService:
         redis_data = self._get_json("agentscope:realtime:overview")
         middleware_stats = self.get_middleware_stats()
         if redis_data and isinstance(redis_data, dict):
+            redis_data = self._with_success_rate(redis_data)
             redis_data["middleware"] = middleware_stats
             return {"data": redis_data, "data_source": "redis", "fallback": False, "reason": None}
         if self._data_mode() == "strict":
             return {"data": {"middleware": middleware_stats}, "data_source": "redis", "fallback": False, "reason": "Redis unavailable or empty"}
         overview = mock_data.realtime_overview()
+        overview = self._with_success_rate(overview)
         overview["middleware"] = middleware_stats
         return {"data": overview, "data_source": "mock", "fallback": True, "reason": "Redis unavailable or empty"}
 

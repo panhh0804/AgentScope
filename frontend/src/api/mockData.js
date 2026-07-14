@@ -1,11 +1,25 @@
+/**
+ * mockData.js —— 前端独立的本地开发/测试 Mock 数据生成器
+ * 
+ * 职责：
+ *   - 当后端服务尚未部署或本地运行在 mock 独立模式时，
+ *     用于直接在前端模拟出完整的各种维度图表、状态概览、AI 报告等假数据。
+ */
+
 const agents = ['planner', 'search', 'analysis', 'writer', 'reviewer']
 
+/**
+ * 辅助工具：生成当前时间加上/减去指定偏移分钟后的 ISO 8601 格式时间
+ */
 function isoMinutes(offset = 0) {
   const date = new Date(Date.now() + offset * 60 * 1000)
   date.setSeconds(0, 0)
   return date.toISOString().slice(0, 16)
 }
 
+/**
+ * 模拟大屏顶部的全局运行性能数据
+ */
 export function mockOverview() {
   return {
     running_tasks: 18,
@@ -22,6 +36,9 @@ export function mockOverview() {
   }
 }
 
+/**
+ * 模拟过去一段时间（如最近 60 分钟）的实时吞吐与时延变化趋势折线数据
+ */
 export function mockTrend(minutes = 60) {
   return Array.from({ length: Math.min(minutes, 60) }, (_, index) => ({
     time: isoMinutes(index - Math.min(minutes, 60) + 1),
@@ -32,6 +49,9 @@ export function mockTrend(minutes = 60) {
   }))
 }
 
+/**
+ * 模拟在线 Agent 角色的活跃和成功率状态
+ */
 export function mockAgents() {
   return agents.map((role, index) => ({
     agent_id: `${role}_agent`,
@@ -46,6 +66,9 @@ export function mockAgents() {
   }))
 }
 
+/**
+ * 模拟大屏弹窗和滚动栏显示的活动告警
+ */
 export function mockRealtimeAlerts() {
   const now = new Date()
   return [
@@ -85,6 +108,9 @@ export function mockRealtimeAlerts() {
   ]
 }
 
+/**
+ * 模拟离线起止日期之间的每日聚合指标数据
+ */
 export function mockDailyMetrics(startDate = '2026-06-01', endDate = '2026-06-24') {
   const start = new Date(`${startDate}T00:00:00`)
   const end = new Date(`${endDate}T00:00:00`)
@@ -105,6 +131,9 @@ export function mockDailyMetrics(startDate = '2026-06-01', endDate = '2026-06-24
   })
 }
 
+/**
+ * 模拟小时细分下的微观运行趋势
+ */
 export function mockHourlyMetrics() {
   return Array.from({ length: 24 }, (_, hour) => ({
     hour,
@@ -115,6 +144,9 @@ export function mockHourlyMetrics() {
   }))
 }
 
+/**
+ * 模拟特定日期的 Agent 效能排行
+ */
 export function mockRankings(date = '2026-06-24') {
   return agents.map((role, index) => ({
     metric_date: date,
@@ -129,6 +161,9 @@ export function mockRankings(date = '2026-06-24') {
   }))
 }
 
+/**
+ * 模拟智能体拓扑连线拓扑图结构
+ */
 export function mockRelationGraph(date = '2026-06-24') {
   return {
     metric_date: date,
@@ -144,6 +179,9 @@ export function mockRelationGraph(date = '2026-06-24') {
   }
 }
 
+/**
+ * 模拟批处理历史异常告警
+ */
 export function mockHistoryAlerts(date = '2026-06-24') {
   return [
     ['high_error_rate', 'warning', 'search_agent', 0.24, 0.2],
@@ -162,6 +200,9 @@ export function mockHistoryAlerts(date = '2026-06-24') {
   }))
 }
 
+/**
+ * 模拟单条 AI 诊断运维报告
+ */
 export function mockReport(payload = {}) {
   const date = payload.report_date || '2026-06-24'
   return {
@@ -170,25 +211,28 @@ export function mockReport(payload = {}) {
     report_type: payload.report_type || 'daily',
     create_time: new Date().toISOString().slice(0, 19),
     content: `# AgentScope ${date} 运行分析报告
-
+ 
 ## 总体结论
-
+ 
 系统实时链路和离线分析链路均处于可观测状态。Planner、Search、Analysis、Writer、Reviewer 五类 Agent 均产生有效事件，整体成功率保持在 93% 左右。
-
+ 
 ## 主要异常
-
+ 
 - Writer Agent 出现高延迟告警，P95 时延超过阈值。
 - Reviewer Agent 存在频繁重试现象，需要关注任务回退逻辑。
 - Search Agent 错误率略高，建议检查外部检索工具稳定性。
-
+ 
 ## 优化建议
-
-1. 对 Writer Agent 增加超时保护和降级策略。
+ 
+1. 对 Writer Agent 增加超时保护 and 降级策略。
 2. 对 Reviewer 重试次数设置硬阈值，避免疑似循环调用。
 3. 将实时告警和历史告警统一纳入 AI 报告摘要。`
   }
 }
 
+/**
+ * 模拟报告列表元数据
+ */
 export function mockReports() {
   return [mockReport({ report_date: '2026-06-24', report_type: 'daily' })]
 }

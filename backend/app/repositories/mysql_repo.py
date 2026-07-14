@@ -1,3 +1,15 @@
+"""
+mysql_repo.py —— AgentScope MySQL 数据访问仓储层
+
+本模块定义了 MySQLAnalyticsRepository 类，作为后端所有服务层（MetricService、StatisticsService 等）
+访问 MySQL 数据库的统一代理大门：
+  1. 支持连接池生命周期管理，加载环境变量连接配置。
+  2. 针对离线多维分析库（agentscope_analytics）执行指标多维聚合、大屏趋势、Agent 效能排行、调用链路拓扑等读写查询。
+  3. 针对源日志库（agentscope_source）执行 DWD 数据抓取与质量问题深度计算分析。
+  4. 支持 HDFS 的脏样本抽取缓存机制（_issues_cache），解决跨组件交互的时延阻塞。
+  5. 自动确保管理任务运行历史（admin_job_runs）与操作审计日志（admin_audit_logs）相关数据库表的动态初始化建立。
+"""
+
 from __future__ import annotations
 
 import logging
@@ -5,18 +17,30 @@ import os
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
-
 logger = logging.getLogger(__name__)
 
 
 class MySQLAnalyticsRepository:
+    """
+    MySQL 数据仓储实现类，处理多维分析指标与系统运维监控数据的 SQL 交互。
+    """
+    # 静态类成员缓存：暂存 HDFS 采集到的脏样本数据以削峰，并定义过期 TTL（秒）
     _issues_cache = {}
     _issues_cache_ttl = 15
 
     def __init__(self) -> None:
+        """
+        根据环境变量判断是否启用真实的 MySQL 数据交互模式。
+        """
         self._enabled = os.getenv("MYSQL_ANALYTICS_ENABLED", "0") == "1"
 
     def _connect(self):
+        """
+        内部辅助方法：建立并返回与 MySQL Analytics 数据库的连接会话。
+
+        Returns:
+            Connection: PyMySQL 数据库连接实例，或在未启用/发生连接异常时返回 None
+        """
         if not self._enabled:
             return None
         try:
@@ -25,17 +49,28 @@ class MySQLAnalyticsRepository:
             return pymysql.connect(
                 host=os.getenv("MYSQL_HOST", "middleware"),
                 port=int(os.getenv("MYSQL_PORT", "3306")),
+                # 默认使用 root 权限连接，以确保具备创建管理辅助表的 DDL 权限
                 user=os.getenv("MYSQL_USER", "root"),
                 password=os.getenv("MYSQL_PASSWORD", "hadoop2026123aa"),
                 database=os.getenv("MYSQL_ANALYTICS_DB", "agentscope_analytics"),
                 charset="utf8mb4",
                 cursorclass=pymysql.cursors.DictCursor,
-                connect_timeout=1,
+                connect_timeout=1, # 快速连接超时响应，防止阻塞
             )
         except Exception:
             return None
 
     def _query(self, sql: str, params: tuple) -> Optional[List[Dict]]:
+        """
+        数据库查询工具：执行 SQL 语句并返回查出的结果集列表。
+
+        Args:
+            sql (str): 参数化 SQL 查询模板
+            params (tuple): 对应的防 SQL 注入参数元组
+
+        Returns:
+            Optional[List[Dict]]: 每行包含列名字典的映射列表。若不可达或异常则返回 None
+        """
         conn = self._connect()
         if not conn:
             return None
@@ -50,6 +85,16 @@ class MySQLAnalyticsRepository:
             conn.close()
 
     def _execute(self, sql: str, params: tuple) -> bool:
+        """
+        数据库命令工具：执行 INSERT / UPDATE / DELETE / CREATE 等非查询类命令。
+
+        Args:
+            sql (str): SQL 命令模板
+            params (tuple): 参数元组
+
+        Returns:
+            bool: 标识是否执行并 commit 成功
+        """
         conn = self._connect()
         if not conn:
             return False
@@ -65,6 +110,13 @@ class MySQLAnalyticsRepository:
             conn.close()
 
     def clear_metrics_for_date(self, metric_date: date, job_code: str) -> None:
+        """
+        为了保证调度重新执行时的幂等性，在作业运行前清理特定日期历史遗留的冲突指标。
+
+        Args:
+            metric_date (date): 业务日期
+            job_code (str): 作业代码类型
+        """
         table_map = {
             "daily_metric": ["daily_metrics"],
             "agent_ranking": ["agent_rankings"],
@@ -77,12 +129,18 @@ class MySQLAnalyticsRepository:
             self._execute(f"DELETE FROM {table} WHERE metric_date = %s", (metric_date,))
 
     def daily_metrics(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
+        """
+        拉取起止日期区间内的每日离线指标大盘汇总。
+        """
         return self._query(
             "SELECT * FROM daily_metrics WHERE metric_date BETWEEN %s AND %s ORDER BY metric_date",
             (start_date, end_date),
         )
 
     def analytics_trend(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
+        """
+        获取趋势看板专用的每日流量、时延、消耗成本及成功率走势。
+        """
         return self._query(
             """
             SELECT
@@ -108,6 +166,9 @@ class MySQLAnalyticsRepository:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Optional[List[Dict]]:
+        """
+        获取统计分析所需要的系统异常分类及相应所占比率分布。
+        """
         if start_date and end_date:
             return self._query(
                 """
@@ -143,6 +204,9 @@ class MySQLAnalyticsRepository:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Optional[List[Dict]]:
+        """
+        在数据资产明细页面，检索并展示 DWS 多维汇总宽表记录。
+        """
         where = []
         params = []
         if start_date:
@@ -167,6 +231,9 @@ class MySQLAnalyticsRepository:
         event_type: Optional[str] = None,
         status: Optional[str] = None,
     ) -> Optional[List[Dict]]:
+        """
+        在数据明细大表，查询 DWD 明细明细表记录（自动过滤掉不合规的时延脏数据）。
+        """
         where = ["latency_ms >= 0", "trace_id IS NOT NULL"]
         params = []
         filters = {
@@ -194,6 +261,9 @@ class MySQLAnalyticsRepository:
         return self._query(sql, tuple(params))
 
     def get_agent_stats(self, start_date: date, end_date: date) -> Optional[List[Dict]]:
+        """
+        以时间范围为维度，分组聚合查询各个 Agent 实体角色的多维工作表现效能。
+        """
         return self._query(
             """
             SELECT
@@ -214,18 +284,27 @@ class MySQLAnalyticsRepository:
         )
 
     def hourly_metrics(self, metric_date: date) -> Optional[List[Dict]]:
+        """
+        获取单日每小时流量指标。
+        """
         return self._query(
             "SELECT * FROM hourly_metrics WHERE metric_date = %s ORDER BY hour",
             (metric_date,),
         )
 
     def agent_rankings(self, metric_date: date) -> Optional[List[Dict]]:
+        """
+        获取单日 Agent 效能排行。
+        """
         return self._query(
             "SELECT * FROM agent_rankings WHERE metric_date = %s ORDER BY execution_count DESC",
             (metric_date,),
         )
 
     def agent_relations(self, metric_date: date) -> Optional[Dict]:
+        """
+        拼装并输出单日 Agent 网络拓扑的全部节点和权值关系连线数据。
+        """
         nodes = self._query("SELECT * FROM agent_relation_nodes WHERE metric_date = %s", (metric_date,))
         links = self._query("SELECT * FROM agent_relation_edges WHERE metric_date = %s", (metric_date,))
         if nodes is None or links is None:
@@ -233,12 +312,19 @@ class MySQLAnalyticsRepository:
         return {"metric_date": metric_date.isoformat(), "nodes": nodes, "links": links}
 
     def history_alerts(self, metric_date: date) -> Optional[List[Dict]]:
+        """
+        查询单日历史告警。
+        """
         return self._query(
             "SELECT * FROM historical_alerts WHERE metric_date = %s ORDER BY create_time DESC",
             (metric_date,),
         )
 
     def get_quality_issues(self, metric_date: date) -> List[Dict]:
+        """
+        获取数据合规明细列表。使用后台常驻线程拉取 HDFS dirty 异常样本文件，
+        配合内存二级缓存结构，消除同步读取大数据分析平台的卡顿问题。
+        """
         import time
         import threading
         now = time.time()
@@ -254,6 +340,7 @@ class MySQLAnalyticsRepository:
         if cache_key not in self._fetching_keys:
             self._fetching_keys.add(cache_key)
             
+            # 使用守护线程在后台无声息地向 HDFS 请求读取 dirty 样本
             def fetch_hdfs_job():
                 hdfs_samples = []
                 try:
@@ -278,15 +365,22 @@ class MySQLAnalyticsRepository:
 
             threading.Thread(target=fetch_hdfs_job, daemon=True).start()
 
+        # 如果没有缓存，先快速返回空的数据库指标骨架，防止前端渲染长时间等待挂起
         return self._build_issues_list(metric_date, [])
 
     def _update_issues_cache(self, metric_date: date, hdfs_samples: List[Dict]):
+        """
+        更新局部缓存并设置过期阈值。
+        """
         import time
         issues = self._build_issues_list(metric_date, hdfs_samples)
         self._issues_cache[metric_date.isoformat()] = (issues, time.time() + self._issues_cache_ttl)
 
     def _build_issues_list(self, metric_date: date, hdfs_samples: List[Dict]) -> List[Dict]:
-        # 1. Query real DB for negative latency count and samples
+        """
+        根据清洗规则（时延负数、主键缺失、Token 不一致），动态计算各规则合规率并附带脏样本详情。
+        """
+        # 1. 负数时延异常计算
         neg_cnt_res = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE latency_ms < 0", ())
         neg_latency_cnt = neg_cnt_res[0]["cnt"] if neg_cnt_res else 0
         
@@ -297,7 +391,7 @@ class MySQLAnalyticsRepository:
                 ()
             )
 
-        # 2. Query real DB for token mismatch count and samples
+        # 2. Token 对不上异常计算
         tok_cnt_res = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE prompt_tokens + completion_tokens != total_tokens", ())
         token_mis_cnt = tok_cnt_res[0]["cnt"] if tok_cnt_res else 0
 
@@ -308,7 +402,7 @@ class MySQLAnalyticsRepository:
                 ()
             )
 
-        # 3. Query real DB for missing fields count and samples
+        # 3. 标识主键缺失计算
         miss_cnt_res = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE event_id = '' OR trace_id = '' OR run_id = '' OR agent_id = ''", ())
         missing_fields_cnt = miss_cnt_res[0]["cnt"] if miss_cnt_res else 0
 
@@ -321,7 +415,7 @@ class MySQLAnalyticsRepository:
         
         issues = []
         
-        # Calculate total counts
+        # 拉取今日生成的总样本条数用以换算规则合格率百分比
         total_count = self._query("SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source", ())
         total_cnt = total_count[0]["cnt"] if total_count and total_count[0]["cnt"] > 0 else 10000
         
@@ -364,6 +458,9 @@ class MySQLAnalyticsRepository:
         return issues
 
     def get_source_total_count(self) -> int:
+        """
+        获取源表积累的总记录条数。
+        """
         sql = "SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source"
         res = self._query(sql, ())
         if res and len(res) > 0:
@@ -371,6 +468,9 @@ class MySQLAnalyticsRepository:
         return 0
 
     def get_today_new_count(self, today_date: date) -> int:
+        """
+        获取特定业务日期当天产生的日志记录总量。
+        """
         sql = "SELECT COUNT(*) as cnt FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s"
         res = self._query(sql, (today_date,))
         if res and len(res) > 0:
@@ -378,6 +478,9 @@ class MySQLAnalyticsRepository:
         return 0
 
     def get_metric_overview_stats(self) -> Dict[str, Any]:
+        """
+        获取多维指标度量库的总体元状态（包含分区总数及最新一次批处理运行日期）。
+        """
         sql = """
         SELECT 
             COUNT(DISTINCT metric_date) as metric_partition_count,
@@ -400,7 +503,10 @@ class MySQLAnalyticsRepository:
         return {"metric_partition_count": 0, "metric_latest_biz_date": None}
 
     def get_data_volume_trend(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
-        # Query raw count from source database
+        """
+        按天汇总对比 ODS 导入量（Raw 数据量）与清洗后可信入仓量（Clean 数据量）的近期变化对比走势。
+        """
+        # 查询原始数据量（Raw）
         sql_raw = """
         SELECT DATE(event_time) as dt, COUNT(*) as cnt 
         FROM agentscope_source.agent_events_source 
@@ -416,7 +522,7 @@ class MySQLAnalyticsRepository:
                     d = d.isoformat()
                 raw_map[str(d)] = row.get("cnt") or 0
 
-        # Query clean count from daily_metrics
+        # 查询入仓可信数据量（Clean）
         sql_clean = """
         SELECT metric_date as dt, task_count as cnt 
         FROM daily_metrics 
@@ -444,21 +550,34 @@ class MySQLAnalyticsRepository:
         return trend
 
     def get_quality_rules(self) -> List[Dict[str, Any]]:
+        """
+        获取当前系统中注册生效的数据质量规则列表元数据。
+        """
         sql = "SELECT rule_id, rule_name, rule_sql, is_active, create_time FROM agentscope_analytics.quality_rules_metadata ORDER BY create_time DESC"
         res = self._query(sql, ())
         return res or []
 
     def create_quality_rule(self, rule_id: str, rule_name: str, rule_sql: str, is_active: int) -> bool:
+        """
+        向多维数据库添加一条新的数据校验质量规则定义。
+        """
         sql = "INSERT INTO agentscope_analytics.quality_rules_metadata (rule_id, rule_name, rule_sql, is_active) VALUES (%s, %s, %s, %s)"
         return self._execute(sql, (rule_id, rule_name, rule_sql, is_active))
 
     def update_quality_rule(self, rule_id: str, is_active: int) -> bool:
+        """
+        启用/禁用指定的质量校验规则。
+        """
         sql = "UPDATE agentscope_analytics.quality_rules_metadata SET is_active = %s WHERE rule_id = %s"
         return self._execute(sql, (is_active, rule_id))
 
     def ensure_admin_tables(self) -> None:
+        """
+        DDL 校验：服务初始化时自动保证运维管理任务记录表与操作日志表完整创建。
+        """
         if not self._enabled:
             return
+        # 建立后台调度的流水记录表（支持存储输入/输出真实条数及 stdout 日志）
         self._execute("""
             CREATE TABLE IF NOT EXISTS admin_job_runs (
                 run_id VARCHAR(64) PRIMARY KEY,
@@ -476,6 +595,7 @@ class MySQLAnalyticsRepository:
                 data_source VARCHAR(32) NOT NULL DEFAULT 'mysql'
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """, ())
+        # 建立操作员审计日志表
         self._execute("""
             CREATE TABLE IF NOT EXISTS admin_audit_logs (
                 audit_id VARCHAR(64) PRIMARY KEY,
@@ -491,9 +611,15 @@ class MySQLAnalyticsRepository:
         """, ())
 
     def get_admin_job_runs(self) -> Optional[List[Dict]]:
+        """
+        获取所有后端调度的作业流水信息。
+        """
         return self._query("SELECT * FROM admin_job_runs ORDER BY start_time DESC", ())
 
     def save_admin_job_run(self, run: Dict) -> bool:
+        """
+        写入或覆盖保存指定的作业运行状态数据记录。
+        """
         sql = """
             INSERT INTO admin_job_runs (
                 run_id, job_code, biz_date, status, input_count, output_count, error_count,
@@ -526,9 +652,15 @@ class MySQLAnalyticsRepository:
         return self._execute(sql, params)
 
     def get_admin_audit_logs(self) -> Optional[List[Dict]]:
+        """
+        拉取系统审计操作历史日志列表。
+        """
         return self._query("SELECT * FROM admin_audit_logs ORDER BY created_at DESC", ())
 
     def save_admin_audit_log(self, log: Dict) -> bool:
+        """
+        写入保存一条新的操作员审计记录。
+        """
         sql = """
             INSERT INTO admin_audit_logs (
                 audit_id, operator, operation_type, resource_type, resource_id, operation_result, created_at, demo, data_source
@@ -546,5 +678,3 @@ class MySQLAnalyticsRepository:
             log.get("data_source", "mysql")
         )
         return self._execute(sql, params)
-
-

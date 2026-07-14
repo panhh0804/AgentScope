@@ -832,6 +832,17 @@
 </template>
 
 <script setup>
+/**
+ * DataAdminView.vue —— 数据管理端后台页面（离线数仓治理与任务运维）
+ * 
+ * 主要职责：
+ *   - 提供三个子面板 tab 切换：
+ *     1. 数据总览：渲染当日流向漏斗图 (FunnelChart)、7 天存储量趋势图 (TrendChart)、HDFS 存储资产配额环形图 (StorageChart) 与 Spark 离线时长性能图 (PerfChart)。
+ *     2. 数据资产管理：展示物理/逻辑数据集列表、数据流向血缘依赖图 (LineageChart) 与各数仓层级 (ODS/DWD/DWS/ADS) 物理明细检索大表。
+ *     3. 数据任务管理：提供离线作业流水线手动下发补数 (Backfill) 触发、数据质量校验规则 SQL 配置 (is_active 启禁用) 以及历史流水作业记录重试审计。
+ *   - 提供短生命周期缓存 ttl 及防并发冲突控制，保障网络性能。
+ */
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
@@ -840,10 +851,12 @@ import LoadingState from '../components/LoadingState.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 
-const loading = ref(true)
-const error = ref('')
-const isEmpty = ref(false)
-const hasLoaded = ref(false)
+// === 1. 基础状态控制与 API 接口挂载 ===
+const loading = ref(true)          // 页签局部/整体加载等待状态
+const error = ref('')              // 网关超时等异常错误字符串
+const isEmpty = ref(false)          // 是否展示无数据占位符
+const hasLoaded = ref(false)        // 标记首个 tab 是否已成功完成首次拉取
+
 import {
   executeAdminJob,
   fetchAdminEvents,
@@ -867,19 +880,23 @@ import {
 import { fetchHistoryAlerts } from '../api/dashboard'
 import { fetchAnalyticsErrors } from '../api/statistics'
 import { lineOption } from '../charts/options'
+
 const route = useRoute()
 const router = useRouter()
+
+// 打开新页签进入实时流监控中心
 const openScreen = () => {
   window.open('/overview', '_blank')
 }
 
-const activeTab = ref('overview')
-const overviewDirty = ref(false)
+// === 2. 选项卡 Tab 控制与路径路由关联监听 ===
+const activeTab = ref('overview')  // 当前激活子 Tab ('overview' | 'assets' | 'jobs')
+const overviewDirty = ref(false)    // 大盘数据是否脏（需重拉）
 const overviewChartRenderKey = ref(0)
-let activeLoadCount = 0
-const moduleRequests = new Map()
-const requestCache = new Map()
-const CACHE_TTL_MS = 8000
+let activeLoadCount = 0             // 统一加载中计数器，防多接口并发时闪烁
+const moduleRequests = new Map()    // 模块请求流缓存 Map
+const requestCache = new Map()      // 内存数据缓存 Map，防短时间频繁刷新
+const CACHE_TTL_MS = 8000           // 缓存生存时间 8s
 
 const pageTitle = computed(() => {
   if (route.path === '/data-overview') return '数据总览'
@@ -901,96 +918,60 @@ watch(
   },
   { immediate: true }
 )
-const bizDate = ref(todayString())
-const generateCount = ref(50)
-const pipelineGenerateMode = ref('append')
-const diagramModalOpen = ref(false)
+
+// === 3. 数据任务补数面板控制 ===
+const bizDate = ref(todayString())              // 补数选择业务日期
+const generateCount = ref(50)                   // 模拟器下发模拟的 Workflow 数
+const pipelineGenerateMode = ref('append')       // 轨迹一键流水生成模式 (append 追加 / skip 跳过)
+const diagramModalOpen = ref(false)             // 模拟器 AST 树状折叠对话框控制
+
+// 模拟器 Workflow 轨迹内嵌事件层级关系模型
 const diagramTree = [
-  {
-    agent: 'planner',
-    events: [
-      { label: 'agent_start', solid: true },
-      { label: 'llm_request', solid: true },
-      { label: 'llm_response', solid: true },
-      { label: 'agent_complete', solid: true }
-    ]
-  },
-  {
-    agent: 'search',
-    events: [
-      { label: 'agent_start', solid: true },
-      { label: 'llm_request', solid: true },
-      { label: 'llm_response', solid: true },
-      { label: 'tool_call', solid: false },
-      { label: 'tool_result', solid: false },
-      { label: 'agent_complete', solid: true }
-    ]
-  },
-  {
-    agent: 'analysis',
-    events: [
-      { label: 'agent_start', solid: true },
-      { label: 'llm_request', solid: true },
-      { label: 'llm_response', solid: true },
-      { label: 'agent_complete', solid: true }
-    ]
-  },
-  {
-    agent: 'writer',
-    events: [
-      { label: 'agent_start', solid: true },
-      { label: 'llm_request', solid: true },
-      { label: 'llm_response', solid: true },
-      { label: 'agent_complete', solid: true },
-      { label: 'retry', solid: false },
-      { label: 'agent_failed', solid: false }
-    ]
-  },
-  {
-    agent: 'reviewer',
-    events: [
-      { label: 'agent_start', solid: true },
-      { label: 'llm_request', solid: true },
-      { label: 'llm_response', solid: true },
-      { label: 'agent_complete', solid: true },
-      { label: 'retry', solid: false },
-      { label: 'agent_failed', solid: false }
-    ]
-  }
+  { agent: 'planner', events: [{ label: 'agent_start', solid: true }, { label: 'llm_request', solid: true }, { label: 'llm_response', solid: true }, { label: 'agent_complete', solid: true }] },
+  { agent: 'search', events: [{ label: 'agent_start', solid: true }, { label: 'llm_request', solid: true }, { label: 'llm_response', solid: true }, { label: 'tool_call', solid: false }, { label: 'tool_result', solid: false }, { label: 'agent_complete', solid: true }] },
+  { agent: 'analysis', events: [{ label: 'agent_start', solid: true }, { label: 'llm_request', solid: true }, { label: 'llm_response', solid: true }, { label: 'agent_complete', solid: true }] },
+  { agent: 'writer', events: [{ label: 'agent_start', solid: true }, { label: 'llm_request', solid: true }, { label: 'llm_response', solid: true }, { label: 'agent_complete', solid: true }, { label: 'retry', solid: false }, { label: 'agent_failed', solid: false }] },
+  { agent: 'reviewer', events: [{ label: 'agent_start', solid: true }, { label: 'llm_request', solid: true }, { label: 'llm_response', solid: true }, { label: 'agent_complete', solid: true }, { label: 'retry', solid: false }, { label: 'agent_failed', solid: false }] }
 ]
 
-const overview = ref({})
-const trend = ref([])
-const pipeline = ref({})
-const datasets = ref([])
-const lineage = ref({})
-const events = ref([])
-const selectedLayer = ref('ods')
-const dwdEvents = ref([])
-const dwsMetrics = ref([])
-const dwdFilters = ref({ event_id: '', trace_id: '', agent_id: '', event_type: '', status: '' })
-const dwsFilters = ref({ start_date: '', end_date: '' })
-const adsSelectedTable = ref('error_distribution')
-const adsFilters = ref({ start_date: todayString(), end_date: todayString() })
-const adsDataList = ref([])
-const jobs = ref([])
-const jobRuns = ref([])
-const qualityOverview = ref({})
-const qualityIssues = ref([])
-const qualityRules = ref([])
-const recleaning = ref({})
+// === 4. 数仓层级数据及过滤字段 Ref 声明 ===
+const overview = ref({})            // 全局大盘卡片与健康网格概览
+const trend = ref([])               // 7 天数据量趋势
+const pipeline = ref({})            // 离线同步管道状况
+const datasets = ref([])            // 物理/逻辑数据集清单
+const lineage = ref({})             // 数据血缘依赖拓扑图数据
+const events = ref([])              // ODS 事件列表
+const selectedLayer = ref('ods')    // 当前点击聚焦查看的数仓层级 ('ods' | 'dwd' | 'dws' | 'ads')
+
+const dwdEvents = ref([])           // DWD 标准化明细数据列表
+const dwsMetrics = ref([])          // DWS 每日汇总指标列表
+const dwdFilters = ref({ event_id: '', trace_id: '', agent_id: '', event_type: '', status: '' }) // DWD 表头过滤
+const dwsFilters = ref({ start_date: '', end_date: '' })                                         // DWS 过滤
+const adsSelectedTable = ref('error_distribution') // ADS 选中的特定视图大表
+const adsFilters = ref({ start_date: todayString(), end_date: todayString() })                    // ADS 过滤
+const adsDataList = ref([])         // ADS 过滤后的数据承载体
+
+const jobs = ref([])                // 当前支持的任务调度定义清单
+const jobRuns = ref([])             // 所有任务调度的执行流水
+const qualityOverview = ref({})     // 今日数据质量百分率与待处理拦截数
+const qualityIssues = ref([])       // 触发数据合规质量拦截的样本明细
+const qualityRules = ref([])        // 生效的数据质量 SQL 校验规则列表
+const recleaning = ref({})          // 标记某日期是否正在重洗自愈中
+
+// ODS 过滤器
 const eventFilters = ref({ event_id: '', trace_id: '', run_id: '', agent_id: '', event_type: '', status: '' })
 const agentOptions = ['planner_agent', 'search_agent', 'analysis_agent', 'writer_agent', 'reviewer_agent']
 const eventTypeOptions = ['agent_start', 'agent_complete', 'agent_failed', 'llm_request', 'llm_response', 'tool_call', 'tool_result', 'retry']
 const statusOptions = ['success', 'failed', 'running']
 
-// Pipeline running states
+// 正在执行中的作业字典
 const runningJobs = ref({})
 const pipelineRunning = ref(false)
 const anyJobRunning = computed(() => {
   return Object.values(runningJobs.value).some(Boolean) || pipelineRunning.value
 })
 
+// === 5. 大步骤作业归组与大卡片状态判断 ===
 function getJobsByStage(stage) {
   if (stage === 1) return jobs.value.filter(j => j.job_code === 'datax_import')
   if (stage === 2) return jobs.value.filter(j => j.job_code === 'spark_clean')
@@ -1002,20 +983,26 @@ function getJobsByStage(stage) {
 function isStageRunning(stage) {
   return getJobsByStage(stage).some(job => runningJobs.value[job.job_code])
 }
+
+// 异常样本查看对话框
 const jsonModalOpen = ref(false)
 const jsonModalTitle = ref('JSON 详情')
 const jsonPreview = ref('')
+
+// 图表 DOM ref 声明
 const trendChartRef = ref(null)
 const funnelChartRef = ref(null)
 const lineageChartRef = ref(null)
 const storageChartRef = ref(null)
 const perfChartRef = ref(null)
+
 let trendChart
 let funnelChart
 let lineageChart
 let storageChart
 let perfChart
 
+// 本地静态备用 ECharts 压测与 HDFS 存储指标假数据
 const defaultComputePerf = [
   { job_name: 'DataX 业务同步', duration: 8 },
   { job_name: 'Spark 格式清洗', duration: 22 },
@@ -1024,27 +1011,12 @@ const defaultComputePerf = [
   { job_name: 'Spark 错误分布聚合', duration: 45 }
 ]
 
-const defaultLineage = {
-  nodes: [
-    { id: 'mysql_source', name: 'MySQL Source' },
-    { id: 'hdfs_raw', name: 'HDFS Raw' },
-    { id: 'hdfs_clean', name: 'HDFS Clean' },
-    { id: 'daily_metric', name: 'Daily Metric' },
-    { id: 'mysql_analytics', name: 'MySQL Analytics' }
-  ],
-  edges: [
-    { from: 'mysql_source', to: 'hdfs_raw', label: 'DataX' },
-    { from: 'hdfs_raw', to: 'hdfs_clean', label: 'Spark Clean' },
-    { from: 'hdfs_clean', to: 'daily_metric', label: 'Spark Analysis' },
-    { from: 'daily_metric', to: 'mysql_analytics', label: 'Write Back' }
-  ]
-}
-
 const defaultHdfsStorage = {
   used_bytes: 1331589120,
   limit_bytes: 10737418240
 }
 
+// === 大盘顶部数据资产与质量核心卡片度量 ===
 const overviewMetrics = computed(() => [
   { label: 'MySQL Source 总量', value: formatNumber(overview.value.source_total_count), hint: `今日新增 ${formatNumber(overview.value.today_new_count)}` },
   { label: 'HDFS Raw 分区', value: overview.value.raw_partition_count ?? '-', hint: latestHint(overview.value.raw_latest_biz_date) },
@@ -1056,6 +1028,7 @@ const overviewMetrics = computed(() => [
   { label: '质量合规率', value: percent(qualityOverview.value.avg_pass_rate), hint: 'average pass rate' }
 ])
 
+// === 6. 助手工具函数 ===
 function todayString() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -1110,6 +1083,9 @@ async function showLogs(runId) {
   showJson(data)
 }
 
+/**
+ * 压缩请求的 query parameters：剥除空格并修正日期斜线
+ */
 function compactParams(params) {
   return Object.fromEntries(
     Object.entries(params)
@@ -1136,6 +1112,7 @@ function setDwsDate(field, value) {
   dwsFilters.value[field] = normalizeDateValue(value)
 }
 
+// 统一的 Loading 状态计数机
 function beginLoading() {
   activeLoadCount += 1
   loading.value = true
@@ -1146,6 +1123,9 @@ function endLoading() {
   loading.value = activeLoadCount > 0
 }
 
+/**
+ * 前端内存级二级接口缓存拦截，防止用户高频切换 Tab 造成 API 雪崩
+ */
 function cachedRequest(key, fetcher, options = {}) {
   const force = options.force === true
   const ttl = options.ttl ?? CACHE_TTL_MS
@@ -1198,6 +1178,7 @@ function applySettled(result, apply, label) {
   return false
 }
 
+// === 7. 模块动态局部拉取 ===
 async function runModuleLoad(moduleKey, loader, options = {}) {
   if (moduleRequests.has(moduleKey)) return moduleRequests.get(moduleKey)
   error.value = ''
@@ -1249,6 +1230,9 @@ async function loadEvents(options = {}) {
   }
 }
 
+/**
+ * 拉取选中数仓物理层级表的数据
+ */
 async function loadLayerData(options = {}) {
   const force = options.force !== false
   if (selectedLayer.value === 'ods') {
@@ -1330,8 +1314,9 @@ async function loadRules(options = {}) {
   }
 }
 
-
-
+/**
+ * 启用/禁用清洗前置的质量校验 SQL 规则
+ */
 async function toggleRule(rule) {
   try {
     const newStatus = rule.is_active ? 0 : 1
@@ -1368,6 +1353,9 @@ async function refreshOverviewAfterJob() {
   }
 }
 
+/**
+ * 对特定业务日期的 DWD 异常脏数据发起重洗自愈，强制刷新大盘
+ */
 async function recleanData(dateVal) {
   if (!dateVal) return
   recleaning.value[dateVal] = true
@@ -1386,9 +1374,6 @@ async function recleanData(dateVal) {
   }
 }
 
-
-
-
 async function loadJobs(options = {}) {
   const force = options.force === true
   const [jobData, runData] = await Promise.allSettled([
@@ -1399,6 +1384,9 @@ async function loadJobs(options = {}) {
   applySettled(runData, (data) => { jobRuns.value = data || [] }, 'job-runs')
 }
 
+/**
+ * 触发调度单步作业下发（模拟数据生成/DataX/Spark清洗/AI分析等）
+ */
 async function runJob(jobCode) {
   runningJobs.value[jobCode] = true
   Message.info({ content: `正在调度执行作业: ${jobCode}...`, duration: 3000 })
@@ -1423,6 +1411,9 @@ async function runJob(jobCode) {
   }
 }
 
+/**
+ * 核心：串行调度一键跑通 01数据同步 -> 02清洗 -> 03多维离线计算 -> 04诊断大模型 的整条离线计算链路
+ */
 async function runFullPipeline() {
   pipelineRunning.value = true
   Message.info({ content: '离线流水线已启动，各阶段任务正按顺序流式调度...', duration: 4000 })
@@ -1453,7 +1444,7 @@ async function runFullPipeline() {
       } finally {
         runningJobs.value[job.job_code] = false
         invalidateAdminCache(['admin:jobs', 'admin:job-runs'])
-        await loadJobs({ force: true }) // refresh intermediate runs live
+        await loadJobs({ force: true }) 
       }
     }
     if (!failed) {
@@ -1469,6 +1460,9 @@ async function runFullPipeline() {
   }
 }
 
+/**
+ * 重新发起失败流水记录的调度执行
+ */
 async function retryRun(runId) {
   Message.info({ content: `正在重新提交运行记录 ${runId}...`, duration: 3000 })
   try {
@@ -1487,6 +1481,7 @@ async function retryRun(runId) {
   }
 }
 
+// === 8. ECharts 图表初始化及绘制 ===
 function renderFunnel(options = {}) {
   try {
     if (!funnelChartRef.value) return
@@ -1821,6 +1816,7 @@ async function scheduleVisibleChartRender(options = {}) {
   resizeCharts()
 }
 
+// === 9. 模块并发加载包装 ===
 async function loadOverviewData(options = {}) {
   const force = options.force === true
   const replay = options.replay === true
@@ -1887,6 +1883,7 @@ async function loadAll(options = {}) {
   return Promise.resolve()
 }
 
+// === 10. 挂载及 Tab 切换监听生命周期绑定 ===
 onMounted(async () => {
   await loadAll()
   window.addEventListener('resize', resizeCharts)

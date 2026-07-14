@@ -1,12 +1,17 @@
-"""Scenario names and default proportions."""
+"""
+scenarios/__init__.py —— AgentScope 模拟器的仿真场景权重定义
 
+该模块规定了在混合产生模拟事件流时，各种正常和异常会话类型对应的概率比例分布。
+用于在没有指定单一场景时生成符合概率配比的综合流量。
+"""
+
+# 定义默认的场景生成权重比（按百分比分配总和为 100）
 SCENARIO_WEIGHTS = {
-    "success": 70,
-    "agent_failed": 10,
-    "tool_failed": 5,
-    "high_latency": 5,
-    "retry": 5,
-    "token_overuse": 3,
-    "loop": 2,
+    "success": 70,          # 成功案例比例：70%
+    "agent_failed": 10,     # Agent 执行失败报错比例：10%
+    "tool_failed": 5,       # 工具调用（网络搜索）异常比例：5%
+    "high_latency": 5,      # 超时与高延迟比例：5%
+    "retry": 5,             # 触发审批重试的比例：5%
+    "token_overuse": 3,     # 大模型 Token 超量报错比例：3%
+    "loop": 2,              # 调用链循环或冗余调用比例：2%
 }
-

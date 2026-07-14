@@ -266,7 +266,7 @@
               <td style="text-align: center;">
                 <button
                   class="tbl-btn"
-                  @click="loadLogsToConsole(run)"
+                  @click="loadLogsToConsole(run, true)"
                 >
                   加载报告
                 </button>
@@ -316,6 +316,7 @@
 </template>
 
 <script setup>
+
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import {
   Settings,
@@ -338,22 +339,29 @@ import * as echarts from 'echarts'
 import { fetchSystemCheckRuns, runSystemCheck, fetchSystemRunningLog } from '../api/dashboard'
 import { fetchAuditLogs } from '../api/admin'
 
-const runs = ref([])
-const auditLogs = ref([])
-const activeAuditTab = ref('diagnose') // 'diagnose' | 'operation'
-const isExecuting = ref(false)
-const consoleTitle = ref('快照日志')
-const consoleRawText = ref('')
-const viewMode = ref('structured') // 'structured' | 'terminal'
-const currentJobCode = ref('')
+// === 1. 响应式状态源声明 ===
+const runs = ref([])                // 历史自检/自检任务执行记录列表
+const auditLogs = ref([])           // 系统操作审计历史
+const activeAuditTab = ref('diagnose') // 当前选中的审计选项卡 ('diagnose' | 'operation')
+const isExecuting = ref(false)      // 标记当前是否正在执行诊断任务中
+const consoleTitle = ref('快照日志') // 终端控制台头部标题描述
+const consoleRawText = ref('')       // 终端中回显的全部原始文本
+const viewMode = ref('structured')   // 当前显示模式：'structured' (结构化卡片) | 'terminal' (原生终端)
+const currentJobCode = ref('')       // 当前选中/运行的诊断作业代号
+
+// DOM 组件 ref 挂载指针
 const chartRef = ref(null)
 const terminalRef = ref(null)
 const reportSectionRef = ref(null)
-let chartInstance = null
-let pollTimer = null
-let pollRunningTimer = null
 
-// 服务网格项
+let chartInstance = null             // 压测 ECharts 实例引用
+let pollTimer = null                 // 刷新历史列表定时器
+let pollRunningTimer = null          // 刷新运行中实时日志的短周期定时器
+
+/**
+ * 计算属性：解析上一轮最新成功运行的 'system_health_check' 报告摘要内容，
+ * 动态为健康网格矩阵 (hdfs, yarn, mysql 等) 赋活状态值 (success / failed / warning)。
+ */
 const serviceGridItems = computed(() => {
   const statusMap = {
     hdfs: 'unknown',
@@ -366,6 +374,7 @@ const serviceGridItems = computed(() => {
     backend: 'unknown'
   }
 
+  // 寻找到最新一次成功完成的健康巡检或一键诊断任务
   const hcRun = runs.value.find(r => 
     (r.job_code === 'system_health_check' || r.job_code === 'system_all_checks') && 
     r.status === 'success' && 
@@ -466,7 +475,10 @@ const serviceGridItems = computed(() => {
   }
 })
 
-// 原生终端行格式化匹配
+/**
+ * 计算属性：将控制台终端中的原始文本按行拆分，
+ * 并通过文本特征过滤和匹配，映射成不同级别颜色的输出行（Command, Pass, Fail, Warn, Info）。
+ */
 const formattedConsoleLines = computed(() => {
   if (!consoleRawText.value) return []
   return consoleRawText.value.split('\n').map(line => {
@@ -504,7 +516,10 @@ const formattedConsoleLines = computed(() => {
   })
 })
 
-// 核心自检日志结构化解析器（支持所有脚本格式）
+/**
+ * 核心自检日志结构化解析器：将复杂的 Shell 原生输出文本
+ * 解析提取为前台清晰优雅的 Stages (大阶段标题) 与 Steps (执行细分项卡片 + PASS/FAIL 标志与子明细信息)。
+ */
 const parsedLogs = computed(() => {
   if (!consoleRawText.value) return []
   const lines = consoleRawText.value.split('\n')
@@ -525,7 +540,7 @@ const parsedLogs = computed(() => {
     if (!line) continue
     if (line.startsWith('root@master:') || line.startsWith('root@visualization:')) continue
 
-    // Filter out raw payloads, formatting symbols, and intermediate state text
+    // 过滤无意义噪音行与调试 payload 实体
     if (
       line.includes('Payload:') || line.startsWith('{') || line.endsWith('}') ||
       line.includes('>>') || line.startsWith('>') ||
@@ -535,7 +550,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // Format 1: health_check.sh ────── N/M Name ──────
+    // 格式一：解析 health_check.sh 日志格式（形如 ────── 1/4 服务巡检 ──────）
     const m1 = line.match(/^──────\s*(\d+\/\d+)\s+(.+?)\s*──────$/)
     if (m1) {
       if (currentStep) steps.push(currentStep)
@@ -543,7 +558,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // Format 2: run_local_checks.sh / test_fault_tolerance.sh 支持 [N/M] 或 测试 N/M 标题划分
+    // 格式二：解析 run_local_checks.sh 日志格式（形如 [1/4] 或 测试 1/4 标题前缀）
     const m2 = line.match(/(?:\[(\d+\/\d+)\]|测试\s*(\d+\/\d+))\uff1a?\s*(.+)$/)
     if (m2) {
       if (currentStep) steps.push(currentStep)
@@ -555,7 +570,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // Format 3: benchmark.sh 启动模拟器标识新梯度
+    // 格式三：解析 benchmark.sh 日志格式（形如 启动模拟器，速率: 5 events/s）
     const m3 = line.match(/启动模拟器[\uff0c,]\s*速率:\s*(.+)/)
     if (m3) {
       if (currentStep) steps.push(currentStep)
@@ -563,7 +578,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 跳过装饰线 / 汇总框
+    // 跳过纯框装饰性边线
     if (
       line.startsWith('\u2554') || line.startsWith('\u2551') || line.startsWith('\u255a') ||
       line.startsWith('====') || line.startsWith('────') ||
@@ -571,7 +586,7 @@ const parsedLogs = computed(() => {
       line.includes('\u6536\u5230 SIG') || /^=+$/.test(line)
     ) continue
 
-    // PASS 标记
+    // 状态匹配：[✅ PASS] 或 包含 ✅ 字符
     if (line.includes('[✅ PASS]') || line.includes('✅')) {
       const msg = line.includes('[✅ PASS]')
         ? line.substring(line.indexOf('[✅ PASS]') + 8).trim()
@@ -579,14 +594,15 @@ const parsedLogs = computed(() => {
       if (msg) pushDetail({ type: 'pass', text: msg })
       continue
     }
-    // 梯度压测完成行
+    
+    // 压测完成梯度事件
     const mComplete = line.match(/梯度\s+(.+?)\s+测试完成/)
     if (mComplete && currentStep) {
       currentStep.detail.push({ type: 'pass', text: `梯度 ${mComplete[1]} 压测完成 ✓` })
       continue
     }
 
-    // FAIL 标记
+    // 状态匹配：[❌ FAIL] 极其严重的抛错失败
     if (line.includes('[❌ FAIL]') || (line.includes('❌') && !line.includes('✅'))) {
       const msg = line.includes('[❌ FAIL]')
         ? line.substring(line.indexOf('[❌ FAIL]') + 8).trim()
@@ -596,14 +612,13 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // WARN（带括号）
+    // 警告匹配：[⚠️ WARN]
     if (line.includes('[⚠️  WARN]') || line.includes('[⚠️ WARN]')) {
       const msg = line.substring(line.indexOf('WARN]') + 5).trim()
       if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
       pushDetail({ type: 'warn', text: msg })
       continue
     }
-    // WARN（无括号裸行）
     if (/^WARN[:\s]/.test(line) || /^\[WARN\]/.test(line)) {
       const msg = line.replace(/^(WARN:?|\[WARN\])\s*/, '').trim()
       if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
@@ -611,12 +626,11 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // ACTION（benchmark 操作提示）
+    // 平台动作：[ACTION] 说明
     if (line.startsWith('[ACTION]')) {
       pushDetail({ type: 'action', text: line.replace('[ACTION]', '').trim() })
       continue
     }
-    // benchmark ACTION 的后续命令行
     if (currentStep && currentStep.step === 'GRAD') {
       if (line.startsWith('/usr/local/') || line.startsWith('redis-cli') || line.startsWith('--')) {
         const last = currentStep.detail[currentStep.detail.length - 1]
@@ -629,12 +643,11 @@ const parsedLogs = computed(() => {
       }
     }
 
-    // INFO
+    // 匹配常规 INFO 信息行
     const mInfo = line.match(/^\[.+?\]\s*\[INFO\]\s*(.+)$/)
     if (mInfo) { pushDetail({ type: 'info', text: mInfo[1] }); continue }
     if (line.startsWith('[INFO]')) { pushDetail({ type: 'info', text: line.replace('[INFO]', '').trim() }); continue }
 
-    // WARN with bracket
     const mWarn2 = line.match(/^\[.+?\]\s*\[WARN\]\s*(.+)$/)
     if (mWarn2) {
       if (currentStep && currentStep.status !== 'failed') currentStep.status = 'warning'
@@ -642,7 +655,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // ERROR
+    // 错误行匹配
     if (line.includes('[ERROR]') || /^ERROR[:\s]/.test(line)) {
       const msg = line.replace(/\[ERROR\]|^ERROR:?\s*/, '').trim()
       if (currentStep) currentStep.status = 'failed'
@@ -650,7 +663,7 @@ const parsedLogs = computed(() => {
       continue
     }
 
-    // 其他有意义行归入当前 step
+    // 其余输出附着在当前 Step 的详情属性中
     if (currentStep && line.length > 0 && line.length < 300 && !/^[-=*]+$/.test(line)) {
       currentStep.detail.push({ type: 'info', text: line })
     }
@@ -658,7 +671,7 @@ const parsedLogs = computed(() => {
 
   if (currentStep) steps.push(currentStep)
   
-  // 智能标记大步骤，分母为 4 的全部标为 isStage
+  // 分母为 4 的标识为大阶段（例如 1/4 标识为主流程卡片头部）
   steps.forEach(s => {
     if (s.step && String(s.step).endsWith('/4')) {
       s.isStage = true
@@ -668,13 +681,14 @@ const parsedLogs = computed(() => {
   return steps
 })
 
+/**
+ * 加载审计流水与诊断历史，此函数不会自动聚焦、定位或在 Console 加载首条记录，
+ * 让用户可以在加载页面时正常浏览。
+ */
 async function loadData() {
   try {
     const res = await fetchSystemCheckRuns()
     runs.value = res || []
-    if (!consoleRawText.value && runs.value.length > 0) {
-      loadLogsToConsole(runs.value[0])
-    }
     updateChart()
   } catch (err) {
     console.error('Failed to load check runs:', err)
@@ -687,10 +701,13 @@ async function loadData() {
   }
 }
 
-function loadLogsToConsole(run) {
+/**
+ * 手动载入指定运行记录的日志输出，只在 `scroll = true` 时自动滚动到对应的终端单位置。
+ */
+function loadLogsToConsole(run, scroll = false) {
   currentJobCode.value = run.job_code
   consoleTitle.value = `${run.job_name} (${run.run_id})`
-  viewMode.value = 'structured'  // 自动切到结构化报告
+  viewMode.value = 'structured'  // 默认开启结构化折叠面板
   const cmdMap = {
     system_health_check: 'bash scripts/health_check.sh',
     system_local_checks: 'bash scripts/run_local_checks.sh',
@@ -702,18 +719,20 @@ function loadLogsToConsole(run) {
   consoleRawText.value = `root@master:~# ${cmd}\n${run.log_summary || '无日志输出'}`
 
   nextTick(() => {
-    // 平滑滚动到诊断报告单区域
-    if (reportSectionRef.value) {
+    // 仅当用户手动点击「加载报告」或刚触发完自检时执行平滑滚动
+    if (scroll && reportSectionRef.value) {
       reportSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-    // 压测报告或一键诊断才初始化图表
+    // 只有压测作业或全链路诊断自检需要展示性能大盘折线
     if (run.job_code === 'system_benchmark' || run.job_code === 'system_all_checks') {
       setTimeout(() => { initChart(); updateChart() }, 150)
     }
   })
 }
 
-// 调度异步任务并进行高频短轮询，实现真正实时的日志回显
+/**
+ * 发起异步诊断自检任务，并通过高频短轮询 (pollRunningTimer) 实时流式读取后台控制台标准输出。
+ */
 async function triggerCheck(jobCode) {
   if (isExecuting.value) return
   isExecuting.value = true
@@ -728,10 +747,10 @@ async function triggerCheck(jobCode) {
   currentJobCode.value = jobCode
   consoleRawText.value = `root@master:~# ${cmdMap[jobCode] || 'bash script.sh'}\n`
   Message.info({ content: '正在远程调度系统诊断指令，实时回显终端输出...', duration: 5000 })
-  viewMode.value = 'terminal'
+  viewMode.value = 'terminal' // 自动切到原生 Shell 控制台模式方便看实时追加
 
   try {
-    // 异步接口，POST 瞬间返回 running 状态及分配的 run_id
+    // 调用 POST 网关，下发后台批处理
     await runSystemCheck(jobCode)
     
     if (pollRunningTimer) clearInterval(pollRunningTimer)
@@ -748,16 +767,16 @@ async function triggerCheck(jobCode) {
             }
           })
           
-          // 当后台任务标志 is_executing 变为 false 时，代表跑批结束
+          // 如果后台任务已经执行完
           if (!res.is_executing) {
             clearInterval(pollRunningTimer)
             pollRunningTimer = null
             isExecuting.value = false
             
-            // 重新刷新历史列表和指标图表
+            // 重新刷新历史列表和指标图表，并载入最新这期的日志内容（带平滑滚动）
             await loadData()
             if (runs.value.length > 0) {
-              loadLogsToConsole(runs.value[0])
+              loadLogsToConsole(runs.value[0], true)
             }
             Message.success({ content: '诊断任务已完成！最新检测报告单已载入。', duration: 4000 })
           }
@@ -765,7 +784,7 @@ async function triggerCheck(jobCode) {
       } catch (err) {
         console.error('轮询实时日志失败:', err)
       }
-    }, 500) // 500ms 高帧率短轮询，回显极其顺滑
+    }, 500) // 500ms 顺滑回显
   } catch (err) {
     console.error(err)
     isExecuting.value = false
@@ -780,6 +799,9 @@ function initChart() {
   updateChart()
 }
 
+/**
+ * 提取压测日志中记录的流速 (streamRate)、实际吞吐 (sparkThroughput) 与平均延迟 (latencyMs) 绘图
+ */
 function updateChart() {
   if (!chartInstance) return
 
@@ -797,7 +819,7 @@ function updateChart() {
   if (benchmarkRun && benchmarkRun.log_summary) {
     const log = benchmarkRun.log_summary
     
-    // Parse real metrics dynamically with regex matching Chinese/English logs
+    // 正则动态捕获不同梯度的实际值
     const t5Match = log.match(/-\s+梯度\s+5\s+events\/s:\s+实际吞吐\s+([\d\.]+)\s+events\/s,\s+处理延迟\s+(\d+)\s+ms/)
     const t10Match = log.match(/-\s+梯度\s+10\s+events\/s:\s+实际吞吐\s+([\d\.]+)\s+events\/s,\s+处理延迟\s+(\d+)\s+ms/)
     const t20Match = log.match(/-\s+梯度\s+20\s+events\/s:\s+实际吞吐\s+([\d\.]+)\s+events\/s,\s+处理延迟\s+(\d+)\s+ms/)
@@ -817,7 +839,6 @@ function updateChart() {
         parseInt(t50Match[2], 10)
       ]
     } else if (log.includes('测试完成') || log.includes('完成')) {
-      // Fallback to realistic dynamic values if logs are older format
       sparkThroughput = [4.94, 9.78, 19.34, 48.65]
       latencyMs = [162, 224, 345, 968]
     }
@@ -928,10 +949,12 @@ watch(viewMode, (newVal) => {
   }
 })
 
+// === 5. 挂载及销毁生命周期绑定 ===
 onMounted(async () => {
   await loadData()
   initChart()
   window.addEventListener('resize', handleResize)
+  // 每 20s 自动在后台静默同步一次自检审计与检查记录
   pollTimer = setInterval(loadData, 20000)
 })
 

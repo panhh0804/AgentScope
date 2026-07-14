@@ -87,6 +87,19 @@
 </template>
 
 <script setup>
+/**
+ * StatisticsView.vue —— 数据统计分析端的多维离线指标统计与效能评估页面
+ * 
+ * 主要职责：
+ *   - 并发加载历史 30 天运行数据、Token/成本消耗、异常分类分布以及分位数时延。
+ *   - 通过 ECharts 提供四类离线深度分析图表：
+ *     1. 任务量与运行成功率双轴图 (TrendChart)
+ *     2. Agent Token 消耗占比环形饼图 (TokenChart)
+ *     3. 系统异常类型与分布水平柱状图 (ErrorChart)
+ *     4. Agent 平均与 P95 延迟折线对比图 (LatencyChart)
+ *   - 支持从 KeepAlive 激活时 (onActivated) 重新布局重置大小 (resizeCharts)，保证图表尺寸自适应。
+ */
+
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { Message } from '@arco-design/web-vue'
@@ -102,26 +115,31 @@ import {
 } from '../api/statistics'
 import { barOption, lineOption } from '../charts/options'
 
-const loading = ref(true)
-const error = ref('')
-const isEmpty = ref(false)
-const hasLoaded = ref(false)
-let loadPromise = null
-const trend = ref([])
-const errors = ref([])
-const agentStats = ref([])
-const dailyMetrics = ref([])
-const historyRankings = ref([])
+// === 1. 状态管理与数据源 ===
+const loading = ref(true)          // 页面首次整体载入遮罩
+const error = ref('')              // 异常抛错信息
+const isEmpty = ref(false)          // 是否没有可读指标
+const hasLoaded = ref(false)        // 标记是否已经完成首轮拉取
+let loadPromise = null              // 单例 Promise 缓存，防并发重入
 
+const trend = ref([])               // 近 30 天每日总执行次数与成功率
+const errors = ref([])              // 各种运行时异常的发生频度
+const agentStats = ref([])          // 各智能体近期的流量、时延、消耗成本汇总
+const dailyMetrics = ref([])        // 大盘折线用：每日吞吐量指标
+const historyRankings = ref([])     // 历史排行榜排行条目
+
+// === 2. ECharts 实例及容器 ref ===
 const trendChartRef = ref(null)
 const tokenChartRef = ref(null)
 const errorChartRef = ref(null)
 const latencyChartRef = ref(null)
+
 let trendChart
 let tokenChart
 let errorChart
 let latencyChart
 
+// 计算今日汇总顶部的数值指标卡片数据
 const summaryMetrics = computed(() => {
   const totalTasks = trend.value.reduce((sum, item) => sum + Number(item.task_count || 0), 0)
   const totalSuccess = trend.value.reduce((sum, item) => sum + Number(item.success_count || 0), 0)
@@ -137,8 +155,10 @@ const summaryMetrics = computed(() => {
   ]
 })
 
+// 时间滑窗天数标签说明
 const trendPeriodLabel = computed(() => `近 ${trend.value.length || 0} 天`)
 
+// Agent 执行次数排行榜 ECharts 配置
 const historyRankingOption = computed(() => {
   return {
     backgroundColor: 'transparent',
@@ -177,6 +197,7 @@ const historyRankingOption = computed(() => {
   }
 })
 
+// 每日 Token 与成本消耗双 Y 轴折线图 ECharts 配置
 const historyCostOption = computed(() => {
   return {
     backgroundColor: 'transparent',
@@ -258,6 +279,7 @@ const historyCostOption = computed(() => {
   }
 })
 
+// 错误分类词典
 const errorTypeLabels = {
   validation_error: '数据校验错误',
   tool_error: '工具调用错误',
@@ -305,14 +327,7 @@ function historyTooltipFormatter(params) {
   return [date, ...lines].join('<br/>')
 }
 
-function historyLineOption(title, series) {
-  const option = lineOption(title, dailyMetrics.value.map((item) => formatShortDate(item.metric_date)), series)
-  option.tooltip = { ...option.tooltip, trigger: 'axis', formatter: historyTooltipFormatter }
-  option.grid = { ...option.grid, right: 34, bottom: 32, containLabel: true }
-  option.xAxis = { ...option.xAxis, boundaryGap: ['4%', '8%'] }
-  return option
-}
-
+// 统一的基础 ECharts 全局排版背景样式配置项
 function baseChartOption() {
   return {
     backgroundColor: 'transparent',
@@ -342,6 +357,7 @@ function baseChartOption() {
   }
 }
 
+// 无指标时的图形文字占位
 function emptyGraphic(text = '暂无数据') {
   return {
     type: 'text',
@@ -364,6 +380,7 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// 防 clientWidth / clientHeight == 0 时的图形加载空白自愈
 async function ensureChartContainer(elRef, attempts = 8) {
   for (let i = 0; i < attempts; i += 1) {
     const el = elRef.value
@@ -380,6 +397,9 @@ function ensureChart(elRef, currentChart) {
   return currentChart || echarts.init(el)
 }
 
+/**
+ * 绘制 1. 任务量与运行成功率双轴折线+柱状图
+ */
 function renderTrend() {
   if (!trendChartRef.value) return
   trendChart = ensureChart(trendChartRef, trendChart)
@@ -435,6 +455,9 @@ function renderTrend() {
   trendChart.resize()
 }
 
+/**
+ * 绘制 2. Agent Token 消耗分布饼图
+ */
 function renderToken() {
   if (!tokenChartRef.value) return
   tokenChart = ensureChart(tokenChartRef, tokenChart)
@@ -484,6 +507,9 @@ function renderToken() {
   tokenChart.resize()
 }
 
+/**
+ * 绘制 3. 系统异常类型与错误分布条形图
+ */
 function renderErrors() {
   if (!errorChartRef.value) return
   errorChart = ensureChart(errorChartRef, errorChart)
@@ -527,6 +553,9 @@ function renderErrors() {
   errorChart.resize()
 }
 
+/**
+ * 绘制 4. 时延及百分时延分位数延迟折线图
+ */
 function renderLatency() {
   if (!latencyChartRef.value) return
   latencyChart = ensureChart(latencyChartRef, latencyChart)
@@ -646,6 +675,9 @@ function updateArrayIfUseful(result, target, label) {
   return true
 }
 
+/**
+ * 离线拉取核心：拉取趋势数据、异常类型分布、Agent 消耗等指标
+ */
 async function loadAll(options = {}) {
   if (loadPromise) return loadPromise
   loading.value = true

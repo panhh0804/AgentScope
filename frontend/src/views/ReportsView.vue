@@ -116,6 +116,16 @@
 </template>
 
 <script setup>
+/**
+ * ReportsView.vue —— AI 运维诊断报告页面视图
+ * 
+ * 主要职责：
+ *   - 通过日期选择器选择业务日期，发起 POST /reports/generate 请求调用 LLM 生成 Markdown 诊断报告。
+ *   - 前端自研一套轻量级 Markdown 解析引擎 (parseMarkdownSections)，将原始的 Markdown 转换为结构化的 AST blocks (paragraph, list, code, table)。
+ *   - 动态提取 Markdown 中的「总体结论」在页首卡片重点渲染。
+ *   - 支持把完整的原始 Markdown 文件内容通过 Blob 形式导出下载。
+ */
+
 import { computed, ref, onMounted } from 'vue'
 import { FilePlus2, Download } from '@lucide/vue'
 import { Message } from '@arco-design/web-vue'
@@ -125,6 +135,7 @@ import LoadingState from '../components/LoadingState.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 
+// 业务日期，默认初始化为今天
 const getTodayString = () => {
   const d = new Date()
   const year = d.getFullYear()
@@ -133,14 +144,18 @@ const getTodayString = () => {
   return `${year}-${month}-${day}`
 }
 const date = ref(getTodayString())
-const reportType = ref('daily')
-const report = ref({})
-const isGenerating = ref(false)
-const reportError = ref('')
-const isLoadingReport = ref(true)
-const error = ref('')
-const isEmpty = ref(false)
+const reportType = ref('daily')     // 诊断报告类型
+const report = ref({})             // 当前选定/生成的诊断报告详情数据
 
+const isGenerating = ref(false)    // 大模型后台生成等待状态
+const reportError = ref('')        // 触发大模型过程中的网络/限流抛错提示
+const isLoadingReport = ref(true)  // 首轮加载最新一期报告的等待状态
+const error = ref('')              // 拉取历史最新报告的错误状态
+const isEmpty = ref(false)          // 空白占位标识
+
+/**
+ * 加载当前数仓历史归档的最新一期运维报告并渲染
+ */
 async function loadLatestReport() {
   isLoadingReport.value = true
   error.value = ''
@@ -171,10 +186,16 @@ onMounted(async () => {
   await loadLatestReport()
 })
 
+// === 核心计算属性 ===
+// 调用 utils/markdown 解析器，将大模型返回的 markdown 正文文本转换为包含标题、段落、表格、代码块的结构化 AST
 const sections = computed(() => parseMarkdownSections(report.value.content || ''))
+
+// 提取出「总体结论」这一核心章节
 const conclusionSection = computed(() => {
   return sections.value.find(s => s.title === '总体结论')
 })
+
+// 过滤掉封面大标题及总体结论，保留作为正文章节卡片来循环展示
 const displaySections = computed(() => {
   return sections.value.filter(s => {
     const isTitle = s.title.includes('多智能体系统运行分析报告') || s.title === '内容'
@@ -182,15 +203,20 @@ const displaySections = computed(() => {
     return !isTitle && !isConclusion
   })
 })
+
 const reportDisplayDate = computed(() => report.value.report_date || date.value)
 const reportDisplayType = computed(() => report.value.report_type || reportType.value)
 const reportTitle = computed(() => sections.value[0]?.title || 'AI 报告')
 const reportTitleHtml = computed(() => sections.value[0]?.titleHtml || 'AI 报告')
+
 const reportIntro = computed(() => {
   const content = String(report.value.content || '')
   return content ? excerptMarkdown(content, 160) : '生成结果会分成多个卡片区块，方便快速阅读和定位。'
 })
 
+/**
+ * 手动下发异步请求，调用 AI 大模型开始诊断运维指标，生成报告
+ */
 async function createReport() {
   if (isGenerating.value) return
 
@@ -214,6 +240,9 @@ async function createReport() {
   }
 }
 
+/**
+ * 将报告以标准的 Markdown 文件（Blob) 形式下载到本地
+ */
 function downloadMarkdown() {
   if (!report.value || !report.value.content) {
     Message.error('没有可导出的报告内容')

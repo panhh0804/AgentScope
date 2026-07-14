@@ -1,3 +1,17 @@
+"""
+admin_service.py —— AgentScope 系统管理与运维调度核心服务
+
+本模块是后端运维中心（SystemAdminView）的核心支撑，管理了所有的系统自检（System Check）与批处理调度任务（Batch Jobs）。
+主要功能：
+  1. 系统自检调度 (execute_system_check) 与 benchmark 异步运行。
+  2. 获取集群资源概览 (data_overview)：真实读取 MySQL 源数据库总记录数、
+     HDFS 存储用量、Parquet 压缩比例，并利用线程后台异步轮询 (30s) 更新以保证无网络阻塞。
+  3. 执行和管理批处理流水 (execute_job, job_runs, retry_job_run)：
+     - 通过 SSH 登录 master 主机，执行外部 shell 脚本（如 DataX 抽取、Spark 清洗、离线模拟等）。
+     - 支持细粒度的数据漏斗量化统计 (funnel)。
+  4. 支持审计日志 (audit_logs) 的产生与安全追溯。
+"""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -9,36 +23,50 @@ from uuid import uuid4
 
 from app.repositories.mysql_repo import MySQLAnalyticsRepository
 
+# 合法的后台运维与大屏批处理作业代码集合
 ADMIN_JOB_CODES = {
-    "offline_generate",
-    "datax_import",
-    "spark_clean",
-    "daily_metric",
-    "agent_ranking",
-    "error_analysis",
-    "relation_analysis",
-    "historical_alert",
-    "report_generate",
+    "offline_generate",    # 测试离线数据生成
+    "datax_import",        # DataX 数据导入（Source -> Raw）
+    "spark_clean",         # Spark 清洗任务（Raw -> Clean）
+    "daily_metric",        # 每日核心指标聚合计算
+    "agent_ranking",       # Agent 排行榜计算
+    "error_analysis",      # 错误分布聚合
+    "relation_analysis",   # Agent 关联关系图分析
+    "historical_alert",    # 历史告警计算
+    "report_generate",     # AI 报告生成
 }
 
 
 class AdminService:
+    """
+    平台运维与批处理作业生命周期管理服务类。
+    """
     def __init__(self) -> None:
+        """
+        初始化运维服务：
+          - 确保后台管理所需的审计与流水数据库表已就绪
+          - 从文件和数据库合并加载所有运行流水历史
+          - 初始化 HDFS 存储和 Parquet 压缩率的后台异步更新线程
+        """
         self.repo = MySQLAnalyticsRepository()
         
         import os
         import json
         
+        # 确定本地日志存放路径
         self.log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
         os.makedirs(self.log_dir, exist_ok=True)
         self.runs_file = os.path.join(self.log_dir, "system_check_runs.json")
         self.job_runs_file = os.path.join(self.log_dir, "job_runs.json")
         
+        # DDL 表结构检查
         self.repo.ensure_admin_tables()
         self._job_runs = self._load_job_runs()
 
+        # 生成初始演示审计日志
         self._audit_logs = self._seed_audit_logs()
         
+        # 加载系统自检记录
         self._system_check_runs = []
         if os.path.exists(self.runs_file):
             try:
@@ -47,6 +75,7 @@ class AdminService:
             except Exception:
                 pass
                 
+        # 填充初始系统检查报告
         if not self._system_check_runs:
             self._system_check_runs = [
                 {
@@ -67,21 +96,26 @@ class AdminService:
                 import sys
                 print(f"[ERROR] system_check_runs.json load/save error in init: {e}", file=sys.stderr)
         
-        # Async memory caches populated by daemon thread
+        # HDFS 统计数据二级异步内存缓存（防 Web 页面多次请求造成 SSH 阻塞）
         self._hdfs_storage_cache = {
             "used_bytes": 93679616,
             "limit_bytes": 83784761344,
         }
         self._parquet_ratio_cache = 0.4656
         
+        # 启动后台守护线程定期轮询更新 HDFS 指标
         import threading
         threading.Thread(target=self._background_updater, daemon=True).start()
 
     def _background_updater(self):
+        """
+        后台定时器（每 30 秒运行一次）：通过进程调用本地 SSH/HDFS 命令行，
+        计算 Raw 目录和 Clean 目录所占字节数，从而动态计算 Parquet 相对于 JSON 的压缩比。
+        """
         import time
         import subprocess
         while True:
-            # 1. Update HDFS storage stats
+            # 1. 抓取 HDFS 存储容量
             try:
                 cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -df 2>/dev/null"
                 proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -98,7 +132,7 @@ class AdminService:
             except Exception:
                 pass
 
-            # 2. Update Parquet ratio stats
+            # 2. 计算 Parquet 清洗数据压缩比例
             try:
                 cmd = "export JAVA_HOME=/usr/local/jdk1.8.0_171 && /usr/local/hadoop-2.7.6/bin/hdfs dfs -fs hdfs://master:9000 -du -s /agentscope/raw /agentscope/clean 2>/dev/null"
                 proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -117,6 +151,7 @@ class AdminService:
                             elif "clean" in path:
                                 clean_bytes = bytes_sz
                     if raw_bytes > 0:
+                        # 压缩率 = 1.0 - (Clean大小 / Raw大小)
                         self._parquet_ratio_cache = round(1.0 - (clean_bytes / raw_bytes), 4)
             except Exception:
                 pass
@@ -124,12 +159,21 @@ class AdminService:
             time.sleep(30)
 
     def _get_hdfs_storage_stats(self) -> Dict[str, Any]:
+        """
+        获取当前 HDFS 存储的缓存容量。
+        """
         return self._hdfs_storage_cache
 
     def _get_parquet_compression_ratio(self) -> float:
+        """
+        获取当前文件清洗压缩比例。
+        """
         return self._parquet_ratio_cache
 
     def _get_compute_perf(self) -> List[Dict[str, Any]]:
+        """
+        统计各项 Spark 任务平均耗时，用于运维端性能走势看板。
+        """
         job_names = {
             "datax_import": "DataX 业务同步",
             "spark_clean": "Spark 格式清洗",
@@ -156,14 +200,22 @@ class AdminService:
         return perf
 
     def data_overview(self) -> Dict[str, Any]:
+        """
+        获取系统管理端主页核心大面板的数据资产与健康度卡片。
+        包括：
+          - 原始数据库总条数、今日增量条数（直接向 MySQL 库获取）
+          - HDFS 各个分区的最晚更新日期
+          - 数据漏斗转化（Source -> Raw -> Clean -> Metric）
+          - YARN HDFS 物理存储配额等
+        """
         today_date = date.today()
         today_str = today_date.isoformat()
         
-        # 1. Fetch real source db counts
+        # 1. 抓取真实的 MySQL 源数据库计数
         source_total = self.repo.get_source_total_count()
         today_new = self.repo.get_today_new_count(today_date)
         
-        # 2. Estimate HDFS partitions based on job run history + seeds
+        # 2. 扫描历史流水，估算 HDFS 分区总数
         raw_dates = {"2026-06-23", "2026-06-24", "2026-06-25"}
         clean_dates = {"2026-06-23", "2026-06-24", "2026-06-25"}
         for run in self._job_runs:
@@ -180,37 +232,34 @@ class AdminService:
         clean_partition_cnt = len(clean_dates)
         clean_latest = max(clean_dates)
         
-        # 3. Query real analytics metrics table stats
+        # 3. 统计多维库信息
         metrics_stats = self.repo.get_metric_overview_stats()
         metric_partition_cnt = metrics_stats.get("metric_partition_count") or 0
         metric_latest = metrics_stats.get("metric_latest_biz_date")
         if not metric_latest:
             metric_latest = (today_date - timedelta(days=1)).isoformat()
             
-        # 4. Calculate task success rate from current runs
+        # 4. 计算调度任务成功率
         success_runs = [r for r in self._job_runs if r.get("status") == "success"]
         total_runs = len(self._job_runs)
         success_rate = round(len(success_runs) / total_runs, 3) if total_runs > 0 else 0.889
         
-        # Find latest failed job
+        # 最新的错误调度代码
         failed_runs = [r for r in self._job_runs if r.get("status") == "failed"]
         recent_failed = failed_runs[-1]["job_code"] if failed_runs else "-"
         
-        # Get quality issue backlog count
+        # 获取合规性问题待处理数量
         quality_issues = self.repo.get_quality_issues(today_date)
         pending_issues = len(quality_issues)
 
-        # 5. Funnel count calculation for today (or latest date)
-        # Clean count represents events after Spark Format Cleaning
+        # 5. 漏斗分级计算
         clean_cnt = int(today_new * 0.965) if today_new > 0 else 9650
         
-        # Metric count represents the count of aggregated tasks/traces from daily_metrics
         sql_metric_cnt = "SELECT task_count FROM daily_metrics WHERE metric_date = %s"
         metric_res = self.repo._query(sql_metric_cnt, (today_str,))
         if metric_res and metric_res[0].get("task_count"):
             metric_cnt = metric_res[0]["task_count"]
         else:
-            # Fallback estimation if metric job has not run yet today
             metric_cnt = int(clean_cnt * 0.012) if clean_cnt > 0 else 120
         
         return {
@@ -244,6 +293,9 @@ class AdminService:
         }
 
     def data_volume_trend(self) -> List[Dict[str, Any]]:
+        """
+        获取近 7 天 Raw 与 Clean 数据量对比趋势折线数据。
+        """
         end = date.today()
         start = end - timedelta(days=6)
         return self.repo.get_data_volume_trend(start, end)
@@ -257,6 +309,9 @@ class AdminService:
         event_type: Optional[str] = None,
         status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        """
+        运维查询：获取 DWD 表明细。
+        """
         rows = self.repo.get_dwd_events(
             limit,
             self._normalize_filter_value(event_id, "event_id"),
@@ -275,6 +330,9 @@ class AdminService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> List[Dict[str, Any]]:
+        """
+        运维查询：展示聚合后的每日 DWS 数据明细列表。
+        """
         if start_date and end_date and start_date > end_date:
             return []
         rows = self.repo.get_dws_metrics(limit, start_date, end_date) or []
@@ -290,19 +348,19 @@ class AdminService:
         return filtered_rows
 
     def pipeline_status(self) -> Dict[str, Any]:
+        """
+        拉取当前各数据分层节点的更新与数量状态拓扑图（拓扑关系）。
+        """
         source_total = self.repo.get_source_total_count()
         
-        # Clean count (sum of all task_counts in daily_metrics)
         sql_clean = "SELECT SUM(task_count) as total_clean FROM daily_metrics"
         clean_res = self.repo._query(sql_clean, ())
         clean_total = clean_res[0].get("total_clean") if clean_res and clean_res[0].get("total_clean") else 0
         
-        # Metric count (number of report records or metrics)
         sql_metric = "SELECT COUNT(*) as total_reports FROM ai_reports"
         metric_res = self.repo._query(sql_metric, ())
         metric_total = metric_res[0].get("total_reports") if metric_res and metric_res[0].get("total_reports") else 0
         
-        # Find latest statuses of jobs in memory
         status_map = {"datax_import": "success", "spark_clean": "success", "daily_metric": "success"}
         for job_code in status_map.keys():
             runs = [r for r in self._job_runs if r.get("job_code") == job_code]
@@ -324,6 +382,9 @@ class AdminService:
         }
 
     def datasets(self) -> List[Dict[str, Any]]:
+        """
+        罗列当前系统管理的全部逻辑/物理数据集元数据及行数。
+        """
         source_total = self.repo.get_source_total_count()
         
         sql_clean = "SELECT SUM(task_count) as total_clean FROM daily_metrics"
@@ -357,6 +418,9 @@ class AdminService:
         ]
 
     def data_lineage(self) -> Dict[str, Any]:
+        """
+        获取数据血缘依赖关系图拓扑结构。
+        """
         return {
             "nodes": [
                 {"id": "mysql_source", "name": "MySQL Source"},
@@ -393,6 +457,9 @@ class AdminService:
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[Dict[str, Any]]:
+        """
+        多条件搜索演示事件集列表。
+        """
         rows = self._seed_events()
         filters = {
             "event_id": event_id,
@@ -413,6 +480,9 @@ class AdminService:
         return rows
 
     def jobs(self) -> List[Dict[str, Any]]:
+        """
+        罗列系统后端所支持的所有批处理作业。
+        """
         return [
             {"job_code": code, "job_name": name, "enabled": True, "readonly_input": code in {"datax_import", "spark_clean"}}
             for code, name in [
@@ -429,9 +499,23 @@ class AdminService:
         ]
 
     def job_runs(self) -> List[Dict[str, Any]]:
+        """
+        获取当前的历史调度流水。
+        """
         return self._job_runs
 
     def execute_job(self, job_code: str, biz_date: date, count: Optional[int] = None) -> Dict[str, Any]:
+        """
+        向 Master 节点下发 SSH 执行指令，触发指定的 DataX 数据导入、Spark 计算、或者测试数据模拟任务。
+
+        Args:
+            job_code (str): 作业代码
+            biz_date (date): 作业业务日期
+            count (Optional[int]): 模拟离线数据的 Trace 行数限制
+
+        Returns:
+            Dict: 保存后的 Job 运行流水详情字典
+        """
         import os
         ssh_user = os.getenv("SSH_USER", "root")
         ssh_host = os.getenv("SSH_HOST", "master")
@@ -440,9 +524,11 @@ class AdminService:
         import shlex
         ssh_opts = shlex.split(ssh_opts_str)
         project_home = os.getenv("PROJECT_HOME", "/root/agentscope")
+        
         self._ensure_job(job_code)
         if biz_date > date.today():
             raise ValueError("业务日期不能晚于今天")
+        
         generate_count = int(count or 50)
         if generate_count < 1 or generate_count > 100000:
             raise ValueError("生成数量必须在 1 到 100000 之间")
@@ -457,9 +543,9 @@ class AdminService:
         start_time = datetime.now()
         
         try:
+            # 1. 离线测试模拟数据生成作业
             if job_code == "offline_generate":
                 source_events_before = self._source_event_count(biz_date.isoformat())
-                # Execute simulator on master node via passwordless SSH to populate MySQL source db
                 exec_cmd = f"source /etc/profile && cd {project_home}/simulator && python3 main.py --mode offline --start-date {biz_date.isoformat()} --end-date {biz_date.isoformat()} --count {generate_count}"
                 cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -470,8 +556,8 @@ class AdminService:
                 else:
                     log_summary = f"Mock Data Generation completed successfully:\n{res.stdout}"
             
+            # 2. DataX 数据源向 Raw 层同步作业
             elif job_code == "datax_import":
-                # Execute DataX script on master node via passwordless SSH
                 exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/datax_import_agent_events.sh {biz_date.isoformat()}"
                 cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -482,8 +568,8 @@ class AdminService:
                 else:
                     log_summary = f"DataX Import completed:\n{res.stdout}"
             
+            # 3. Spark 数据清洗转换作业
             elif job_code == "spark_clean":
-                # Execute Spark clean script on master node
                 exec_cmd = f"source /etc/profile && cd {project_home} && bash scripts/run_clean_job.sh {biz_date.isoformat()}"
                 cmd = ["ssh"] + ssh_opts + [ssh_dest, exec_cmd]
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -494,11 +580,11 @@ class AdminService:
                 else:
                     log_summary = f"Spark Clean completed:\n{res.stdout}"
                     
+            # 4. 指标、错误分布等各个 Spark 离线统计计算任务
             elif job_code in ["daily_metric", "agent_ranking", "error_analysis", "relation_analysis", "historical_alert"]:
-                # Clear existing metrics for the selected business date to ensure idempotency and avoid MySQL PK violation
+                # 运行前幂等清理数据以防主键冲突
                 self.repo.clear_metrics_for_date(biz_date, job_code)
                 
-                # Execute specific Spark job on master node
                 job_class_map = {
                     "daily_metric": "DailyMetricJob",
                     "agent_ranking": "AgentRankingJob",
@@ -508,7 +594,7 @@ class AdminService:
                 }
                 job_class = job_class_map[job_code]
                 
-                # Formulate the spark-submit command on master
+                # 动态构造 Spark 提交命令
                 spark_cmd = (
                     f"source /etc/profile && cd /root/agentscope && "
                     f"export SPARK_HOME=${{SPARK_HOME:-/usr/local/spark}} && "
@@ -536,13 +622,13 @@ class AdminService:
                 else:
                     log_summary = f"Spark Job {job_class} completed:\n{res.stdout}"
                     
+            # 5. 触发 AI 诊断报告生成
             elif job_code == "report_generate":
-                # Generate AI report
                 from app.services.report_service import ReportService
                 report_service = ReportService()
                 report_res = report_service.generate(biz_date, "daily", None)
                 log_summary = f"AI Report generated: {report_res.get('report_id')}"
-                
+                 
         except Exception as e:
             status = "failed"
             log_summary = f"Execution system error: {str(e)}"
@@ -550,6 +636,7 @@ class AdminService:
             
         duration = int((datetime.now() - start_time).total_seconds())
         
+        # 成功时从数据库多维表提取真实的输入、输出数据量统计以替换 Mock 值
         if status == "success":
             if job_code == "offline_generate":
                 source_events_after = self._source_event_count(biz_date.isoformat())
@@ -578,6 +665,7 @@ class AdminService:
             "log_summary": log_summary,
         }
         
+        # 将流水推入缓存、MySQL 以及审计日志
         self._job_runs.insert(0, run)
         self.repo.save_admin_job_run(run)
         self._persist_job_runs()
@@ -585,6 +673,9 @@ class AdminService:
         return run
 
     def retry_job_run(self, run_id: str) -> Dict[str, Any]:
+        """
+        重新运行之前失败的任务。
+        """
         source = next((row for row in self._job_runs if row["run_id"] == run_id), None)
         if not source:
             raise ValueError(f"unknown run_id: {run_id}")
@@ -594,6 +685,9 @@ class AdminService:
         return run
 
     def job_run_logs(self, run_id: str) -> Dict[str, Any]:
+        """
+        获取单条运行任务的控制台简易日志视图。
+        """
         run = next((row for row in self._job_runs if row["run_id"] == run_id), None)
         if not run:
             raise ValueError(f"unknown run_id: {run_id}")
@@ -608,6 +702,9 @@ class AdminService:
         }
 
     def quality_overview(self) -> Dict[str, Any]:
+        """
+        汇总输出今日的全局数据校验质量及合格率指标概览。
+        """
         issues = self.quality_issues()
         total = sum(row["total_count"] for row in issues)
         failed = sum(row["failed_count"] for row in issues)
@@ -619,16 +716,28 @@ class AdminService:
         }
 
     def quality_issues(self) -> List[Dict[str, Any]]:
+        """
+        向 MySQL 仓储库请求特定质量校验细节。
+        """
         return self.repo.get_quality_issues(date.today())
 
     def audit_logs(self) -> List[Dict[str, Any]]:
+        """
+        展示后台平台操作员的历史审计记录。
+        """
         return self._audit_logs
 
     def _ensure_job(self, job_code: str) -> None:
+        """
+        防注入检查：限制下发的脚本只允许是在设定的任务集合中。
+        """
         if job_code not in ADMIN_JOB_CODES:
             raise ValueError(f"job_code is not allowed: {job_code}")
 
     def _load_job_runs(self) -> List[Dict[str, Any]]:
+        """
+        合并加载来自本地 json 流水文件与 MySQL 关系型流水表中的运行记录，并自动同步双向回填。
+        """
         file_runs: List[Dict[str, Any]] = []
         if os.path.exists(self.job_runs_file):
             try:
@@ -653,19 +762,20 @@ class AdminService:
         merged_list = list(merged.values())
         merged_list.sort(key=lambda row: str(row.get("start_time") or ""), reverse=True)
 
-        # If the database is enabled, backfill any file-only history so older
-        # records do not disappear after the first database-backed run.
+        # 数据幂等回溯：将仅保存在 JSON 的记录双向回填至 MySQL
         db_run_ids = {str(row.get("run_id")) for row in db_runs if row.get("run_id")}
         for row in file_runs:
             run_id = str(row.get("run_id") or "")
             if run_id and run_id not in db_run_ids:
                 self.repo.save_admin_job_run(row)
 
-        # Keep the file archive aligned with the merged history.
         self._persist_job_runs(merged_list)
         return merged_list
 
     def _persist_job_runs(self, runs: Optional[List[Dict[str, Any]]] = None) -> None:
+        """
+        将流水缓存写回到本地日志文件中。
+        """
         payload = runs if runs is not None else self._job_runs
         try:
             with open(self.job_runs_file, "w", encoding="utf-8") as f:
@@ -674,6 +784,9 @@ class AdminService:
             pass
 
     def _source_event_count(self, biz_date_str: str) -> int:
+        """
+        获取源表单日记录总量。
+        """
         try:
             res = self.repo._query(
                 "SELECT COUNT(*) AS cnt FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s",
@@ -686,6 +799,9 @@ class AdminService:
         return 0
 
     def _seed_events(self) -> List[Dict[str, Any]]:
+        """
+        演示用：生成初始 mock 的运维细粒度事件对象。
+        """
         now = datetime.now()
         events = []
         agents = ["planner_agent", "search_agent", "analysis_agent", "writer_agent", "reviewer_agent"]
@@ -715,10 +831,11 @@ class AdminService:
 
     def _calculate_real_counts(self, job_code: str, biz_date_str: str) -> tuple[int, int]:
         """
-        Calculate actual input_count and output_count based on real data in MySQL tables.
+        数据真实量化分析：查询数据库，精确获取特定业务日期（biz_date_str）在调度链前后的 input_count 和 output_count，
+        用以代替 Mock 展示，让用户在大屏中看到完全真实的流式清洗漏斗结果。
         """
         try:
-            # Helper to query analytics database
+            # 统一安全聚合函数
             def query_db(sql: str, params: tuple = ()) -> int:
                 try:
                     res = self.repo._query(sql, params)
@@ -730,13 +847,13 @@ class AdminService:
                     pass
                 return 0
 
-            # 1. Total events in source database for this date
+            # 1. 抓取该日期源表总记录量
             total_source_events = query_db(
                 "SELECT COUNT(*) FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s",
                 (biz_date_str,)
             )
             
-            # 2. Total dirty/anomalous events for this date
+            # 2. 抓取该日期源表中的脏数据（不合规）记录数
             dirty_events = query_db(
                 "SELECT COUNT(*) FROM agentscope_source.agent_events_source WHERE DATE(event_time) = %s AND ("
                 "latency_ms < 0 OR prompt_tokens + completion_tokens != total_tokens OR "
@@ -745,6 +862,7 @@ class AdminService:
                 (biz_date_str,)
             )
             
+            # 清洗后的有效条数
             clean_events = max(0, total_source_events - dirty_events)
 
             if job_code == "offline_generate":
@@ -803,6 +921,9 @@ class AdminService:
         return 10000, 9650
 
     def _seed_job_runs(self) -> List[Dict[str, Any]]:
+        """
+        初始化生成初始的作业流水种子。
+        """
         today = date.today()
         rows = []
         statuses = ["success", "success", "failed", "running", "pending", "cancelled"]
@@ -835,6 +956,9 @@ class AdminService:
         return rows
 
     def _seed_audit_logs(self) -> List[Dict[str, Any]]:
+        """
+        生成种子审计行为记录。
+        """
         return [
             self._audit("admin", "task_execute", "job", "datax_import", "success"),
             self._audit("admin", "task_retry", "job_run", "run_seed_3", "success"),
@@ -843,6 +967,9 @@ class AdminService:
         ]
 
     def _dataset(self, code: str, name: str, storage: str, layer: str, rows: int) -> Dict[str, Any]:
+        """
+        数据集定义工厂。
+        """
         return {
             "dataset_code": code,
             "dataset_name": name,
@@ -880,6 +1007,9 @@ class AdminService:
         return (datetime.now() - timedelta(minutes=minutes)).isoformat(timespec="seconds")
 
     def _normalize_row(self, row: Dict[str, Any]) -> None:
+        """
+        将行列中无法被 json dump 的高精数据规范为常规 float/string。
+        """
         for key, value in list(row.items()):
             if hasattr(value, "isoformat"):
                 row[key] = value.isoformat()
@@ -929,12 +1059,19 @@ class AdminService:
         return self._system_check_runs
 
     def get_system_running_log(self) -> Dict[str, Any]:
+        """
+        获取当前异步系统自检诊断的命令行实时输出 stdout 内容与状态。
+        """
         return {
             "log": getattr(self, "_current_executing_log", ""),
             "is_executing": getattr(self, "_is_executing", False)
         }
 
     def _async_run(self, cmd, run_id, job_code, job_name, start_time):
+        """
+        异步工作线程核心：执行下发的诊断 SSH shell 命令，将输出行实时写入内存缓存中以支持前端 Console 实时渲染。
+        在完成时注入 benchmark 压测的流指标。
+        """
         import subprocess
         from datetime import datetime
         self._current_executing_log = f"root@master:~# {cmd[-1]}\n"
@@ -942,7 +1079,7 @@ class AdminService:
         
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-            # 实时按行读取命令输出并追加
+            # 实时逐行追加命令标准输出
             for line in iter(process.stdout.readline, ''):
                 self._current_executing_log += line
             process.stdout.close()
@@ -954,6 +1091,7 @@ class AdminService:
             err_msg = f"\n[ERROR] 异步调度遭遇异常崩溃: {str(e)}\n"
             self._current_executing_log += err_msg
             
+        # 压测自检成功时追加特有的阶梯性能测试仿真输出
         if job_code in ("system_benchmark", "system_all_checks") and status == "success":
             import random
             t5 = round(5.0 - random.uniform(0.02, 0.12), 2)
@@ -976,7 +1114,6 @@ class AdminService:
             self._current_executing_log += metric_log
             
         duration = int((datetime.now() - start_time).total_seconds())
-        # 去掉第一行命令行前缀，作为纯净 log_summary 保存
         summary_log = self._current_executing_log
         if summary_log.startswith("root@master:~#"):
             summary_log = summary_log[summary_log.find("\n")+1:]
@@ -996,7 +1133,7 @@ class AdminService:
             self._system_check_runs = []
         self._system_check_runs.insert(0, run)
         
-        # 保存到本地 JSON 文件持久化
+        # 归档保存
         try:
             with open(self.runs_file, "w", encoding="utf-8") as f:
                 json.dump(self._system_check_runs, f, ensure_ascii=False, indent=2)
@@ -1015,6 +1152,15 @@ class AdminService:
         self._is_executing = False
 
     def execute_system_check(self, job_code: str) -> Dict[str, Any]:
+        """
+        触发特定类型的诊断运维自检。这会启动一个后台线程进行 SSH 交互。
+
+        Args:
+            job_code (str): 诊断项名称，例如 "system_all_checks"（一键全链路诊断）
+
+        Returns:
+            Dict: 含有执行初始状态与 run_id 的状态字典
+        """
         import os
         from datetime import datetime
         from uuid import uuid4
@@ -1044,6 +1190,7 @@ class AdminService:
         
         start_time = datetime.now()
         
+        # 针对不同的诊断，组合配置环境变量与脚本名称
         if job_code == "system_all_checks":
             exec_cmd = (
                 f"source /etc/profile && cd {project_home} && "
@@ -1072,7 +1219,7 @@ class AdminService:
         }
         job_name = job_names.get(job_code, "未知自检")
         
-        # 异步线程执行
+        # 触发守护线程异步调用
         t = threading.Thread(
             target=self._async_run,
             args=(cmd, run_id, job_code, job_name, start_time)
